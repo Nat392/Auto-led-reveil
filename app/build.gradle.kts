@@ -16,6 +16,7 @@ fun String.escapeForBuildConfig(): String =
     replace("\\", "\\\\").replace("\"", "\\\"")
 
 val discordWebhookUrl = localProperties.getProperty("DISCORD_WEBHOOK_URL", "").trim().trim('"')
+val zenggeBulbMac = localProperties.getProperty("ZENGGE_BULB_MAC", "").trim().trim('"')
 
 android {
     namespace = "com.example.alarmwatcher"
@@ -36,6 +37,11 @@ android {
             "String",
             "DISCORD_WEBHOOK_URL",
             "\"${discordWebhookUrl.escapeForBuildConfig()}\""
+        )
+        buildConfigField(
+            "String",
+            "ZENGGE_BULB_MAC",
+            "\"${zenggeBulbMac.escapeForBuildConfig()}\""
         )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

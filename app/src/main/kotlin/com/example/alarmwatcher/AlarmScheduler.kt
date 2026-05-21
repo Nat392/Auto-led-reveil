@@ -22,13 +22,38 @@ object AlarmScheduler {
         val pi = PendingIntent.getBroadcast(context, REQ_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !am.canScheduleExactAlarms()) {
+            val canScheduleExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) am.canScheduleExactAlarms() else true
+            if (!canScheduleExact) {
                 Log.w(TAG, "App cannot schedule exact alarms: request user permission")
             }
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMs, pi)
             Log.i(TAG, "Scheduled pre-warn at $whenMs for alarm $originalAlarmMs")
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "AlarmScheduler.schedulePreWarn",
+                details = buildString {
+                    appendLine("AlarmScheduler.schedulePreWarn()")
+                    appendLine("canScheduleExactAlarms=$canScheduleExact")
+                    appendLine("requestedAt=$whenMs")
+                    appendLine("originalAlarmMs=$originalAlarmMs")
+                    appendLine("delayMs=${whenMs - System.currentTimeMillis()}")
+                    appendLine("sdk=${Build.VERSION.SDK_INT}")
+                }
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule exact alarm: ${e.message}")
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "AlarmScheduler.schedulePreWarn",
+                details = buildString {
+                    appendLine("AlarmScheduler.schedulePreWarn() failed")
+                    appendLine("requestedAt=$whenMs")
+                    appendLine("originalAlarmMs=$originalAlarmMs")
+                    appendLine("error=${e::class.java.name}")
+                    appendLine("message=${e.message}")
+                    appendLine("sdk=${Build.VERSION.SDK_INT}")
+                }
+            )
         }
     }
 
@@ -40,6 +65,11 @@ object AlarmScheduler {
             am.cancel(pi)
             pi.cancel()
             Log.i(TAG, "Cancelled pre-warn")
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "AlarmScheduler.cancelPreWarn",
+                details = "Cancelled pending pre-warn alarm"
+            )
         }
     }
 }

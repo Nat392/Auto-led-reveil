@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.READ_ALARMS" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
 
     <queries>
         <!-- allow starting the target app by package name -->
@@ -41,7 +42,7 @@
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
-        <receiver android:name=".AlarmTriggerReceiver" />
+        <receiver android:name=".AlarmTriggerReceiver" android:exported="true" />
         
         <!-- Accessibility automation service used to interact with the target app UI -->
         <service
