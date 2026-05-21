@@ -20,7 +20,6 @@ class MainActivity : AppCompatActivity() {
         if (am != null && !am.canScheduleExactAlarms()) {
             // open system UI to grant SCHEDULE_EXACT_ALARM to this app
             val intent = Intent(android.provider.Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
-            intent.putExtra(android.provider.Settings.EXTRA_PACKAGE_NAME, packageName)
             requestScheduleExact.launch(intent)
         }
 

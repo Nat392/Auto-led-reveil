@@ -3,6 +3,7 @@ package com.example.alarmwatcher
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.view.accessibility.AccessibilityEvent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -42,7 +43,7 @@ class AutomationService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         val info = AccessibilityServiceInfo().apply {
-            eventTypes = AccessibilityNodeInfo.ACTION_CLICK
+            eventTypes = AccessibilityEvent.TYPES_ALL_MASK
             feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
             notificationTimeout = 100
             flags = AccessibilityServiceInfo.DEFAULT
@@ -55,6 +56,10 @@ class AutomationService : AccessibilityService() {
 
     override fun onInterrupt() {
         automationJob?.cancel()
+    }
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // No-op: this service is driven by broadcasts and direct UI inspection.
     }
 
     override fun onDestroy() {
@@ -159,7 +164,11 @@ class AutomationService : AccessibilityService() {
         queue.add(root)
         while (queue.isNotEmpty()) {
             val n = queue.removeFirst()
-            val text = (n.text ?: "") + " " + (n.contentDescription ?: "")
+            val text = buildString {
+                append(n.text ?: "")
+                append(' ')
+                append(n.contentDescription ?: "")
+            }
             val low = text.toString().lowercase()
             for (k in keywords) if (low.contains(k)) {
                 out.add(n)
@@ -201,9 +210,9 @@ class AutomationService : AccessibilityService() {
         val nodes = ArrayList<AccessibilityNodeInfo>()
         collectNodesWithTextOrDesc(root, nodes, listOf("brightness", "luminosité", "slider"))
         for (n in nodes) {
-            if (n.supportsAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id)) {
+            if (n.actionList.any { it.id == AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id }) {
                 val args = android.os.Bundle()
-                args.putFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE.toString(), percent / 100f)
+                args.putFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, percent / 100f)
                 n.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id, args)
                 n.recycle()
                 return
