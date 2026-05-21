@@ -69,36 +69,45 @@ class AutomationService : AccessibilityService() {
 
     private fun startAutomation(durationMs: Long, r: Int, g: Int, b: Int, room: String, fallbackRoom: String) {
         automationJob?.cancel()
-        automationJob = CoroutineScope(Dispatchers.Main).launch {
-            // 1) Press Back to ensure we're at room list
-            performGlobalAction(GLOBAL_ACTION_BACK)
-            delay(1000)
-
-            // 2) Click fallback room (e.g., "Bureau") to ensure list visible
-            if (!clickByText(fallbackRoom)) {
-                Log.w(TAG, "Could not find fallback room: $fallbackRoom")
-            }
-            delay(1200)
-
-            // 3) Click target room ("Chambre")
-            if (!clickByText(room)) {
-                Log.w(TAG, "Could not find room: $room")
-            }
-            // Take a screenshot after opening the target app / navigating to room
+        automationJob = CoroutineScope(Dispatchers.Main + SupervisorJob()).launch {
             try {
-                performScreenshotAttempt()
-            } catch (e: Exception) {
-                Log.w(TAG, "Screenshot attempt failed: ${e.message}")
+                // 1) Press Back to ensure we're at room list
+                performGlobalAction(GLOBAL_ACTION_BACK)
+                delay(1000)
+
+                // 2) Click fallback room (e.g., "Bureau") to ensure list visible
+                if (!clickByText(fallbackRoom)) {
+                    Log.w(TAG, "Could not find fallback room: $fallbackRoom")
+                }
+                delay(1200)
+
+                // 3) Click target room ("Chambre")
+                if (!clickByText(room)) {
+                    Log.w(TAG, "Could not find room: $room")
+                }
+                // Take a screenshot after opening the target app / navigating to room
+                try {
+                    performScreenshotAttempt()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Screenshot attempt failed: ${e.message}")
+                }
+                delay(1500)
+
+                // 4) Select color on the color wheel (approximate tap)
+                // We attempt to find a view that looks like a color wheel; if not, we tap center area
+                selectColorOnWheel(r, g, b)
+                delay(800)
+
+                // 5) Gradually increase brightness over durationMs until reaching 100%
+                performBrightnessRamp(durationMs)
+            } catch (e: Throwable) {
+                DiscordCrashReporter.reportNonFatal(
+                    context = applicationContext,
+                    throwable = e,
+                    source = "AutomationService.startAutomation"
+                )
+                Log.e(TAG, "Automation failed", e)
             }
-            delay(1500)
-
-            // 4) Select color on the color wheel (approximate tap)
-            // We attempt to find a view that looks like a color wheel; if not, we tap center area
-            selectColorOnWheel(r, g, b)
-            delay(800)
-
-            // 5) Gradually increase brightness over durationMs until reaching 100%
-            performBrightnessRamp(durationMs)
         }
     }
 

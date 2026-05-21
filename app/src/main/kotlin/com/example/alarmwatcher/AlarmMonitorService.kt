@@ -65,6 +65,13 @@ class AlarmMonitorService : Service() {
             }
         } catch (e: SecurityException) {
             Log.w(TAG, "Missing permission to read alarms: ${e.message}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Unexpected alarm scan failure", e)
+            DiscordCrashReporter.reportNonFatal(
+                context = this,
+                throwable = e,
+                source = "AlarmMonitorService.scanNextAlarmAndSchedule"
+            )
         }
     }
 
