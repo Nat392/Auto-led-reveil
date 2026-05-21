@@ -108,26 +108,22 @@ class AutomationService : AccessibilityService() {
         for (n in nodes) {
             if (n.isClickable) {
                 n.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                n.recycle()
                 return true
             } else {
                 var parent = n.parent
                 while (parent != null) {
                     if (parent.isClickable) {
                         parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                        parent.recycle()
-                        n.recycle()
                         return true
                     }
                     parent = parent.parent
                 }
-                n.recycle()
             }
         }
         return false
     }
 
-    private fun selectColorOnWheel(r: Int, g: Int, b: Int) {
+    private fun selectColorOnWheel(_r: Int, _g: Int, _b: Int) {
         // Convert target color to an angle on wheel (simple heuristic)
         // For simplicity map color temperature to angle; this is highly device/app dependent
         val angle = 0.0 // placeholder angle; tuning required per app
@@ -147,7 +143,6 @@ class AutomationService : AccessibilityService() {
             val x = (cx + radius * Math.cos(angle)).toFloat()
             val y = (cy + radius * Math.sin(angle)).toFloat()
             tapped = dispatchTap(x, y)
-            n.recycle()
         }
 
         if (!tapped) {
@@ -214,7 +209,6 @@ class AutomationService : AccessibilityService() {
                 val args = android.os.Bundle()
                 args.putFloat(AccessibilityNodeInfo.ACTION_ARGUMENT_PROGRESS_VALUE, percent / 100f)
                 n.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_SET_PROGRESS.id, args)
-                n.recycle()
                 return
             }
             // fallback: try tapping at proportional x inside node bounds
@@ -223,7 +217,6 @@ class AutomationService : AccessibilityService() {
             val x = bounds.left + (bounds.width() * percent / 100f)
             val y = bounds.centerY().toFloat()
             dispatchTap(x, y)
-            n.recycle()
             return
         }
     }
