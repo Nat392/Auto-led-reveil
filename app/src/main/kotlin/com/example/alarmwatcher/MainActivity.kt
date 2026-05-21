@@ -23,9 +23,8 @@ class MainActivity : AppCompatActivity() {
             requestScheduleExact.launch(intent)
         }
 
-        // Start the foreground monitoring service
-        val svc = Intent(this, AlarmMonitorService::class.java)
-        startForegroundService(svc)
+        // Rescan and schedule the next pre-warn directly.
+        AlarmMonitor.scanNextAlarmAndSchedule(this)
 
         finish() // no UI needed
     }

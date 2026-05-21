@@ -24,7 +24,7 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
 
         // Broadcast an automation request to the AccessibilityService to perform UI actions
         val now = System.currentTimeMillis()
-        val durationMs = if (originalAlarmMs > now) (originalAlarmMs - now) else AlarmMonitorService.PREWARN_MS
+        val durationMs = if (originalAlarmMs > now) (originalAlarmMs - now) else AlarmScheduler.PREWARN_MS
         val auto = Intent("com.example.alarmwatcher.ACTION_RUN_AUTOMATION").apply {
             putExtra("duration_ms", durationMs)
             putExtra("target_r", 255)

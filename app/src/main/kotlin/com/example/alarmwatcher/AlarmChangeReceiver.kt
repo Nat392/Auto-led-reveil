@@ -11,7 +11,6 @@ import android.util.Log
 class AlarmChangeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d("AlarmChangeReceiver", "Received ${intent.action}")
-        val svc = Intent(context, AlarmMonitorService::class.java)
-        context.startForegroundService(svc)
+        AlarmMonitor.scanNextAlarmAndSchedule(context)
     }
 }

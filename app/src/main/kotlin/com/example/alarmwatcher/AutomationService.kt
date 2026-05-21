@@ -28,7 +28,7 @@ class AutomationService : AccessibilityService() {
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == "com.example.alarmwatcher.ACTION_RUN_AUTOMATION") {
-                val duration = intent.getLongExtra("duration_ms", AlarmMonitorService.PREWARN_MS)
+                val duration = intent.getLongExtra("duration_ms", AlarmScheduler.PREWARN_MS)
                 val r = intent.getIntExtra("target_r", 255)
                 val g = intent.getIntExtra("target_g", 230)
                 val b = intent.getIntExtra("target_b", 210)

@@ -12,7 +12,7 @@ Cette application surveille l'alarme système et lance une automatisation 30 min
 Test rapide:
 
 1. Créer une alarme réveil dans l'application Horloge, 31 minutes dans le futur.
-2. Vérifier que le service démarre et que le `AlarmTriggerReceiver` reçoit le pré-avertissement 30 minutes avant l'alarme.
+2. Vérifier que l'application rescanne l'alarme système au lancement, au boot et lors des changements d'heure/alarme, puis que le `AlarmTriggerReceiver` reçoit le pré-avertissement 30 minutes avant l'alarme.
 3. Si l'accessibilité est activée, l'application tentera d'ouvrir `com.zengge.blev2` et d'effectuer les actions: retour, sélectionner la pièce, choisir la couleur, puis augmenter progressivement la luminosité.
 
 Notes techniques:
