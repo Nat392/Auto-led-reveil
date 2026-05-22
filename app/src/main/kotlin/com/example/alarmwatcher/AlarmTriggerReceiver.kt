@@ -8,6 +8,15 @@ import android.util.Log
 class AlarmTriggerReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.i("AlarmTriggerReceiver", "onReceive entry action=${intent.action}")
+        DiscordCrashReporter.reportDebugBlocking(
+            context = context,
+            source = "AlarmTriggerReceiver.onReceive.entry",
+            details = buildString {
+                appendLine("AlarmTriggerReceiver.onReceive() entry")
+                appendLine("action=${intent.action}")
+                appendLine("now=${System.currentTimeMillis()}")
+            }
+        )
         handleAlarm(context, intent)
     }
 
@@ -29,6 +38,16 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
         val bulbMac = BuildConfig.ZENGGE_BULB_MAC.trim()
         try {
             if (bulbMac.isNotBlank()) {
+                DiscordCrashReporter.reportDebugBlocking(
+                    context = context,
+                    source = "AlarmTriggerReceiver.handleAlarm.startService",
+                    details = buildString {
+                        appendLine("Starting SunriseService")
+                        appendLine("action=$action")
+                        appendLine("originalAlarmMs=$originalAlarmMs")
+                        appendLine("bulbMac=$bulbMac")
+                    }
+                )
                 val serviceIntent = Intent(context, SunriseService::class.java).apply {
                     setAction(SunriseService.ACTION_START_SUNRISE)
                     putExtra(SunriseService.EXTRA_BULB_MAC, bulbMac)
@@ -45,13 +64,43 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
                 } else {
                     context.startService(serviceIntent)
                 }
+                DiscordCrashReporter.reportDebugBlocking(
+                    context = context,
+                    source = "AlarmTriggerReceiver.handleAlarm.serviceStarted",
+                    details = buildString {
+                        appendLine("SunriseService start requested")
+                        appendLine("bulbMac=$bulbMac")
+                        appendLine("originalAlarmMs=$originalAlarmMs")
+                    }
+                )
                 return
             }
         } catch (e: Exception) {
             Log.w("AlarmTriggerReceiver", "Direct BLE control failed: ${e.message}")
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "AlarmTriggerReceiver.handleAlarm.exception",
+                details = buildString {
+                    appendLine("Direct BLE control failed")
+                    appendLine("action=$action")
+                    appendLine("originalAlarmMs=$originalAlarmMs")
+                    appendLine("error=${e::class.java.name}")
+                    appendLine("message=${e.message}")
+                }
+            )
         }
 
         // Always show fallback notification in case automation is not enabled or fails
+        DiscordCrashReporter.reportDebugBlocking(
+            context = context,
+            source = "AlarmTriggerReceiver.handleAlarm.fallback",
+            details = buildString {
+                appendLine("Falling back to notification")
+                appendLine("action=$action")
+                appendLine("originalAlarmMs=$originalAlarmMs")
+                appendLine("bulbMacBlank=${bulbMac.isBlank()}")
+            }
+        )
         NotificationHelper.showFallbackNotification(context)
     }
 }

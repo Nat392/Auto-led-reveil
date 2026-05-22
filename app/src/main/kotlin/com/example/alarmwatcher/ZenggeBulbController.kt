@@ -18,12 +18,14 @@ object ZenggeBulbController {
     private const val TAG = "ZenggeBulbController"
     private const val CONNECT_TIMEOUT_MS = 12_000L
     private const val OP_TIMEOUT_MS = 5_000L
-    private const val POWER_ON_SETTLE_MS = 500L
-    private const val NO_RESPONSE_SETTLE_MS = 200L
+    private const val POWER_ON_SETTLE_MS = 800L
+    private const val NO_RESPONSE_SETTLE_MS = 300L
     private const val GAMMA_EXP = 0.5 // sqrt mapping for perceptual ramp
 
     private val UUID_RGBW_NEW: UUID = UUID.fromString("0000ff01-0000-1000-8000-00805f9b34fb")
     private val UUID_RGBW_LEGACY: UUID = UUID.fromString("0000ffe9-0000-1000-8000-00805f9b34fb")
+    private val UUID_RGBW_ALT: UUID = UUID.fromString("0000ff22-0000-1000-8000-00805f9b34fb")
+    private val UUID_STATUS_CHAR: UUID = UUID.fromString("0000ff02-0000-1000-8000-00805f9b34fb")
     fun applyScene(
         context: Context,
         macAddress: String,
@@ -35,17 +37,32 @@ object ZenggeBulbController {
     ): Boolean {
         val adapter = getBluetoothAdapter(context) ?: run {
             Log.w(TAG, "Bluetooth adapter unavailable")
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "ZenggeBulbController.applyScene.adapterMissing",
+                details = "Bluetooth adapter unavailable"
+            )
             return false
         }
 
         val normalizedMac = macAddress.trim()
         if (normalizedMac.isBlank()) {
             Log.w(TAG, "No bulb MAC configured")
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "ZenggeBulbController.applyScene.macMissing",
+                details = "No bulb MAC configured"
+            )
             return false
         }
 
         val device = runCatching { adapter.getRemoteDevice(normalizedMac) }.getOrNull() ?: run {
             Log.w(TAG, "Invalid bulb MAC: $normalizedMac")
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "ZenggeBulbController.applyScene.macInvalid",
+                details = "Invalid bulb MAC: $normalizedMac"
+            )
             return false
         }
 
@@ -65,6 +82,16 @@ object ZenggeBulbController {
         }
 
         Log.d(TAG, "applyScene start mac=$normalizedMac requested r=$red g=$green b=$blue w=$white brightness=$brightnessPercent")
+        DiscordCrashReporter.reportDebugBlocking(
+            context = context,
+            source = "ZenggeBulbController.applyScene.entry",
+            details = buildString {
+                appendLine("applyScene entry")
+                appendLine("mac=$normalizedMac")
+                appendLine("requestedR=$red requestedG=$green requestedB=$blue requestedW=$white")
+                appendLine("brightnessPercent=$brightnessPercent")
+            }
+        )
         return try {
             if (!discoverServices(gatt, callback, context)) {
                 Log.w(TAG, "Service discovery failed")
@@ -80,12 +107,28 @@ object ZenggeBulbController {
             }
 
             Log.d(TAG, "Stabilisation de la puce BLE...")
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "ZenggeBulbController.applyScene.beforeSettle",
+                details = buildString {
+                    appendLine("Waiting for BLE settle")
+                    appendLine("mac=$normalizedMac")
+                }
+            )
             settleForBulb(1000L)
 
             val scaled = scaleScene(red, green, blue, white, brightnessPercent)
-            val testScene = Scene(red = 255, green = 255, blue = 0, white = 0)
             Log.d(TAG, "Scaled scene values r=${scaled.red} g=${scaled.green} b=${scaled.blue} w=${scaled.white}")
-            Log.d(TAG, "Temporary test scene forced r=${testScene.red} g=${testScene.green} b=${testScene.blue} w=${testScene.white}")
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "ZenggeBulbController.applyScene.scaled",
+                details = buildString {
+                    appendLine("Scaled scene")
+                    appendLine("mac=$normalizedMac")
+                    appendLine("scaledR=${scaled.red} scaledG=${scaled.green} scaledB=${scaled.blue} scaledW=${scaled.white}")
+                    appendLine("brightnessPercent=$brightnessPercent")
+                }
+            )
             Log.d(TAG, "Powering on bulb and applying scene")
             val success = powerOn(gatt, callback, context) &&
                 settleForBulb(POWER_ON_SETTLE_MS) &&
@@ -94,10 +137,10 @@ object ZenggeBulbController {
                 writeRgbPacket(
                     gatt,
                     callback,
-                    testScene.red,
-                    testScene.green,
-                    testScene.blue,
-                    testScene.white,
+                    scaled.red,
+                    scaled.green,
+                    scaled.blue,
+                    scaled.white,
                     macAddress = normalizedMac,
                     context = context
                 )
@@ -167,13 +210,32 @@ object ZenggeBulbController {
         context: Context,
         callback: SessionCallback
     ): BluetoothGatt? {
+        DiscordCrashReporter.reportDebugBlocking(
+            context = context,
+            source = "ZenggeBulbController.connect.entry",
+            details = buildString {
+                appendLine("connect entry")
+                appendLine("mac=${device.address}")
+                appendLine("sdk=${Build.VERSION.SDK_INT}")
+            }
+        )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             try {
                 if (context.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                     Log.w(TAG, "Missing BLUETOOTH_CONNECT permission")
+                    DiscordCrashReporter.reportDebugBlocking(
+                        context = context,
+                        source = "ZenggeBulbController.connect.permissionDenied",
+                        details = "Missing BLUETOOTH_CONNECT permission"
+                    )
                     return null
                 }
             } catch (_: Exception) {
+                DiscordCrashReporter.reportDebugBlocking(
+                    context = context,
+                    source = "ZenggeBulbController.connect.permissionCheckException",
+                    details = "Permission check threw exception"
+                )
                 return null
             }
         }
@@ -187,16 +249,42 @@ object ZenggeBulbController {
 
         if (gatt == null) {
             Log.w(TAG, "connectGatt returned null")
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "ZenggeBulbController.connect.gattNull",
+                details = buildString {
+                    appendLine("connectGatt returned null")
+                    appendLine("mac=${device.address}")
+                }
+            )
             return null
         }
 
         if (!callback.connectionLatch.await(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
             Log.w(TAG, "Timed out connecting to bulb")
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "ZenggeBulbController.connect.timeout",
+                details = buildString {
+                    appendLine("Timed out connecting to bulb")
+                    appendLine("mac=${device.address}")
+                }
+            )
             return null
         }
 
         if (callback.connectionState != BluetoothProfile.STATE_CONNECTED) {
             Log.w(TAG, "Bulb connection failed status=${callback.connectionStatus} state=${callback.connectionState}")
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "ZenggeBulbController.connect.failed",
+                details = buildString {
+                    appendLine("Connection failed")
+                    appendLine("mac=${device.address}")
+                    appendLine("status=${callback.connectionStatus}")
+                    appendLine("state=${callback.connectionState}")
+                }
+            )
             return null
         }
 
@@ -217,12 +305,30 @@ object ZenggeBulbController {
     private fun discoverServices(gatt: BluetoothGatt, callback: SessionCallback, context: Context): Boolean {
         callback.resetServicesLatch()
         if (!gatt.discoverServices()) {
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "ZenggeBulbController.discoverServices.startFailed",
+                details = "discoverServices() returned false"
+            )
             return false
         }
         if (!callback.servicesLatch.await(OP_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "ZenggeBulbController.discoverServices.timeout",
+                details = "Timed out waiting for services discovery"
+            )
             return false
         }
         if (callback.servicesStatus != BluetoothGatt.GATT_SUCCESS) {
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "ZenggeBulbController.discoverServices.failed",
+                details = buildString {
+                    appendLine("Service discovery failed")
+                    appendLine("status=${callback.servicesStatus}")
+                }
+            )
             return false
         }
 
@@ -267,8 +373,8 @@ object ZenggeBulbController {
     ): Boolean {
         val characteristic = gatt.findCharacteristic() ?: return false
         return when {
-            powerOff -> writeCharacteristic(gatt, callback, characteristic, byteArrayOf(0x71.toByte(), 0x24, 0x0F, 0xA4.toByte()), context)
-            powerOn -> writeCharacteristic(gatt, callback, characteristic, byteArrayOf(0x71.toByte(), 0x23, 0x0F, 0xA3.toByte()), context)
+            powerOff -> writeCharacteristic(gatt, callback, characteristic, buildPowerPacket(false), context)
+            powerOn -> writeCharacteristic(gatt, callback, characteristic, buildPowerPacket(true), context)
             else -> tryVendorPayloads(gatt, callback, characteristic, red, green, blue, white, macAddress, context)
         }
     }
@@ -284,20 +390,26 @@ object ZenggeBulbController {
         macAddress: String = "",
         context: Context? = null
     ): Boolean {
-        val payload = buildVendorScenePacket(255, 0, 0, 0)
-        Log.d(TAG, "Writing vendor payload: ${payload.toHexString()}")
-        return writeCharacteristic(gatt, callback, characteristic, payload, context)
+        return tryAllSceneWrites(gatt, callback, characteristic, red, green, blue, white, macAddress, context)
     }
 
     private fun ByteArray.toHexString(): String = joinToString(" ") { "%02X".format(it) }
 
-    private fun buildVendorScenePacket(
+    private fun buildPowerPacket(powerOn: Boolean): ByteArray {
+        return if (powerOn) {
+            byteArrayOf(0x71, 0x23, 0x0F, 0xA3.toByte())
+        } else {
+            byteArrayOf(0x71, 0x24, 0x0F, 0xA4.toByte())
+        }
+    }
+
+    private fun buildScenePacket(
         red: Int,
         green: Int,
         blue: Int,
         white: Int
     ): ByteArray {
-        val tmpl = byteArrayOf(
+        val template = byteArrayOf(
             0x31,
             red.coerceIn(0, 255).toByte(),
             green.coerceIn(0, 255).toByte(),
@@ -305,8 +417,105 @@ object ZenggeBulbController {
             white.coerceIn(0, 255).toByte(),
             0x0F
         )
-        val checksum = (tmpl.sumOf { it.toInt() and 0xFF } and 0xFF).toByte()
-        return tmpl + checksum
+        val checksum = (template.sumOf { it.toInt() and 0xFF } and 0xFF).toByte()
+        return template + checksum
+    }
+
+    private fun buildVendorScenePacket(
+        red: Int,
+        green: Int,
+        blue: Int,
+        white: Int
+    ): ByteArray {
+        return byteArrayOf(
+            0x56,
+            red.coerceIn(0, 255).toByte(),
+            green.coerceIn(0, 255).toByte(),
+            blue.coerceIn(0, 255).toByte(),
+            white.coerceIn(0, 255).toByte(),
+            0xF0.toByte(),
+            0xAA.toByte()
+        )
+    }
+
+    private fun buildAltScenePacketA(red: Int, green: Int, blue: Int, white: Int): ByteArray {
+        // Alternate frame starting with 0x41 (observed in some bulbs)
+        val tpl = byteArrayOf(
+            0x41,
+            red.coerceIn(0, 255).toByte(),
+            green.coerceIn(0, 255).toByte(),
+            blue.coerceIn(0, 255).toByte(),
+            white.coerceIn(0, 255).toByte()
+        )
+        val checksum = (tpl.sumOf { it.toInt() and 0xFF } and 0xFF).toByte()
+        return tpl + checksum
+    }
+
+    private fun buildAltScenePacketB(red: Int, green: Int, blue: Int, white: Int): ByteArray {
+        // Variant: same as 0x31 but reversed RGB order occasionally used
+        val tpl = byteArrayOf(
+            0x31,
+            blue.coerceIn(0, 255).toByte(),
+            green.coerceIn(0, 255).toByte(),
+            red.coerceIn(0, 255).toByte(),
+            white.coerceIn(0, 255).toByte(),
+            0x0F
+        )
+        val checksum = (tpl.sumOf { it.toInt() and 0xFF } and 0xFF).toByte()
+        return tpl + checksum
+    }
+
+    fun diagnosticApplyScene(
+        context: Context,
+        macAddress: String,
+        red: Int,
+        green: Int,
+        blue: Int,
+        white: Int
+    ): String {
+        val results = mutableListOf<String>()
+        try {
+            val adapter = getBluetoothAdapter(context) ?: run {
+                return "{\"error\":\"adapter_unavailable\"}"
+            }
+            val device = adapter.getRemoteDevice(macAddress.trim())
+            val callback = SessionCallback()
+            val gatt = connect(device, context, callback) ?: return "{\"error\":\"connect_failed\"}"
+            if (!discoverServices(gatt, callback, context)) {
+                return "{\"error\":\"discover_failed\"}"
+            }
+            val characteristic = gatt.findCharacteristic() ?: return "{\"error\":\"char_not_found\"}"
+
+            fun runAttempt(name: String, payload: ByteArray, forceType: Int? = null) {
+                val ok = writeCharacteristic(gatt, callback, characteristic, payload, context, forceType)
+                results.add("$name:${payload.toHexString()}:$ok:status=${callback.lastWriteStatus}")
+            }
+
+            // baseline
+            runAttempt("scene_31", buildScenePacket(red, green, blue, white))
+            // power on then scene
+            runAttempt("power71", buildPowerPacket(true))
+            Thread.sleep(700)
+            runAttempt("scene_after_71", buildScenePacket(red, green, blue, white))
+            // alt packets
+            runAttempt("scene_41", buildAltScenePacketA(red, green, blue, white))
+            runAttempt("scene_31_rev", buildAltScenePacketB(red, green, blue, white))
+            // legacy
+            runAttempt("legacy_56", buildVendorScenePacket(red, green, blue, white))
+
+            // try ff22 as NO_RESPONSE if present
+            val altChar = gatt.services.flatMap { it.characteristics }.firstOrNull { it.uuid == UUID_RGBW_ALT }
+            if (altChar != null) {
+                val ok = writeCharacteristic(gatt, callback, altChar, buildScenePacket(red, green, blue, white), context, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
+                results.add("alt_ff22_noresp:${ok}:status=${callback.lastWriteStatus}")
+            }
+
+            gatt.disconnect()
+            gatt.close()
+        } catch (e: Exception) {
+            return "{\"error\":\"${e.message}\"}"
+        }
+        return "{\"results\": [\"${results.joinToString("\",\"")}\"] }"
     }
 
     private fun writeCharacteristic(
@@ -314,12 +523,14 @@ object ZenggeBulbController {
         callback: SessionCallback,
         characteristic: BluetoothGattCharacteristic,
         payload: ByteArray,
-        context: Context? = null
+        context: Context? = null,
+        forceWriteType: Int? = null
     ): Boolean {
         val props = characteristic.properties
         val supportsWrite = (props and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0
         val supportsWriteNoResponse = (props and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0
         val preferredWriteType = when {
+            forceWriteType != null -> forceWriteType
             supportsWrite -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
             supportsWriteNoResponse -> BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
             else -> null
@@ -330,9 +541,36 @@ object ZenggeBulbController {
             TAG,
             "writeCharacteristic uuid=${characteristic.uuid} props=$props supportsWrite=$supportsWrite supportsWriteNR=$supportsWriteNoResponse preferredWriteType=$preferredWriteType payload=${payload.toHexString()}"
         )
+        context?.let {
+            DiscordCrashReporter.reportDebugBlocking(
+                context = it,
+                source = "ZenggeBulbController.writeCharacteristic.entry",
+                details = buildString {
+                    appendLine("writeCharacteristic entry")
+                    appendLine("uuid=${characteristic.uuid}")
+                    appendLine("props=$props")
+                    appendLine("supportsWrite=$supportsWrite")
+                    appendLine("supportsWriteNR=$supportsWriteNoResponse")
+                    appendLine("preferredWriteType=$preferredWriteType")
+                    appendLine("payload=${payload.toHexString()}")
+                }
+            )
+        }
 
         if (preferredWriteType == null) {
             Log.w(TAG, "Characteristic ${characteristic.uuid} does not advertise write support")
+            context?.let {
+                DiscordCrashReporter.reportDebugBlocking(
+                    context = it,
+                    source = "ZenggeBulbController.writeCharacteristic.unsupported",
+                    details = buildString {
+                        appendLine("Characteristic does not advertise write support")
+                        appendLine("uuid=${characteristic.uuid}")
+                        appendLine("props=$props")
+                        appendLine("payload=${payload.toHexString()}")
+                    }
+                )
+            }
             callback.lastWriteStatus = BluetoothGatt.GATT_FAILURE
             return false
         }
@@ -376,7 +614,7 @@ object ZenggeBulbController {
                 return false
             }
             val result = if (preferredWriteType == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) {
-                Thread.sleep(300)
+                Thread.sleep(500)
                 true
             } else {
                 callback.writeLatch.await(OP_TIMEOUT_MS, TimeUnit.MILLISECONDS) &&
@@ -401,7 +639,7 @@ object ZenggeBulbController {
                     return false
                 }
                 val result = if (legacyWriteType == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) {
-                    Thread.sleep(300)
+                    Thread.sleep(500)
                     true
                 } else {
                     val awaited = callback.writeLatch.await(OP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
@@ -416,6 +654,113 @@ object ZenggeBulbController {
         }
     }
 
+    private fun tryAllSceneWrites(
+        gatt: BluetoothGatt,
+        callback: SessionCallback,
+        characteristic: BluetoothGattCharacteristic,
+        red: Int,
+        green: Int,
+        blue: Int,
+        white: Int,
+        macAddress: String = "",
+        context: Context? = null
+    ): Boolean {
+        val scene = buildScenePacket(red, green, blue, white)
+
+        fun reportAttempt(name: String, ok: Boolean, extra: String = "") {
+            context?.let {
+                DiscordCrashReporter.reportDebugBlocking(
+                    context = it,
+                    source = "ZenggeBulbController.tryAllSceneWrites",
+                    details = buildString {
+                        appendLine("Attempt: $name")
+                        appendLine("mac=$macAddress")
+                        appendLine("payload=${scene.toHexString()}")
+                        appendLine("result=$ok")
+                        appendLine("lastWriteStatus=${callback.lastWriteStatus}")
+                        appendLine("writeLatchCount=${callback.writeLatch.count}")
+                        if (extra.isNotBlank()) appendLine(extra)
+                    }
+                )
+            }
+            Log.d(TAG, "tryAllSceneWrites: attempt=$name result=$ok lastWriteStatus=${callback.lastWriteStatus} writeLatchCount=${callback.writeLatch.count}")
+        }
+
+        // 1) Try alternative write characteristic (0000ff22) first if present (NO_RESPONSE preferred)
+        try {
+            val alt = gatt.services.flatMap { it.characteristics }.firstOrNull { it.uuid == UUID_RGBW_ALT }
+            if (alt != null) {
+                val altFirstOk = writeCharacteristic(gatt, callback, alt, scene, context, forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
+                reportAttempt("alt_ff22_no_response_first", altFirstOk, "wrote to 0000ff22 with NO_RESPONSE first")
+                if (altFirstOk) return true
+                settleForBulb(NO_RESPONSE_SETTLE_MS)
+            }
+        } catch (_: Exception) {
+        }
+
+        // 2) Normal write
+        val normal = writeCharacteristic(gatt, callback, characteristic, scene, context)
+        // read status after attempt if available
+        try {
+            gatt.findStatusCharacteristic()?.let { statusChar ->
+                callback.resetReadLatch()
+                if (gatt.readCharacteristic(statusChar)) {
+                    callback.readLatch.await(OP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                    context?.let {
+                        DiscordCrashReporter.reportDebugBlocking(
+                            context = it,
+                            source = "ZenggeBulbController.tryAllSceneWrites.readStatus",
+                            details = buildString {
+                                appendLine("after_attempt=normal")
+                                appendLine("statusReadResult=${callback.lastReadStatus}")
+                                appendLine("statusValue=${callback.lastReadValue?.toHexString() ?: "<null>"}")
+                            }
+                        )
+                    }
+                }
+            }
+        } catch (ignored: Exception) {
+        }
+        reportAttempt("normal", normal)
+        if (normal) return true
+        settleForBulb(NO_RESPONSE_SETTLE_MS)
+
+        // 2) Force NO_RESPONSE
+        val noResp = writeCharacteristic(gatt, callback, characteristic, scene, context, forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
+        reportAttempt("force_no_response", noResp)
+        if (noResp) return true
+        settleForBulb(NO_RESPONSE_SETTLE_MS)
+
+        // 3) Try power-on fallback (legacy CC) then scene
+        val ccPower = writeCharacteristic(gatt, callback, characteristic, byteArrayOf(0xCC.toByte(), 0x23, 0x33), context)
+        reportAttempt("cc_power_on", ccPower, "sent CC power-on")
+        settleForBulb(POWER_ON_SETTLE_MS)
+        val afterCc = writeCharacteristic(gatt, callback, characteristic, scene, context)
+        reportAttempt("after_cc_poweron", afterCc, "sent CC power-on then scene")
+        if (afterCc) return true
+        settleForBulb(NO_RESPONSE_SETTLE_MS)
+
+        // 4) Try legacy vendor packet 0x56 ... F0 AA
+        val legacy = buildVendorScenePacket(red, green, blue, white)
+        val legacyOk = writeCharacteristic(gatt, callback, characteristic, legacy, context)
+        reportAttempt("legacy_56", legacyOk, "legacy payload: ${legacy.toHexString()}")
+        if (legacyOk) return true
+
+        // 5) Try alternative write characteristic (0000ff22) if present
+        try {
+            gatt.findCharacteristic()?.let { /* no-op reuse */ }
+            val alt = gatt.services.flatMap { it.characteristics }.firstOrNull { it.uuid == UUID_RGBW_ALT }
+            if (alt != null) {
+                val altOk = writeCharacteristic(gatt, callback, alt, scene, context, forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
+                reportAttempt("alt_ff22_no_response", altOk, "wrote to 0000ff22 with NO_RESPONSE")
+                if (altOk) return true
+            }
+        } catch (_: Exception) {
+        }
+
+        return false
+    }
+
     private fun describeWriteType(writeType: Int?): String = when (writeType) {
         BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT -> "WRITE_TYPE_DEFAULT"
         BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE -> "WRITE_TYPE_NO_RESPONSE"
@@ -424,13 +769,23 @@ object ZenggeBulbController {
     }
 
     private fun BluetoothGatt.findCharacteristic(): BluetoothGattCharacteristic? {
-        val uuidsToTry = listOf(UUID_RGBW_NEW, UUID_RGBW_LEGACY)
+        val uuidsToTry = listOf(UUID_RGBW_NEW, UUID_RGBW_ALT, UUID_RGBW_LEGACY)
         services.forEach { service ->
             uuidsToTry.forEach { uuid ->
                 service.getCharacteristic(uuid)?.let {
                     Log.d(TAG, "Found write characteristic uuid=$uuid in service=${service.uuid}")
                     return it
                 }
+            }
+        }
+        return null
+    }
+
+    private fun BluetoothGatt.findStatusCharacteristic(): BluetoothGattCharacteristic? {
+        services.forEach { service ->
+            service.getCharacteristic(UUID_STATUS_CHAR)?.let {
+                Log.d(TAG, "Found status characteristic uuid=${it.uuid} in service=${service.uuid}")
+                return it
             }
         }
         return null
@@ -475,6 +830,9 @@ object ZenggeBulbController {
         @Volatile var servicesStatus: Int = BluetoothGatt.GATT_FAILURE
         @Volatile var writeLatch = CountDownLatch(1)
         @Volatile var lastWriteStatus: Int = BluetoothGatt.GATT_FAILURE
+        @Volatile var readLatch = CountDownLatch(1)
+        @Volatile var lastReadStatus: Int = BluetoothGatt.GATT_FAILURE
+        @Volatile var lastReadValue: ByteArray? = null
 
         fun resetServicesLatch() {
             servicesLatch = CountDownLatch(1)
@@ -484,6 +842,12 @@ object ZenggeBulbController {
         fun resetWriteLatch() {
             writeLatch = CountDownLatch(1)
             lastWriteStatus = BluetoothGatt.GATT_FAILURE
+        }
+
+        fun resetReadLatch() {
+            readLatch = CountDownLatch(1)
+            lastReadStatus = BluetoothGatt.GATT_FAILURE
+            lastReadValue = null
         }
 
         override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
@@ -497,6 +861,12 @@ object ZenggeBulbController {
         override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
             servicesStatus = status
             servicesLatch.countDown()
+        }
+
+        override fun onCharacteristicRead(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+            lastReadStatus = status
+            lastReadValue = characteristic.value
+            readLatch.countDown()
         }
 
         @Suppress("DEPRECATION")

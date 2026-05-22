@@ -32,10 +32,29 @@ class SunriseService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action != ACTION_START_SUNRISE) {
+            DiscordCrashReporter.reportDebugBlocking(
+                context = applicationContext,
+                source = "SunriseService.onStartCommand.ignored",
+                details = buildString {
+                    appendLine("Ignored start command")
+                    appendLine("action=${intent?.action}")
+                    appendLine("startId=$startId")
+                }
+            )
             stopSelf(startId)
             return START_NOT_STICKY
         }
 
+        DiscordCrashReporter.reportDebugBlocking(
+            context = applicationContext,
+            source = "SunriseService.onStartCommand.entry",
+            details = buildString {
+                appendLine("SunriseService start command received")
+                appendLine("flags=$flags")
+                appendLine("startId=$startId")
+                appendLine("action=${intent.action}")
+            }
+        )
         startForeground(NOTIFICATION_ID, buildNotification("Démarrage du lever de soleil"))
 
         rampJob?.cancel()
@@ -52,6 +71,18 @@ class SunriseService : Service() {
             try {
                 val steps = 30
                 val stepDelayMs = max(1L, durationMs / steps)
+                DiscordCrashReporter.reportDebugBlocking(
+                    context = applicationContext,
+                    source = "SunriseService.ramp.start",
+                    details = buildString {
+                        appendLine("Starting sunrise ramp")
+                        appendLine("mac=$macAddress")
+                        appendLine("originalAlarmMs=$originalAlarmMs")
+                        appendLine("durationMs=$durationMs")
+                        appendLine("steps=$steps")
+                        appendLine("initialBrightness=$initialBrightness")
+                    }
+                )
                 for (step in 0 until steps) {
                     val computedBrightness = ((step * 99) / (steps - 1)) + 1
                     val brightness = max(initialBrightness, computedBrightness.coerceIn(1, 100))
@@ -85,6 +116,15 @@ class SunriseService : Service() {
             } catch (e: Exception) {
                 DiscordCrashReporter.reportDebugBlocking(
                     context = applicationContext,
+                    source = "SunriseService.ramp.exception",
+                    details = buildString {
+                        appendLine("SunriseService ramp exception")
+                        appendLine("error=${e::class.java.name}")
+                        appendLine("message=${e.message}")
+                    }
+                )
+                DiscordCrashReporter.reportDebugBlocking(
+                    context = applicationContext,
                     source = "SunriseService.ramp",
                     details = buildString {
                         appendLine("SunriseService ramp failed")
@@ -93,6 +133,15 @@ class SunriseService : Service() {
                     }
                 )
             } finally {
+                DiscordCrashReporter.reportDebugBlocking(
+                    context = applicationContext,
+                    source = "SunriseService.ramp.finally",
+                    details = buildString {
+                        appendLine("Stopping SunriseService")
+                        appendLine("mac=$macAddress")
+                        appendLine("originalAlarmMs=$originalAlarmMs")
+                    }
+                )
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }

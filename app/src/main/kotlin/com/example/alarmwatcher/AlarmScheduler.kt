@@ -15,6 +15,16 @@ object AlarmScheduler {
 
     fun schedulePreWarn(context: Context, whenMs: Long, originalAlarmMs: Long) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
+        DiscordCrashReporter.reportDebugBlocking(
+            context = context,
+            source = "AlarmScheduler.schedulePreWarn.entry",
+            details = buildString {
+                appendLine("schedulePreWarn entry")
+                appendLine("whenMs=$whenMs")
+                appendLine("originalAlarmMs=$originalAlarmMs")
+                appendLine("now=${System.currentTimeMillis()}")
+            }
+        )
         val intent = Intent(context, AlarmTriggerReceiver::class.java).apply {
             action = ACTION_PREWARN
             putExtra("original_alarm_ms", originalAlarmMs)
@@ -69,6 +79,12 @@ object AlarmScheduler {
                 context = context,
                 source = "AlarmScheduler.cancelPreWarn",
                 details = "Cancelled pending pre-warn alarm"
+            )
+        } else {
+            DiscordCrashReporter.reportDebugBlocking(
+                context = context,
+                source = "AlarmScheduler.cancelPreWarn.none",
+                details = "No pending pre-warn alarm to cancel"
             )
         }
     }
