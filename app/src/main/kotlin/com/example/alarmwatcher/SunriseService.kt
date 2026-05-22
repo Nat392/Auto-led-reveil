@@ -60,13 +60,6 @@ class SunriseService : Service() {
         rampJob?.cancel()
         val macAddress = intent.getStringExtra(EXTRA_BULB_MAC).orEmpty().trim()
         val originalAlarmMs = intent.getLongExtra(EXTRA_ORIGINAL_ALARM_MS, -1L)
-        // Targets (treated as per-channel maxima for the RGB Dimming Hack)
-        val targetRMax = intent.getIntExtra(EXTRA_TARGET_R, 220)
-        val targetGMax = intent.getIntExtra(EXTRA_TARGET_G, 240)
-        val targetBMax = intent.getIntExtra(EXTRA_TARGET_B, 255)
-        // White channel not used for this RGB-only sequence; keep user-provided value but
-        // we will force sending W=0 during the ramp.
-        val targetWhite = intent.getIntExtra(EXTRA_TARGET_WHITE, 0)
         val initialBrightness = intent.getIntExtra(EXTRA_INITIAL_BRIGHTNESS, 1).coerceIn(1, 100)
         val durationMs = intent.getLongExtra(EXTRA_DURATION_MS, AlarmScheduler.PREWARN_MS).coerceAtLeast(1L)
 
@@ -88,27 +81,11 @@ class SunriseService : Service() {
                         appendLine("initialBrightness=$initialBrightness")
                     }
                 )
-                // RGB Dimming Hack: keep master brightness at 100% and modulate R/G/B per step.
-                val gamma = 2.4
                 for (t in 0..steps) {
-                    // Normalized progression with channel-specific delays (Rayleigh-like timing)
-                    val tR = t.toDouble() / steps.toDouble() // starts at t=0
-                    val tG = max(0.0, (t - 3).toDouble() / (steps - 3).toDouble()) // green starts at t=3
-                    val tB = max(0.0, (t - 8).toDouble() / (steps - 8).toDouble()) // blue starts at t=8
-
-                    // Apply gamma exponent and scale to per-channel maxima
-                    val rRaw = if (tR <= 0.0) 0.0 else Math.pow(tR, gamma) * targetRMax.toDouble()
-                    val gRaw = if (tG <= 0.0) 0.0 else Math.pow(tG, gamma) * targetGMax.toDouble()
-                    val bRaw = if (tB <= 0.0) 0.0 else Math.pow(tB, gamma) * targetBMax.toDouble()
-
-                    var r = Math.round(rRaw).toInt().coerceIn(0, 255)
-                    var g = Math.round(gRaw).toInt().coerceIn(0, 255)
-                    var b = Math.round(bRaw).toInt().coerceIn(0, 255)
-
-                    // Anti-stagnation: force small red values on first iterations
-                    if (t == 1) r = 1
-                    if (t == 2) r = 2
-                    if (t == 3) r = 3
+                    val palette = reportSceneAtStep(t)
+                    val r = palette.red
+                    val g = palette.green
+                    val b = palette.blue
 
                     val brightnessPercentForController = 100 // master brightness locked to 100%
                     val ts = System.currentTimeMillis()
@@ -138,7 +115,9 @@ class SunriseService : Service() {
                             appendLine("originalAlarmMs=$originalAlarmMs")
                         }
                     )
-                    delay(stepDelayMs)
+                    if (t < steps) {
+                        delay(stepDelayMs)
+                    }
                 }
             } catch (e: Exception) {
                 DiscordCrashReporter.reportDebugBlocking(
@@ -203,6 +182,12 @@ class SunriseService : Service() {
         .setPriority(NotificationCompat.PRIORITY_LOW)
         .build()
 
+    private data class Scene(
+        val red: Int,
+        val green: Int,
+        val blue: Int
+    )
+
     companion object {
         const val ACTION_START_SUNRISE = "com.example.alarmwatcher.ACTION_START_SUNRISE"
         const val EXTRA_BULB_MAC = "extra_bulb_mac"
@@ -216,5 +201,43 @@ class SunriseService : Service() {
 
         private const val NOTIFICATION_ID = 401
         private const val NOTIFICATION_CHANNEL_ID = "sunrise_service"
+
+        private val REPORT_RGB_TABLE = listOf(
+            Scene(0, 0, 0),
+            Scene(1, 0, 0),
+            Scene(2, 0, 0),
+            Scene(3, 0, 0),
+            Scene(4, 0, 0),
+            Scene(6, 1, 0),
+            Scene(8, 2, 0),
+            Scene(10, 3, 0),
+            Scene(13, 5, 0),
+            Scene(17, 7, 0),
+            Scene(22, 10, 1),
+            Scene(28, 14, 2),
+            Scene(35, 18, 4),
+            Scene(43, 23, 6),
+            Scene(52, 29, 9),
+            Scene(61, 36, 13),
+            Scene(72, 44, 18),
+            Scene(84, 53, 24),
+            Scene(96, 62, 31),
+            Scene(109, 73, 40),
+            Scene(123, 84, 49),
+            Scene(138, 97, 60),
+            Scene(154, 111, 73),
+            Scene(170, 126, 88),
+            Scene(188, 142, 104),
+            Scene(206, 159, 122),
+            Scene(220, 177, 142),
+            Scene(220, 196, 165),
+            Scene(220, 216, 191),
+            Scene(220, 237, 220),
+            Scene(220, 240, 255)
+        )
+    }
+
+    private fun reportSceneAtStep(t: Int): Scene {
+        return REPORT_RGB_TABLE.getOrElse(t) { REPORT_RGB_TABLE.last() }
     }
 }

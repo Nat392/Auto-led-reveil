@@ -84,17 +84,6 @@ object ZenggeBulbController {
                 return false
             }
 
-            Log.d(TAG, "Waiting for BLE settle")
-            DiscordCrashReporter.reportDebugBlocking(
-                context = context,
-                source = "ZenggeBulbController.applyScene.beforeSettle",
-                details = buildString {
-                    appendLine("Waiting for BLE settle")
-                    appendLine("mac=$normalizedMac")
-                }
-            )
-            settleForBulb(1000L)
-
             val scaled = scaleScene(red, green, blue, white, brightnessPercent)
             DiscordCrashReporter.reportDebugBlocking(
                 context = context,
