@@ -4,21 +4,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 
 class AlarmTriggerReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.i("AlarmTriggerReceiver", "onReceive entry action=${intent.action}")
-        val pendingResult = goAsync()
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                handleAlarm(context, intent)
-            } finally {
-                pendingResult.finish()
-            }
-        }
+        handleAlarm(context, intent)
     }
 
     private fun handleAlarm(context: Context, intent: Intent) {
@@ -39,40 +29,26 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
         val bulbMac = BuildConfig.ZENGGE_BULB_MAC.trim()
         try {
             if (bulbMac.isNotBlank()) {
-                val applied = ZenggeBulbController.applyScene(
-                    context = context,
-                    macAddress = bulbMac,
-                    red = intent.getIntExtra("target_r", 255),
-                    green = intent.getIntExtra("target_g", 230),
-                    blue = intent.getIntExtra("target_b", 210),
-                    white = intent.getIntExtra("target_white", 255),
-                    brightnessPercent = intent.getIntExtra("brightness_percent", 100)
-                )
-                DiscordCrashReporter.reportDebugBlocking(
-                    context = context,
-                    source = "AlarmTriggerReceiver.directBle",
-                    details = buildString {
-                        appendLine("AlarmTriggerReceiver.directBle()")
-                        appendLine("mac=$bulbMac")
-                        appendLine("applied=$applied")
-                    }
-                )
-                if (applied) {
-                    return
+                val serviceIntent = Intent(context, SunriseService::class.java).apply {
+                    setAction(SunriseService.ACTION_START_SUNRISE)
+                    putExtra(SunriseService.EXTRA_BULB_MAC, bulbMac)
+                    putExtra(SunriseService.EXTRA_ORIGINAL_ALARM_MS, originalAlarmMs)
+                    putExtra(SunriseService.EXTRA_TARGET_R, intent.getIntExtra("target_r", 255))
+                    putExtra(SunriseService.EXTRA_TARGET_G, intent.getIntExtra("target_g", 230))
+                    putExtra(SunriseService.EXTRA_TARGET_B, intent.getIntExtra("target_b", 210))
+                    putExtra(SunriseService.EXTRA_TARGET_WHITE, intent.getIntExtra("target_white", 255))
+                    putExtra(SunriseService.EXTRA_INITIAL_BRIGHTNESS, intent.getIntExtra("brightness_percent", 1))
+                    putExtra(SunriseService.EXTRA_DURATION_MS, AlarmScheduler.PREWARN_MS)
                 }
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    context.startForegroundService(serviceIntent)
+                } else {
+                    context.startService(serviceIntent)
+                }
+                return
             }
         } catch (e: Exception) {
             Log.w("AlarmTriggerReceiver", "Direct BLE control failed: ${e.message}")
-            DiscordCrashReporter.reportDebugBlocking(
-                context = context,
-                source = "AlarmTriggerReceiver.directBle",
-                details = buildString {
-                    appendLine("AlarmTriggerReceiver.directBle() failed")
-                    appendLine("mac=$bulbMac")
-                    appendLine("error=${e::class.java.name}")
-                    appendLine("message=${e.message}")
-                }
-            )
         }
 
         // Always show fallback notification in case automation is not enabled or fails

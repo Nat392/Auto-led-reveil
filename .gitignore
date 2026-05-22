@@ -5,6 +5,7 @@
 
 # Android Studio / IntelliJ
 .idea/
+.vscode/
 *.iml
 *.ipr
 *.iws
@@ -17,6 +18,11 @@ captures/
 .externalNativeBuild/
 .cxx/
 *.log
+.venv/
+_apk_extract/
+_apk_extract2/
+*.apk
+*.zip
 .DS_Store
 Thumbs.db
 
