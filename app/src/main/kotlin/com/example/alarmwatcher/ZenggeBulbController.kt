@@ -409,11 +409,28 @@ object ZenggeBulbController {
     private fun ByteArray.toHexString(): String = joinToString(" ") { "%02X".format(it) }
 
     private fun buildPowerPacket(powerOn: Boolean): ByteArray {
-        return if (powerOn) {
-            byteArrayOf(0x71, 0x23, 0x0F, 0xA3.toByte())
-        } else {
-            byteArrayOf(0x71, 0x24, 0x0F, 0xA4.toByte())
+        val payload = ByteArray(12)
+        payload[0] = 0x3B.toByte()
+        payload[1] = if (powerOn) 0x23.toByte() else 0x24.toByte()
+
+        var sum = 0
+        for (b in payload) {
+            sum += (b.toInt() and 0xFF)
         }
+        val checksum = (sum and 0xFF).toByte()
+
+        val header = byteArrayOf(
+            0x00.toByte(),
+            0x01.toByte(),
+            0x80.toByte(),
+            0x00.toByte(),
+            0x00.toByte(),
+            0x0D.toByte(),
+            0x0E.toByte(),
+            0x0B.toByte()
+        )
+
+        return header + payload + checksum
     }
 
     private fun buildScenePacket(red: Int, green: Int, blue: Int, white: Int): ByteArray {
@@ -423,6 +440,7 @@ object ZenggeBulbController {
             green.coerceIn(0, 255).toByte(),
             blue.coerceIn(0, 255).toByte(),
             white.coerceIn(0, 255).toByte(),
+            0x00.toByte(),
             0x0F.toByte()
         )
         var sum = 0
@@ -430,7 +448,19 @@ object ZenggeBulbController {
             sum += (b.toInt() and 0xFF)
         }
         val checksum = (sum and 0xFF).toByte()
-        return payload + checksum
+
+        val header = byteArrayOf(
+            0x00.toByte(),
+            0x01.toByte(),
+            0x80.toByte(),
+            0x00.toByte(),
+            0x00.toByte(),
+            0x08.toByte(),
+            0x09.toByte(),
+            0x0B.toByte()
+        )
+
+        return header + payload + checksum
     }
 
     private fun writeCharacteristic(
