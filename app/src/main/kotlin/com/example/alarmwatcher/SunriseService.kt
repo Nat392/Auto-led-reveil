@@ -60,16 +60,21 @@ class SunriseService : Service() {
         rampJob?.cancel()
         val macAddress = intent.getStringExtra(EXTRA_BULB_MAC).orEmpty().trim()
         val originalAlarmMs = intent.getLongExtra(EXTRA_ORIGINAL_ALARM_MS, -1L)
-        val red = intent.getIntExtra(EXTRA_TARGET_R, 255)
-        val green = intent.getIntExtra(EXTRA_TARGET_G, 230)
-        val blue = intent.getIntExtra(EXTRA_TARGET_B, 210)
-        val white = intent.getIntExtra(EXTRA_TARGET_WHITE, 255)
+        // Targets (treated as per-channel maxima for the RGB Dimming Hack)
+        val targetRMax = intent.getIntExtra(EXTRA_TARGET_R, 220)
+        val targetGMax = intent.getIntExtra(EXTRA_TARGET_G, 240)
+        val targetBMax = intent.getIntExtra(EXTRA_TARGET_B, 255)
+        // White channel not used for this RGB-only sequence; keep user-provided value but
+        // we will force sending W=0 during the ramp.
+        val targetWhite = intent.getIntExtra(EXTRA_TARGET_WHITE, 0)
         val initialBrightness = intent.getIntExtra(EXTRA_INITIAL_BRIGHTNESS, 1).coerceIn(1, 100)
         val durationMs = intent.getLongExtra(EXTRA_DURATION_MS, AlarmScheduler.PREWARN_MS).coerceAtLeast(1L)
 
         rampJob = serviceScope.launch {
             try {
+                // Steps: 0..30 inclusive (31 iterations). 'steps' is the max t value.
                 val steps = 30
+                // We want duration split into 30 intervals (ramp granularity), so divide by steps.
                 val stepDelayMs = max(1L, durationMs / steps)
                 DiscordCrashReporter.reportDebugBlocking(
                     context = applicationContext,
@@ -79,33 +84,55 @@ class SunriseService : Service() {
                         appendLine("mac=$macAddress")
                         appendLine("originalAlarmMs=$originalAlarmMs")
                         appendLine("durationMs=$durationMs")
-                        appendLine("steps=$steps")
+                        appendLine("steps=$steps (inclusive 0..$steps)")
                         appendLine("initialBrightness=$initialBrightness")
                     }
                 )
-                for (step in 0 until steps) {
-                    val computedBrightness = ((step * 99) / (steps - 1)) + 1
-                    val brightness = max(initialBrightness, computedBrightness.coerceIn(1, 100))
+                // RGB Dimming Hack: keep master brightness at 100% and modulate R/G/B per step.
+                val gamma = 2.4
+                for (t in 0..steps) {
+                    // Normalized progression with channel-specific delays (Rayleigh-like timing)
+                    val tR = t.toDouble() / steps.toDouble() // starts at t=0
+                    val tG = max(0.0, (t - 3).toDouble() / (steps - 3).toDouble()) // green starts at t=3
+                    val tB = max(0.0, (t - 8).toDouble() / (steps - 8).toDouble()) // blue starts at t=8
+
+                    // Apply gamma exponent and scale to per-channel maxima
+                    val rRaw = if (tR <= 0.0) 0.0 else Math.pow(tR, gamma) * targetRMax.toDouble()
+                    val gRaw = if (tG <= 0.0) 0.0 else Math.pow(tG, gamma) * targetGMax.toDouble()
+                    val bRaw = if (tB <= 0.0) 0.0 else Math.pow(tB, gamma) * targetBMax.toDouble()
+
+                    var r = Math.round(rRaw).toInt().coerceIn(0, 255)
+                    var g = Math.round(gRaw).toInt().coerceIn(0, 255)
+                    var b = Math.round(bRaw).toInt().coerceIn(0, 255)
+
+                    // Anti-stagnation: force small red values on first iterations
+                    if (t == 1) r = 1
+                    if (t == 2) r = 2
+                    if (t == 3) r = 3
+
+                    val brightnessPercentForController = 100 // master brightness locked to 100%
                     val ts = System.currentTimeMillis()
-                    Log.d("SunriseService", "[$ts] Step ${step + 1}/$steps start brightness=$brightness targetR=$red targetG=$green targetB=$blue targetW=$white mac=$macAddress")
+                    Log.d("SunriseService", "[$ts] Step ${t + 1}/${steps + 1} start t=$t r=$r g=$g b=$b mac=$macAddress")
+
                     val applied = ZenggeBulbController.applyScene(
                         context = applicationContext,
                         macAddress = macAddress,
-                        red = red,
-                        green = green,
-                        blue = blue,
-                        white = white,
-                        brightnessPercent = brightness
+                        red = r,
+                        green = g,
+                        blue = b,
+                        white = 0,
+                        brightnessPercent = brightnessPercentForController
                     )
+
                     val ts2 = System.currentTimeMillis()
-                    Log.d("SunriseService", "[$ts2] Step ${step + 1}/$steps end applied=$applied brightness=$brightness durationMs=${ts2 - ts}")
+                    Log.d("SunriseService", "[$ts2] Step ${t + 1}/${steps + 1} end applied=$applied r=$r g=$g b=$b durationMs=${ts2 - ts}")
                     DiscordCrashReporter.reportDebugBlocking(
                         context = applicationContext,
                         source = "SunriseService.step",
                         details = buildString {
                             appendLine("SunriseService.step")
-                            appendLine("step=${step + 1}/$steps")
-                            appendLine("brightness=$brightness")
+                            appendLine("step=${t + 1}/${steps + 1}")
+                            appendLine("r=$r g=$g b=$b controllerBrightness=100")
                             appendLine("applied=$applied")
                             appendLine("mac=$macAddress")
                             appendLine("originalAlarmMs=$originalAlarmMs")

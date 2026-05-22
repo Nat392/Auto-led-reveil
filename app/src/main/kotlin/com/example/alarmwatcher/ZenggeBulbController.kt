@@ -20,7 +20,7 @@ object ZenggeBulbController {
     private const val OP_TIMEOUT_MS = 5_000L
     private const val POWER_ON_SETTLE_MS = 800L
     private const val NO_RESPONSE_SETTLE_MS = 300L
-    private const val GAMMA_EXP = 0.5
+    private const val GAMMA_EXP = 1.0
 
     private val UUID_RGBW_NEW: UUID = UUID.fromString("0000ff01-0000-1000-8000-00805f9b34fb")
     private val UUID_RGBW_LEGACY: UUID = UUID.fromString("0000ffe9-0000-1000-8000-00805f9b34fb")
