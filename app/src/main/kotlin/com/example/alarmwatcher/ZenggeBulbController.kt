@@ -107,20 +107,16 @@ object ZenggeBulbController {
                 }
             )
 
-            val success = powerOn(gatt, callback, context) &&
-                settleForBulb(POWER_ON_SETTLE_MS) &&
-                powerOn(gatt, callback, context) &&
-                settleForBulb(100L) &&
-                writeRgbPacket(
-                    gatt = gatt,
-                    callback = callback,
-                    red = scaled.red,
-                    green = scaled.green,
-                    blue = scaled.blue,
-                    white = scaled.white,
-                    macAddress = normalizedMac,
-                    context = context
-                )
+            val success = writeRgbPacket(
+                gatt = gatt,
+                callback = callback,
+                red = scaled.red,
+                green = scaled.green,
+                blue = scaled.blue,
+                white = scaled.white,
+                macAddress = normalizedMac,
+                context = context
+            )
 
             Log.i(TAG, "Applied scene to $normalizedMac success=$success red=${scaled.red} green=${scaled.green} blue=${scaled.blue} white=${scaled.white} brightness=$brightnessPercent")
             if (!success) {
