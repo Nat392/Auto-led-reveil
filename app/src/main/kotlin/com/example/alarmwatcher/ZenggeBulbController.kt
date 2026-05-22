@@ -22,11 +22,8 @@ object ZenggeBulbController {
     private const val NO_RESPONSE_SETTLE_MS = 300L
     private const val GAMMA_EXP = 0.5
 
-    private val UUID_ELK: UUID = UUID.fromString("0000fff3-0000-1000-8000-00805f9b34fb")
     private val UUID_RGBW_NEW: UUID = UUID.fromString("0000ff01-0000-1000-8000-00805f9b34fb")
     private val UUID_RGBW_LEGACY: UUID = UUID.fromString("0000ffe9-0000-1000-8000-00805f9b34fb")
-    private val UUID_RGBW_ALT: UUID = UUID.fromString("0000ff22-0000-1000-8000-00805f9b34fb")
-
     fun applyScene(
         context: Context,
         macAddress: String,
@@ -204,22 +201,6 @@ object ZenggeBulbController {
             runAttempt("power_on", buildPowerPacket(true))
             Thread.sleep(700)
             runAttempt("scene", buildScenePacket(red, green, blue, white))
-            runAttempt("scene_41", buildAltScenePacketA(red, green, blue, white))
-            runAttempt("scene_rev", buildAltScenePacketB(red, green, blue, white))
-            runAttempt("legacy_56", buildVendorScenePacket(red, green, blue, white))
-
-            val altChar = gatt.services.flatMap { it.characteristics }.firstOrNull { it.uuid == UUID_RGBW_ALT }
-            if (altChar != null) {
-                val ok = writeCharacteristic(
-                    gatt,
-                    callback,
-                    altChar,
-                    buildScenePacket(red, green, blue, white),
-                    context,
-                    BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-                )
-                results.add("alt_ff22_noresp:$ok:status=${callback.lastWriteStatus}")
-            }
 
             gatt.disconnect()
             gatt.close()
@@ -382,8 +363,22 @@ object ZenggeBulbController {
     ): Boolean {
         val characteristic = gatt.findCharacteristic() ?: return false
         return when {
-            powerOff -> writeCharacteristic(gatt, callback, characteristic, buildPowerPacket(false), context)
-            powerOn -> writeCharacteristic(gatt, callback, characteristic, buildPowerPacket(true), context)
+            powerOff -> writeCharacteristic(
+                gatt,
+                callback,
+                characteristic,
+                buildPowerPacket(false),
+                context,
+                forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            )
+            powerOn -> writeCharacteristic(
+                gatt,
+                callback,
+                characteristic,
+                buildPowerPacket(true),
+                context,
+                forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+            )
             else -> tryAllSceneWrites(gatt, callback, characteristic, red, green, blue, white, macAddress, context)
         }
     }
@@ -400,7 +395,7 @@ object ZenggeBulbController {
         context: Context? = null
     ): Boolean {
         val scene = buildScenePacket(red, green, blue, white)
-        Log.d(TAG, "Writing ELK-BLEDOM scene payload mac=$macAddress: ${scene.toHexString()}")
+        Log.d(TAG, "Writing Zengge scene payload mac=$macAddress: ${scene.toHexString()}")
         return writeCharacteristic(
             gatt = gatt,
             callback = callback,
@@ -415,61 +410,27 @@ object ZenggeBulbController {
 
     private fun buildPowerPacket(powerOn: Boolean): ByteArray {
         return if (powerOn) {
-            byteArrayOf(0x7E, 0x00, 0x04, 0x01, 0x00, 0x00, 0x00, 0x00, 0xEF.toByte())
+            byteArrayOf(0x71, 0x23, 0x0F, 0xA3.toByte())
         } else {
-            byteArrayOf(0x7E, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0xEF.toByte())
+            byteArrayOf(0x71, 0x24, 0x0F, 0xA4.toByte())
         }
     }
 
     private fun buildScenePacket(red: Int, green: Int, blue: Int, white: Int): ByteArray {
-        return byteArrayOf(
-            0x7E,
-            0x00,
-            0x05,
-            0x03,
-            red.coerceIn(0, 255).toByte(),
-            green.coerceIn(0, 255).toByte(),
-            blue.coerceIn(0, 255).toByte(),
-            0x00,
-            0xEF.toByte()
-        )
-    }
-
-    private fun buildVendorScenePacket(red: Int, green: Int, blue: Int, white: Int): ByteArray {
-        return byteArrayOf(
-            0x56,
+        val payload = byteArrayOf(
+            0x31.toByte(),
             red.coerceIn(0, 255).toByte(),
             green.coerceIn(0, 255).toByte(),
             blue.coerceIn(0, 255).toByte(),
             white.coerceIn(0, 255).toByte(),
-            0xF0.toByte(),
-            0xAA.toByte()
+            0x0F.toByte()
         )
-    }
-
-    private fun buildAltScenePacketA(red: Int, green: Int, blue: Int, white: Int): ByteArray {
-        val tpl = byteArrayOf(
-            0x41,
-            red.coerceIn(0, 255).toByte(),
-            green.coerceIn(0, 255).toByte(),
-            blue.coerceIn(0, 255).toByte(),
-            white.coerceIn(0, 255).toByte()
-        )
-        val checksum = (tpl.sumOf { it.toInt() and 0xFF } and 0xFF).toByte()
-        return tpl + checksum
-    }
-
-    private fun buildAltScenePacketB(red: Int, green: Int, blue: Int, white: Int): ByteArray {
-        val tpl = byteArrayOf(
-            0x31,
-            blue.coerceIn(0, 255).toByte(),
-            green.coerceIn(0, 255).toByte(),
-            red.coerceIn(0, 255).toByte(),
-            white.coerceIn(0, 255).toByte(),
-            0x0F
-        )
-        val checksum = (tpl.sumOf { it.toInt() and 0xFF } and 0xFF).toByte()
-        return tpl + checksum
+        var sum = 0
+        for (b in payload) {
+            sum += (b.toInt() and 0xFF)
+        }
+        val checksum = (sum and 0xFF).toByte()
+        return payload + checksum
     }
 
     private fun writeCharacteristic(
@@ -589,12 +550,16 @@ object ZenggeBulbController {
     }
 
     private fun BluetoothGatt.findCharacteristic(): BluetoothGattCharacteristic? {
-        val uuidsToTry = listOf(UUID_ELK, UUID_RGBW_NEW, UUID_RGBW_ALT, UUID_RGBW_LEGACY)
-        services.forEach { service ->
-            uuidsToTry.forEach { uuid ->
-                service.getCharacteristic(uuid)?.let {
-                    Log.d(TAG, "Found write characteristic uuid=$uuid in service=${service.uuid}")
-                    return it
+        val uuidsToTry = listOf(UUID_RGBW_NEW, UUID_RGBW_LEGACY)
+        for (uuid in uuidsToTry) {
+            for (service in services) {
+                val characteristic = service.getCharacteristic(uuid) ?: continue
+                val props = characteristic.properties
+                val supportsWrite = (props and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0
+                val supportsWriteNoResponse = (props and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0
+                if (supportsWrite || supportsWriteNoResponse) {
+                    Log.d(TAG, "Found preferred write char uuid=$uuid in service=${service.uuid}")
+                    return characteristic
                 }
             }
         }
