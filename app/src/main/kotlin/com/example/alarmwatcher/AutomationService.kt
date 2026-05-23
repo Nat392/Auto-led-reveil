@@ -29,13 +29,9 @@ class AutomationService : AccessibilityService() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (intent?.action == "com.example.alarmwatcher.ACTION_RUN_AUTOMATION") {
                 val duration = intent.getLongExtra("duration_ms", AlarmScheduler.PREWARN_MS)
-                val r = intent.getIntExtra("target_r", 255)
-                val g = intent.getIntExtra("target_g", 230)
-                val b = intent.getIntExtra("target_b", 210)
                 val room = intent.getStringExtra("room_name_click") ?: "Chambre"
                 val fallback = intent.getStringExtra("fallback_room") ?: "Bureau"
-                Log.i(TAG, "Automation requested duration=$duration, rgb=($r,$g,$b), room=$room")
-                startAutomation(duration, r, g, b, room, fallback)
+                startAutomation(duration, room, fallback)
             }
         }
     }
@@ -51,7 +47,6 @@ class AutomationService : AccessibilityService() {
         serviceInfo = info
 
         registerReceiver(receiver, IntentFilter("com.example.alarmwatcher.ACTION_RUN_AUTOMATION"))
-        Log.i(TAG, "Service connected and receiver registered")
     }
 
     override fun onInterrupt() {
@@ -67,7 +62,7 @@ class AutomationService : AccessibilityService() {
         try { unregisterReceiver(receiver) } catch (e: Exception) {}
     }
 
-    private fun startAutomation(durationMs: Long, r: Int, g: Int, b: Int, room: String, fallbackRoom: String) {
+    private fun startAutomation(durationMs: Long, room: String, fallbackRoom: String) {
         automationJob?.cancel()
         automationJob = CoroutineScope(Dispatchers.Main + SupervisorJob()).launch {
             try {
@@ -95,7 +90,7 @@ class AutomationService : AccessibilityService() {
 
                 // 4) Select color on the color wheel (approximate tap)
                 // We attempt to find a view that looks like a color wheel; if not, we tap center area
-                selectColorOnWheel(r, g, b)
+                selectColorOnWheel()
                 delay(800)
 
                 // 5) Gradually increase brightness over durationMs until reaching 100%
@@ -132,7 +127,7 @@ class AutomationService : AccessibilityService() {
         return false
     }
 
-    private fun selectColorOnWheel(_r: Int, _g: Int, _b: Int) {
+    private fun selectColorOnWheel() {
         // Convert target color to an angle on wheel (simple heuristic)
         // For simplicity map color temperature to angle; this is highly device/app dependent
         val angle = 0.0 // placeholder angle; tuning required per app
@@ -190,7 +185,7 @@ class AutomationService : AccessibilityService() {
             val path = Path().apply { moveTo(x, y) }
             val desc = GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, 50)).build()
             return dispatchGesture(desc, object : GestureResultCallback() {
-                override fun onCompleted(gestureDescription: GestureDescription?) { super.onCompleted(gestureDescription); Log.i(TAG, "Tap completed at $x,$y") }
+                override fun onCompleted(gestureDescription: GestureDescription?) { super.onCompleted(gestureDescription) }
                 override fun onCancelled(gestureDescription: GestureDescription?) { super.onCancelled(gestureDescription); Log.w(TAG, "Tap cancelled") }
             }, null)
         }
@@ -232,8 +227,7 @@ class AutomationService : AccessibilityService() {
 
     private fun performScreenshotAttempt() {
         try {
-            val ok = performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT)
-            Log.i(TAG, "Requested system screenshot, result=$ok")
+            performGlobalAction(GLOBAL_ACTION_TAKE_SCREENSHOT)
         } catch (e: Exception) {
             Log.w(TAG, "performScreenshotAttempt failed: ${e.message}")
         }

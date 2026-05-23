@@ -32,35 +32,13 @@ class SunriseService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action != ACTION_START_SUNRISE) {
-            DiscordCrashReporter.reportDebugBlocking(
-                context = applicationContext,
-                source = "SunriseService.onStartCommand.ignored",
-                details = buildString {
-                    appendLine("Ignored start command")
-                    appendLine("action=${intent?.action}")
-                    appendLine("startId=$startId")
-                }
-            )
             stopSelf(startId)
             return START_NOT_STICKY
         }
-
-        DiscordCrashReporter.reportDebugBlocking(
-            context = applicationContext,
-            source = "SunriseService.onStartCommand.entry",
-            details = buildString {
-                appendLine("SunriseService start command received")
-                appendLine("flags=$flags")
-                appendLine("startId=$startId")
-                appendLine("action=${intent.action}")
-            }
-        )
         startForeground(NOTIFICATION_ID, buildNotification("Démarrage du lever de soleil"))
 
         rampJob?.cancel()
         val macAddress = intent.getStringExtra(EXTRA_BULB_MAC).orEmpty().trim()
-        val originalAlarmMs = intent.getLongExtra(EXTRA_ORIGINAL_ALARM_MS, -1L)
-        val initialBrightness = intent.getIntExtra(EXTRA_INITIAL_BRIGHTNESS, 1).coerceIn(1, 100)
         val durationMs = intent.getLongExtra(EXTRA_DURATION_MS, AlarmScheduler.PREWARN_MS).coerceAtLeast(1L)
 
         rampJob = serviceScope.launch {
@@ -69,18 +47,6 @@ class SunriseService : Service() {
                 val steps = 30
                 // We want duration split into 30 intervals (ramp granularity), so divide by steps.
                 val stepDelayMs = max(1L, durationMs / steps)
-                DiscordCrashReporter.reportDebugBlocking(
-                    context = applicationContext,
-                    source = "SunriseService.ramp.start",
-                    details = buildString {
-                        appendLine("Starting sunrise ramp")
-                        appendLine("mac=$macAddress")
-                        appendLine("originalAlarmMs=$originalAlarmMs")
-                        appendLine("durationMs=$durationMs")
-                        appendLine("steps=$steps (inclusive 0..$steps)")
-                        appendLine("initialBrightness=$initialBrightness")
-                    }
-                )
                 for (t in 0..steps) {
                     val palette = reportSceneAtStep(t)
                     val r = palette.red
@@ -88,10 +54,7 @@ class SunriseService : Service() {
                     val b = palette.blue
 
                     val brightnessPercentForController = 100 // master brightness locked to 100%
-                    val ts = System.currentTimeMillis()
-                    Log.d("SunriseService", "[$ts] Step ${t + 1}/${steps + 1} start t=$t r=$r g=$g b=$b mac=$macAddress")
-
-                    val applied = ZenggeBulbController.applyScene(
+                    ZenggeBulbController.applyScene(
                         context = applicationContext,
                         macAddress = macAddress,
                         red = r,
@@ -100,54 +63,18 @@ class SunriseService : Service() {
                         white = 0,
                         brightnessPercent = brightnessPercentForController
                     )
-
-                    val ts2 = System.currentTimeMillis()
-                    Log.d("SunriseService", "[$ts2] Step ${t + 1}/${steps + 1} end applied=$applied r=$r g=$g b=$b durationMs=${ts2 - ts}")
-                    DiscordCrashReporter.reportDebugBlocking(
-                        context = applicationContext,
-                        source = "SunriseService.step",
-                        details = buildString {
-                            appendLine("SunriseService.step")
-                            appendLine("step=${t + 1}/${steps + 1}")
-                            appendLine("r=$r g=$g b=$b controllerBrightness=100")
-                            appendLine("applied=$applied")
-                            appendLine("mac=$macAddress")
-                            appendLine("originalAlarmMs=$originalAlarmMs")
-                        }
-                    )
                     if (t < steps) {
                         delay(stepDelayMs)
                     }
                 }
             } catch (e: Exception) {
-                DiscordCrashReporter.reportDebugBlocking(
+                Log.e(TAG, "Erreur durant la rampe de luminosité", e)
+                DiscordCrashReporter.reportNonFatal(
                     context = applicationContext,
-                    source = "SunriseService.ramp.exception",
-                    details = buildString {
-                        appendLine("SunriseService ramp exception")
-                        appendLine("error=${e::class.java.name}")
-                        appendLine("message=${e.message}")
-                    }
-                )
-                DiscordCrashReporter.reportDebugBlocking(
-                    context = applicationContext,
-                    source = "SunriseService.ramp",
-                    details = buildString {
-                        appendLine("SunriseService ramp failed")
-                        appendLine("error=${e::class.java.name}")
-                        appendLine("message=${e.message}")
-                    }
+                    throwable = e,
+                    source = "SunriseService.rampJob"
                 )
             } finally {
-                DiscordCrashReporter.reportDebugBlocking(
-                    context = applicationContext,
-                    source = "SunriseService.ramp.finally",
-                    details = buildString {
-                        appendLine("Stopping SunriseService")
-                        appendLine("mac=$macAddress")
-                        appendLine("originalAlarmMs=$originalAlarmMs")
-                    }
-                )
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
             }
@@ -189,6 +116,7 @@ class SunriseService : Service() {
     )
 
     companion object {
+        private const val TAG = "SunriseService"
         const val ACTION_START_SUNRISE = "com.example.alarmwatcher.ACTION_START_SUNRISE"
         const val EXTRA_BULB_MAC = "extra_bulb_mac"
         const val EXTRA_ORIGINAL_ALARM_MS = "extra_original_alarm_ms"

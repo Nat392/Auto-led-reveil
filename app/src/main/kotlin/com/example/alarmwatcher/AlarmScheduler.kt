@@ -15,16 +15,6 @@ object AlarmScheduler {
 
     fun schedulePreWarn(context: Context, whenMs: Long, originalAlarmMs: Long) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
-        DiscordCrashReporter.reportDebugBlocking(
-            context = context,
-            source = "AlarmScheduler.schedulePreWarn.entry",
-            details = buildString {
-                appendLine("schedulePreWarn entry")
-                appendLine("whenMs=$whenMs")
-                appendLine("originalAlarmMs=$originalAlarmMs")
-                appendLine("now=${System.currentTimeMillis()}")
-            }
-        )
         val intent = Intent(context, AlarmTriggerReceiver::class.java).apply {
             action = ACTION_PREWARN
             putExtra("original_alarm_ms", originalAlarmMs)
@@ -37,33 +27,8 @@ object AlarmScheduler {
                 Log.w(TAG, "App cannot schedule exact alarms: request user permission")
             }
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMs, pi)
-            Log.i(TAG, "Scheduled pre-warn at $whenMs for alarm $originalAlarmMs")
-            DiscordCrashReporter.reportDebugBlocking(
-                context = context,
-                source = "AlarmScheduler.schedulePreWarn",
-                details = buildString {
-                    appendLine("AlarmScheduler.schedulePreWarn()")
-                    appendLine("canScheduleExactAlarms=$canScheduleExact")
-                    appendLine("requestedAt=$whenMs")
-                    appendLine("originalAlarmMs=$originalAlarmMs")
-                    appendLine("delayMs=${whenMs - System.currentTimeMillis()}")
-                    appendLine("sdk=${Build.VERSION.SDK_INT}")
-                }
-            )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule exact alarm: ${e.message}")
-            DiscordCrashReporter.reportDebugBlocking(
-                context = context,
-                source = "AlarmScheduler.schedulePreWarn",
-                details = buildString {
-                    appendLine("AlarmScheduler.schedulePreWarn() failed")
-                    appendLine("requestedAt=$whenMs")
-                    appendLine("originalAlarmMs=$originalAlarmMs")
-                    appendLine("error=${e::class.java.name}")
-                    appendLine("message=${e.message}")
-                    appendLine("sdk=${Build.VERSION.SDK_INT}")
-                }
-            )
         }
     }
 
@@ -74,18 +39,6 @@ object AlarmScheduler {
         if (pi != null) {
             am.cancel(pi)
             pi.cancel()
-            Log.i(TAG, "Cancelled pre-warn")
-            DiscordCrashReporter.reportDebugBlocking(
-                context = context,
-                source = "AlarmScheduler.cancelPreWarn",
-                details = "Cancelled pending pre-warn alarm"
-            )
-        } else {
-            DiscordCrashReporter.reportDebugBlocking(
-                context = context,
-                source = "AlarmScheduler.cancelPreWarn.none",
-                details = "No pending pre-warn alarm to cancel"
-            )
         }
 
         stopSunriseService(context)
@@ -93,15 +46,6 @@ object AlarmScheduler {
 
     fun stopSunriseService(context: Context) {
         val serviceIntent = Intent(context, SunriseService::class.java)
-        val stopped = context.stopService(serviceIntent)
-        Log.i(TAG, "Requested SunriseService stop, stopped=$stopped")
-        DiscordCrashReporter.reportDebugBlocking(
-            context = context,
-            source = "AlarmScheduler.stopSunriseService",
-            details = buildString {
-                appendLine("Requested SunriseService stop")
-                appendLine("stopped=$stopped")
-            }
-        )
+        context.stopService(serviceIntent)
     }
 }
