@@ -124,6 +124,10 @@ class MainActivity : AppCompatActivity() {
             // let the service run while we finish
         }
 
-        finish() // no UI needed
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            finishAndRemoveTask()
+        } else {
+            finish() // no UI needed
+        }
     }
 }

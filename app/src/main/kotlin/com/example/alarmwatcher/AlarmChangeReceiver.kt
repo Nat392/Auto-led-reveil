@@ -11,6 +11,7 @@ import android.util.Log
 class AlarmChangeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         Log.d("AlarmChangeReceiver", "Received ${intent.action}")
+        AlarmScheduler.stopSunriseService(context)
         AlarmMonitor.scanNextAlarmAndSchedule(context)
     }
 }

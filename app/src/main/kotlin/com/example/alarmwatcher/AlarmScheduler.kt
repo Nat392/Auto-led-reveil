@@ -87,5 +87,21 @@ object AlarmScheduler {
                 details = "No pending pre-warn alarm to cancel"
             )
         }
+
+        stopSunriseService(context)
+    }
+
+    fun stopSunriseService(context: Context) {
+        val serviceIntent = Intent(context, SunriseService::class.java)
+        val stopped = context.stopService(serviceIntent)
+        Log.i(TAG, "Requested SunriseService stop, stopped=$stopped")
+        DiscordCrashReporter.reportDebugBlocking(
+            context = context,
+            source = "AlarmScheduler.stopSunriseService",
+            details = buildString {
+                appendLine("Requested SunriseService stop")
+                appendLine("stopped=$stopped")
+            }
+        )
     }
 }
