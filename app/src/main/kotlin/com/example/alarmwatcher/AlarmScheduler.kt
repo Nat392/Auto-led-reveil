@@ -7,13 +7,13 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 
-object AlarmScheduler {
+object AlarmScheduler : AlarmSchedulerApi {
     private const val TAG = "AlarmScheduler"
     private const val REQ_CODE = 5401
     private const val ACTION_PREWARN = "com.example.alarmwatcher.ACTION_PREWARN"
     const val PREWARN_MS = 30 * 60 * 1000L
 
-    fun schedulePreWarn(context: Context, whenMs: Long, originalAlarmMs: Long, durationMs: Long = PREWARN_MS) {
+    override fun schedulePreWarn(context: Context, whenMs: Long, originalAlarmMs: Long, durationMs: Long) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
         val intent = Intent(context, AlarmTriggerReceiver::class.java).apply {
             action = ACTION_PREWARN
@@ -34,7 +34,7 @@ object AlarmScheduler {
         }
     }
 
-    fun cancelPreWarn(context: Context) {
+    override fun cancelPreWarn(context: Context) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
         val intent = Intent(context, AlarmTriggerReceiver::class.java).apply { action = ACTION_PREWARN }
         val pi = PendingIntent.getBroadcast(context, REQ_CODE, intent, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
@@ -46,7 +46,7 @@ object AlarmScheduler {
         stopSunriseService(context)
     }
 
-    fun stopSunriseService(context: Context) {
+    override fun stopSunriseService(context: Context) {
         val serviceIntent = Intent(context, SunriseService::class.java)
         context.stopService(serviceIntent)
     }

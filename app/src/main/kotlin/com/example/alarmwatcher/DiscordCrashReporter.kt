@@ -27,7 +27,7 @@ import java.util.TimeZone
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-object DiscordCrashReporter {
+object DiscordCrashReporter : CrashReporterApi {
     private const val TAG = "DiscordCrashReporter"
     private const val SCREENSHOT_FILENAME = "crash_screenshot.png"
     private const val STACKTRACE_FILENAME = "stacktrace.txt"
@@ -37,10 +37,10 @@ object DiscordCrashReporter {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    fun reportNonFatal(
+    override fun reportNonFatal(
         context: Context,
         throwable: Throwable,
-        source: String? = null
+        source: String?
     ): Job = scope.launch {
         sendReport(
             context = context.applicationContext,
@@ -50,10 +50,10 @@ object DiscordCrashReporter {
         )
     }
 
-    fun reportFatalBlocking(
+    override fun reportFatalBlocking(
         context: Context,
         throwable: Throwable,
-        threadName: String? = null
+        threadName: String?
     ) {
         runBlocking(Dispatchers.IO) {
             withTimeout(FATAL_WAIT_TIMEOUT_MS) {
@@ -67,7 +67,7 @@ object DiscordCrashReporter {
         }
     }
 
-    fun reportDebugBlocking(
+    override fun reportDebugBlocking(
         context: Context,
         source: String,
         details: String

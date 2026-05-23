@@ -58,7 +58,7 @@ class MainActivity : AppCompatActivity() {
                 try {
                     val mac = BuildConfig.ZENGGE_BULB_MAC.trim()
                     runBlocking {
-                        ZenggeBulbController.diagnosticApplyScene(this, mac, 255, 230, 210, 255)
+                        ZenggeBulbController.diagnosticApplyScene(applicationContext, mac, 255, 230, 210, 255)
                     }
                 } catch (e: Exception) {
                     Log.e(tag, "Diagnostic failed", e)

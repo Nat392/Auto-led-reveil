@@ -19,7 +19,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-object ZenggeBulbController {
+object ZenggeBulbController : BulbControllerApi {
     private const val TAG = "ZenggeBulbController"
     private const val CONNECT_TIMEOUT_MS = 12_000L
     private const val OP_TIMEOUT_MS = 5_000L
@@ -28,7 +28,7 @@ object ZenggeBulbController {
     private val UUID_RGBW_NEW: UUID = UUID.fromString("0000ff01-0000-1000-8000-00805f9b34fb")
     private val UUID_RGBW_LEGACY: UUID = UUID.fromString("0000ffe9-0000-1000-8000-00805f9b34fb")
 
-    suspend fun openSession(context: Context, macAddress: String): BulbSession? {
+    override suspend fun openSession(context: Context, macAddress: String): BulbSession? {
         val adapter = getBluetoothAdapter(context) ?: run {
             Log.w(TAG, "Bluetooth adapter unavailable")
             return null
@@ -53,10 +53,10 @@ object ZenggeBulbController {
             return null
         }
 
-        return BulbSession(gatt, callback)
+        return Session(gatt, callback)
     }
 
-    suspend fun applyScene(
+    override suspend fun applyScene(
         context: Context,
         macAddress: String,
         red: Int,
@@ -68,9 +68,7 @@ object ZenggeBulbController {
         val session = openSession(context, macAddress) ?: return false
         return try {
             val scaled = scaleScene(red, green, blue, white, brightnessPercent)
-            writeRgbPacket(
-                gatt = session.gatt,
-                callback = session.callback,
+            session.applyScene(
                 red = scaled.red,
                 green = scaled.green,
                 blue = scaled.blue,
@@ -84,7 +82,7 @@ object ZenggeBulbController {
         }
     }
 
-    suspend fun powerOff(context: Context, macAddress: String): Boolean {
+    override suspend fun powerOff(context: Context, macAddress: String): Boolean {
         val adapter = getBluetoothAdapter(context) ?: return false
         val device = runCatching { adapter.getRemoteDevice(macAddress.trim()) }.getOrNull() ?: return false
         val callback = SessionCallback()
@@ -99,7 +97,7 @@ object ZenggeBulbController {
         }
     }
 
-    suspend fun diagnosticApplyScene(
+    override suspend fun diagnosticApplyScene(
         context: Context,
         macAddress: String,
         red: Int,
@@ -152,11 +150,11 @@ object ZenggeBulbController {
         return manager.adapter
     }
 
-    class BulbSession internal constructor(
+    class Session internal constructor(
         internal val gatt: BluetoothGatt,
         internal val callback: SessionCallback
-    ) : AutoCloseable {
-        suspend fun applyScene(red: Int, green: Int, blue: Int, white: Int): Boolean {
+    ) : BulbSession {
+        override suspend fun applyScene(red: Int, green: Int, blue: Int, white: Int): Boolean {
             return try {
                 writeRgbPacket(
                     gatt = gatt,

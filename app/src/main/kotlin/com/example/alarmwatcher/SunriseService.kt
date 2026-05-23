@@ -14,14 +14,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.min
-import kotlin.math.max
 
 class SunriseService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var rampJob: Job? = null
+    private val rampRunner = SunriseRampRunner(ZenggeBulbController, DiscordCrashReporter)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -43,29 +41,7 @@ class SunriseService : Service() {
 
         rampJob = serviceScope.launch {
             try {
-                val steps = min(MAX_RAMP_STEPS, max(1L, durationMs / MIN_STEP_DELAY_MS).toInt())
-                val stepDelayMs = max(1L, durationMs / steps)
-                val session = ZenggeBulbController.openSession(applicationContext, macAddress)
-                if (session == null) {
-                    Log.w(TAG, "Impossible d'ouvrir une session BLE pour la rampe")
-                } else {
-                    try {
-                        for (t in 0..steps) {
-                            val palette = reportSceneAtStep(t, steps)
-                            session.applyScene(
-                                red = palette.red,
-                                green = palette.green,
-                                blue = palette.blue,
-                                white = 0
-                            )
-                            if (t < steps) {
-                                delay(stepDelayMs)
-                            }
-                        }
-                    } finally {
-                        session.close()
-                    }
-                }
+                rampRunner.run(applicationContext, macAddress, durationMs)
             } catch (e: Exception) {
                 Log.e(TAG, "Erreur durant la rampe de luminosité", e)
                 DiscordCrashReporter.reportNonFatal(
@@ -118,56 +94,10 @@ class SunriseService : Service() {
         private const val TAG = "SunriseService"
         private const val NOTIFICATION_ID = 401
         private const val NOTIFICATION_CHANNEL_ID = "sunrise_service"
-        private const val MAX_RAMP_STEPS = 30
-        private const val MIN_STEP_DELAY_MS = 250L
 
         const val ACTION_START_SUNRISE = "com.example.alarmwatcher.ACTION_START_SUNRISE"
         const val EXTRA_BULB_MAC = "extra_bulb_mac"
         const val EXTRA_ORIGINAL_ALARM_MS = "extra_original_alarm_ms"
         const val EXTRA_DURATION_MS = "extra_duration_ms"
-
-        private val REPORT_RGB_TABLE = listOf(
-            Scene(0, 0, 0),
-            Scene(1, 0, 0),
-            Scene(2, 0, 0),
-            Scene(3, 0, 0),
-            Scene(4, 0, 0),
-            Scene(6, 1, 0),
-            Scene(8, 2, 0),
-            Scene(10, 3, 0),
-            Scene(13, 5, 0),
-            Scene(17, 7, 0),
-            Scene(22, 10, 1),
-            Scene(28, 14, 2),
-            Scene(35, 18, 4),
-            Scene(43, 23, 6),
-            Scene(52, 29, 9),
-            Scene(61, 36, 13),
-            Scene(72, 44, 18),
-            Scene(84, 53, 24),
-            Scene(96, 62, 31),
-            Scene(109, 73, 40),
-            Scene(123, 84, 49),
-            Scene(138, 97, 60),
-            Scene(154, 111, 73),
-            Scene(170, 126, 88),
-            Scene(188, 142, 104),
-            Scene(206, 159, 122),
-            Scene(220, 177, 142),
-            Scene(220, 196, 165),
-            Scene(220, 216, 191),
-            Scene(220, 237, 220),
-            Scene(220, 240, 255)
-        )
-    }
-
-    private fun reportSceneAtStep(t: Int, steps: Int): Scene {
-        val lastIndex = REPORT_RGB_TABLE.lastIndex
-        val mappedIndex = if (steps <= 0) {
-            lastIndex
-        } else {
-            (t * lastIndex) / steps
-        }
-        return REPORT_RGB_TABLE[mappedIndex.coerceIn(0, lastIndex)]
     }
 }
