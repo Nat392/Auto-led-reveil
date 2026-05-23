@@ -17,6 +17,8 @@ fun String.escapeForBuildConfig(): String =
 
 val discordWebhookUrl = localProperties.getProperty("DISCORD_WEBHOOK_URL", "").trim().trim('"')
 val zenggeBulbMac = localProperties.getProperty("ZENGGE_BULB_MAC", "").trim().trim('"')
+val zenggeBulbMacChambre = localProperties.getProperty("ZENGGE_BULB_MAC_CHAMBRE", "").trim().trim('"')
+val zenggeBulbMacBureau = localProperties.getProperty("ZENGGE_BULB_MAC_BUREAU", "").trim().trim('"')
 
 android {
     namespace = "com.example.alarmwatcher"
@@ -42,6 +44,16 @@ android {
             "String",
             "ZENGGE_BULB_MAC",
             "\"${zenggeBulbMac.escapeForBuildConfig()}\""
+        )
+        buildConfigField(
+            "String",
+            "ZENGGE_BULB_MAC_CHAMBRE",
+            "\"${zenggeBulbMacChambre.escapeForBuildConfig()}\""
+        )
+        buildConfigField(
+            "String",
+            "ZENGGE_BULB_MAC_BUREAU",
+            "\"${zenggeBulbMacBureau.escapeForBuildConfig()}\""
         )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.example.alarmwatcher.BuildConfig
 
 class AlarmTriggerReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -14,13 +13,28 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
     private fun handleAlarm(context: Context, intent: Intent) {
         val originalAlarmMs = intent.getLongExtra("original_alarm_ms", -1L)
         val durationMs = intent.getLongExtra(SunriseService.EXTRA_DURATION_MS, AlarmScheduler.PREWARN_MS)
+        val sunriseZones = SunriseZoneConfig.configuredZones()
 
-        val bulbMac = BuildConfig.ZENGGE_BULB_MAC.trim()
         try {
-            if (bulbMac.isNotBlank()) {
+            if (sunriseZones.isNotEmpty()) {
+                val macAddresses = ArrayList<String>(sunriseZones.size)
+                val targetRValues = IntArray(sunriseZones.size)
+                val targetGValues = IntArray(sunriseZones.size)
+                val targetBValues = IntArray(sunriseZones.size)
+
+                sunriseZones.forEachIndexed { index, zone ->
+                    macAddresses += zone.macAddress
+                    targetRValues[index] = zone.targetR
+                    targetGValues[index] = zone.targetG
+                    targetBValues[index] = zone.targetB
+                }
+
                 val serviceIntent = Intent(context, SunriseService::class.java).apply {
                     setAction(SunriseService.ACTION_START_SUNRISE)
-                    putExtra(SunriseService.EXTRA_BULB_MAC, bulbMac)
+                    putStringArrayListExtra(SunriseService.EXTRA_BULB_MACS, macAddresses)
+                    putExtra(SunriseService.EXTRA_TARGET_RS, targetRValues)
+                    putExtra(SunriseService.EXTRA_TARGET_GS, targetGValues)
+                    putExtra(SunriseService.EXTRA_TARGET_BS, targetBValues)
                     putExtra(SunriseService.EXTRA_ORIGINAL_ALARM_MS, originalAlarmMs)
                     putExtra(SunriseService.EXTRA_DURATION_MS, durationMs)
                 }

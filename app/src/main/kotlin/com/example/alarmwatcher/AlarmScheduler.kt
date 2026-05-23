@@ -42,8 +42,6 @@ object AlarmScheduler : AlarmSchedulerApi {
             am.cancel(pi)
             pi.cancel()
         }
-
-        stopSunriseService(context)
     }
 
     override fun stopSunriseService(context: Context) {

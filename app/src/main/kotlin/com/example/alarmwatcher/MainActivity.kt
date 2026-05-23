@@ -124,16 +124,17 @@ class MainActivity : AppCompatActivity() {
         if (intent?.action == "com.example.alarmwatcher.DIAGNOSTIC") {
             Thread {
                 try {
-                    val mac = BuildConfig.ZENGGE_BULB_MAC.trim()
                     kotlinx.coroutines.runBlocking {
-                        ZenggeBulbController.diagnosticApplyScene(
-                            applicationContext,
-                            mac,
-                            255,
-                            230,
-                            210,
-                            255
-                        )
+                        SunriseZoneConfig.configuredZones().forEach { zone ->
+                            ZenggeBulbController.diagnosticApplyScene(
+                                applicationContext,
+                                zone.macAddress,
+                                zone.targetR,
+                                zone.targetG,
+                                zone.targetB,
+                                0
+                            )
+                        }
                     }
                 } catch (e: Exception) {
                     android.util.Log.e(TAG, "Diagnostic failed", e)
@@ -189,7 +190,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         lines += exactAlarmStatusLine(alarmManager)
-        lines += bleStatusLine()
+        lines += bleStatusLines()
         lines += "Fermeture automatique dans 2 secondes."
 
         return lines.joinToString("\n\n")
@@ -205,26 +206,32 @@ class MainActivity : AppCompatActivity() {
         return "Alarme exacte : autorisation à accorder"
     }
 
-    private fun bleStatusLine(): String {
-        val mac = BuildConfig.ZENGGE_BULB_MAC.trim()
-        if (mac.isBlank()) {
-            return "BLE : non configuré (ZENGGE_BULB_MAC manquant)"
-        }
-
+    private fun bleStatusLines(): List<String> {
         val bluetoothManager = getSystemService(BluetoothManager::class.java)
-            ?: return "BLE : Bluetooth indisponible"
-        val adapter = bluetoothManager.adapter ?: return "BLE : Bluetooth indisponible"
+            ?: return listOf("BLE : Bluetooth indisponible")
+        val adapter = bluetoothManager.adapter ?: return listOf("BLE : Bluetooth indisponible")
         if (!adapter.isEnabled) {
-            return "BLE : Bluetooth désactivé"
+            return listOf("BLE : Bluetooth désactivé")
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
         ) {
-            return "BLE : permission BLUETOOTH_CONNECT manquante"
+            return listOf("BLE : permission BLUETOOTH_CONNECT manquante")
         }
 
-        return "BLE : MAC configurée, prêt à tester à la prochaine rampe"
+        val lines = SunriseZoneConfig.all().map { zone ->
+            val status = if (zone.macAddress.isBlank()) {
+                "MAC manquante"
+            } else {
+                "MAC configurée"
+            }
+            "BLE ${zone.label} : $status (${zone.targetR}, ${zone.targetG}, ${zone.targetB})"
+        }.toMutableList()
+
+        val configuredZone = SunriseZoneConfig.primaryZone()
+        lines += "Zone sunrise par défaut : ${configuredZone.label}"
+        return lines
     }
 
     private fun formatDateTime(timeMs: Long): String {

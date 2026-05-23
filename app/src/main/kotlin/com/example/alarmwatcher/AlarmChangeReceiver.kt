@@ -9,7 +9,6 @@ import android.content.Intent
  */
 class AlarmChangeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        AlarmScheduler.stopSunriseService(context)
         AlarmMonitor.scanNextAlarmAndSchedule(context)
     }
 }

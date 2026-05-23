@@ -2,6 +2,8 @@ package com.example.alarmwatcher
 
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
+import kotlin.math.roundToInt
 
 internal object SunriseRampSupport {
     const val MAX_RAMP_STEPS = 30
@@ -13,52 +15,26 @@ internal object SunriseRampSupport {
         val blue: Int
     )
 
-    private val reportRgbTable = listOf(
-        Scene(0, 0, 0),
-        Scene(1, 0, 0),
-        Scene(2, 0, 0),
-        Scene(3, 0, 0),
-        Scene(4, 0, 0),
-        Scene(6, 1, 0),
-        Scene(8, 2, 0),
-        Scene(10, 3, 0),
-        Scene(13, 5, 0),
-        Scene(17, 7, 0),
-        Scene(22, 10, 1),
-        Scene(28, 14, 2),
-        Scene(35, 18, 4),
-        Scene(43, 23, 6),
-        Scene(52, 29, 9),
-        Scene(61, 36, 13),
-        Scene(72, 44, 18),
-        Scene(84, 53, 24),
-        Scene(96, 62, 31),
-        Scene(109, 73, 40),
-        Scene(123, 84, 49),
-        Scene(138, 97, 60),
-        Scene(154, 111, 73),
-        Scene(170, 126, 88),
-        Scene(188, 142, 104),
-        Scene(206, 159, 122),
-        Scene(220, 177, 142),
-        Scene(220, 196, 165),
-        Scene(220, 216, 191),
-        Scene(220, 237, 220),
-        Scene(220, 240, 255)
-    )
-
     fun computeStepCount(durationMs: Long): Int {
         val rawStepCount = max(1L, durationMs / MIN_STEP_DELAY_MS).toInt()
         return min(MAX_RAMP_STEPS, rawStepCount)
     }
 
-    fun reportSceneAtStep(step: Int, steps: Int): Scene {
-        val lastIndex = reportRgbTable.lastIndex
-        val mappedIndex = if (steps <= 0) {
-            lastIndex
-        } else {
-            (step * lastIndex) / steps
-        }
-        return reportRgbTable[mappedIndex.coerceIn(0, lastIndex)]
+    fun computeSceneAtStep(
+        step: Int,
+        totalSteps: Int,
+        targetR: Int,
+        targetG: Int,
+        targetB: Int
+    ): Scene {
+        val safeTotalSteps = totalSteps.coerceAtLeast(1)
+        val progress = (step.toDouble() / safeTotalSteps.toDouble()).coerceIn(0.0, 1.0)
+        val gammaProgress = progress.pow(2.4)
+
+        return Scene(
+            red = (targetR.coerceIn(0, 255) * gammaProgress).roundToInt().coerceIn(0, 255),
+            green = (targetG.coerceIn(0, 255) * gammaProgress).roundToInt().coerceIn(0, 255),
+            blue = (targetB.coerceIn(0, 255) * gammaProgress).roundToInt().coerceIn(0, 255)
+        )
     }
 }

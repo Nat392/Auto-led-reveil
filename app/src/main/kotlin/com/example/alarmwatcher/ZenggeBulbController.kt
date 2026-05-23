@@ -22,7 +22,7 @@ object ZenggeBulbController : BulbControllerApi {
     private const val TAG = "ZenggeBulbController"
     private const val CONNECT_TIMEOUT_MS = 12_000L
     private const val OP_TIMEOUT_MS = 5_000L
-    private const val GAMMA_EXP = 1.0
+    private const val GAMMA_EXP = 2.4
 
     private val UUID_RGBW_NEW: UUID = UUID.fromString("0000ff01-0000-1000-8000-00805f9b34fb")
     private val UUID_RGBW_LEGACY: UUID = UUID.fromString("0000ffe9-0000-1000-8000-00805f9b34fb")
@@ -287,6 +287,11 @@ object ZenggeBulbController : BulbControllerApi {
         blue: Int,
         white: Int,
     ): Boolean {
+        if ((characteristic.properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) == 0) {
+            Log.w(TAG, "Scene write requires WRITE_TYPE_NO_RESPONSE but characteristic does not support it")
+            callback.lastWriteStatus = BluetoothGatt.GATT_FAILURE
+            return false
+        }
         val scene = buildScenePacket(red, green, blue, white)
         return writeCharacteristic(
             gatt = gatt,
@@ -324,13 +329,14 @@ object ZenggeBulbController : BulbControllerApi {
         return header + payload + checksum
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun buildScenePacket(red: Int, green: Int, blue: Int, white: Int): ByteArray {
         val payload = byteArrayOf(
             0x31.toByte(),
             red.coerceIn(0, 255).toByte(),
             green.coerceIn(0, 255).toByte(),
             blue.coerceIn(0, 255).toByte(),
-            white.coerceIn(0, 255).toByte(),
+            0x00.toByte(),
             0x00.toByte(),
             0x0F.toByte()
         )
@@ -365,6 +371,11 @@ object ZenggeBulbController : BulbControllerApi {
         val props = characteristic.properties
         val supportsWrite = (props and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0
         val supportsWriteNoResponse = (props and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE) != 0
+        if (forceWriteType == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE && !supportsWriteNoResponse) {
+            Log.w(TAG, "Characteristic rejected strict WRITE_TYPE_NO_RESPONSE scene write")
+            callback.lastWriteStatus = BluetoothGatt.GATT_FAILURE
+            return false
+        }
         val preferredWriteType = when {
             forceWriteType != null -> forceWriteType
             supportsWriteNoResponse -> BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE

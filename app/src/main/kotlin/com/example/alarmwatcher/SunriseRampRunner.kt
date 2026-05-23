@@ -13,6 +13,9 @@ internal class SunriseRampRunner(
     suspend fun run(
         context: Context,
         macAddress: String,
+        targetR: Int,
+        targetG: Int,
+        targetB: Int,
         durationMs: Long,
         onProgress: (currentStep: Int, totalSteps: Int) -> Unit = { _, _ -> }
     ) {
@@ -26,7 +29,7 @@ internal class SunriseRampRunner(
 
         try {
             for (step in 0..steps) {
-                val palette = SunriseRampSupport.reportSceneAtStep(step, steps)
+                val palette = SunriseRampSupport.computeSceneAtStep(step, steps, targetR, targetG, targetB)
                 if (!session.applyScene(
                     red = palette.red,
                     green = palette.green,

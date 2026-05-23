@@ -16,6 +16,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import java.text.DateFormat
 import java.util.Date
 
@@ -38,9 +40,10 @@ class SunriseService : Service() {
         }
 
         val originalAlarmMs = intent.getLongExtra(EXTRA_ORIGINAL_ALARM_MS, -1L)
+        val zones = extractZones(intent)
+            .ifEmpty { SunriseZoneConfig.configuredZones() }
 
         rampJob?.cancel()
-        val macAddress = intent.getStringExtra(EXTRA_BULB_MAC).orEmpty().trim()
         val durationMs = intent.getLongExtra(EXTRA_DURATION_MS, AlarmScheduler.PREWARN_MS).coerceAtLeast(1L)
         val totalSteps = SunriseRampSupport.computeStepCount(durationMs)
 
@@ -48,8 +51,21 @@ class SunriseService : Service() {
 
         rampJob = serviceScope.launch {
             try {
-                rampRunner.run(applicationContext, macAddress, durationMs) { currentStep, total ->
-                    updateRampNotification(currentStep + 1, total, originalAlarmMs)
+                coroutineScope {
+                    zones.map { zone ->
+                        async {
+                            rampRunner.run(
+                                applicationContext,
+                                zone.macAddress,
+                                zone.targetR,
+                                zone.targetG,
+                                zone.targetB,
+                                durationMs
+                            ) { currentStep, total ->
+                                updateRampNotification(currentStep + 1, total, originalAlarmMs)
+                            }
+                        }
+                    }.forEach { it.await() }
                 }
             } catch (e: CancellationException) {
                 Log.i(TAG, "Rampe sunrise annulée")
@@ -118,8 +134,38 @@ class SunriseService : Service() {
         private const val NOTIFICATION_CHANNEL_ID = "sunrise_service"
 
         const val ACTION_START_SUNRISE = "com.example.alarmwatcher.ACTION_START_SUNRISE"
-        const val EXTRA_BULB_MAC = "extra_bulb_mac"
+        const val EXTRA_BULB_MACS = "extra_bulb_macs"
+        const val EXTRA_TARGET_RS = "extra_target_rs"
+        const val EXTRA_TARGET_GS = "extra_target_gs"
+        const val EXTRA_TARGET_BS = "extra_target_bs"
         const val EXTRA_ORIGINAL_ALARM_MS = "extra_original_alarm_ms"
         const val EXTRA_DURATION_MS = "extra_duration_ms"
+    }
+
+    private fun extractZones(intent: Intent): List<SunriseBulbZone> {
+        val macAddresses = intent.getStringArrayListExtra(EXTRA_BULB_MACS).orEmpty()
+        val targetRs = intent.getIntArrayExtra(EXTRA_TARGET_RS)
+        val targetGs = intent.getIntArrayExtra(EXTRA_TARGET_GS)
+        val targetBs = intent.getIntArrayExtra(EXTRA_TARGET_BS)
+
+        if (macAddresses.isEmpty() || targetRs == null || targetGs == null || targetBs == null) {
+            return emptyList()
+        }
+
+        val zoneCount = minOf(macAddresses.size, targetRs.size, targetGs.size, targetBs.size)
+        return (0 until zoneCount)
+            .mapNotNull { index ->
+                val macAddress = macAddresses[index].trim()
+                if (macAddress.isBlank()) {
+                    return@mapNotNull null
+                }
+                SunriseBulbZone(
+                    label = "Zone ${index + 1}",
+                    macAddress = macAddress,
+                    targetR = targetRs[index],
+                    targetG = targetGs[index],
+                    targetB = targetBs[index]
+                )
+            }
     }
 }
