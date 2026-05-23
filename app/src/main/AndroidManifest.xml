@@ -48,7 +48,7 @@
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
-        <receiver android:name=".AlarmTriggerReceiver" android:exported="true" />
+        <receiver android:name=".AlarmTriggerReceiver" android:exported="false" />
         
         <service
             android:name=".SunriseService"
