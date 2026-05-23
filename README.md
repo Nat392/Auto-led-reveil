@@ -78,14 +78,13 @@ Pour installer sur un appareil connecté:
 
 ## Où trouver de l’aide
 
-- Consultez [AGENTS.md](AGENTS.md) pour les règles de contribution du dépôt, y compris la langue des messages de commit.
 - Consultez [scripts/install-git-hooks.sh](scripts/install-git-hooks.sh) si vous souhaitez activer les hooks Git fournis.
 - Regardez `app/src/main/AndroidManifest.xml` et `app/build.gradle.kts` pour les permissions, services et dépendances réellement utilisés.
 - Pour diagnostiquer un problème runtime, lancez l’app puis consultez les logs Android Studio ou `adb logcat`.
 
 ## Qui maintient et contribue
 
-Le dépôt ne déclare pas de mainteneur nominatif dans les fichiers présents. Les contributions sont donc gérées par les contributeurs du projet.
+Maintenue par Nat392.
 
 Pour contribuer:
 
@@ -93,13 +92,10 @@ Pour contribuer:
 2. Faites des changements ciblés.
 3. Ouvrez une pull request avec une description courte et claire.
 
-Avant d’envoyer une PR, lisez [AGENTS.md](AGENTS.md): les messages de commit doivent être rédigés en français.
-
 ## Structure du dépôt
 
 - `app/` : code Android de l’application.
 - `scripts/` : scripts utilitaires et hooks Git.
-- `_apk_extract/` et `_apk_extract2/` : ressources extraites de l’APK pour référence.
 
 ## Licence
 
