@@ -109,12 +109,6 @@ class SunriseService : Service() {
         return "Alarme cible : ${formatter.format(Date(originalAlarmMs))}"
     }
 
-    private data class Scene(
-        val red: Int,
-        val green: Int,
-        val blue: Int
-    )
-
     companion object {
         private const val TAG = "SunriseService"
         private const val NOTIFICATION_ID = 401
