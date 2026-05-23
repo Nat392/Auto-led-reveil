@@ -111,21 +111,24 @@ object ZenggeBulbController {
             val device = adapter.getRemoteDevice(macAddress.trim())
             val callback = SessionCallback()
             val gatt = connect(device, context, callback) ?: return "{\"error\":\"connect_failed\"}"
-            if (!discoverServices(gatt, callback)) return "{\"error\":\"discover_failed\"}"
-            val characteristic = gatt.findCharacteristic() ?: return "{\"error\":\"char_not_found\"}"
+            try {
+                if (!discoverServices(gatt, callback)) return "{\"error\":\"discover_failed\"}"
+                val characteristic = gatt.findCharacteristic() ?: return "{\"error\":\"char_not_found\"}"
 
-            fun runAttempt(name: String, payload: ByteArray, forceType: Int? = null) {
-                val ok = writeCharacteristic(gatt, callback, characteristic, payload, forceType)
-                results.add("$name:${payload.toHexString()}:$ok:status=${callback.lastWriteStatus}")
+                fun runAttempt(name: String, payload: ByteArray, forceType: Int? = null) {
+                    val ok = writeCharacteristic(gatt, callback, characteristic, payload, forceType)
+                    results.add("$name:${payload.toHexString()}:$ok:status=${callback.lastWriteStatus}")
+                }
+
+                runAttempt("power_on", buildPowerPacket(true))
+                Thread.sleep(700)
+                runAttempt("scene", buildScenePacket(red, green, blue, white))
+
+                "{\"results\":[\"${results.joinToString("\",\"")}\"]}"
+            } finally {
+                gatt.disconnect()
+                gatt.close()
             }
-
-            runAttempt("power_on", buildPowerPacket(true))
-            Thread.sleep(700)
-            runAttempt("scene", buildScenePacket(red, green, blue, white))
-
-            gatt.disconnect()
-            gatt.close()
-            "{\"results\":[\"${results.joinToString("\",\"")}\"]}"
         } catch (e: Exception) {
             "{\"error\":\"${e.message}\"}"
         }
@@ -164,17 +167,26 @@ object ZenggeBulbController {
             return null
         }
 
-        if (!callback.connectionLatch.await(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
-            Log.w(TAG, "Timed out connecting to bulb")
-            return null
-        }
+        var connected = false
+        try {
+            if (!callback.connectionLatch.await(CONNECT_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+                Log.w(TAG, "Timed out connecting to bulb")
+                return null
+            }
 
-        if (callback.connectionState != BluetoothProfile.STATE_CONNECTED) {
-            Log.w(TAG, "Bulb connection failed status=${callback.connectionStatus} state=${callback.connectionState}")
-            return null
-        }
+            if (callback.connectionState != BluetoothProfile.STATE_CONNECTED) {
+                Log.w(TAG, "Bulb connection failed status=${callback.connectionStatus} state=${callback.connectionState}")
+                return null
+            }
 
-        return gatt
+            connected = true
+            return gatt
+        } finally {
+            if (!connected) {
+                runCatching { gatt.disconnect() }
+                runCatching { gatt.close() }
+            }
+        }
     }
 
     private fun discoverServices(gatt: BluetoothGatt, callback: SessionCallback): Boolean {
