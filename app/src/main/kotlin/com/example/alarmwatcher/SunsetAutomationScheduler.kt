@@ -114,7 +114,8 @@ internal object SunsetAutomationScheduler {
 
     private fun scheduleSceneAlarmIfNeeded(context: Context, zoneKey: String, whenMs: Long) {
         if (whenMs <= System.currentTimeMillis()) {
-            Log.i(TAG, "Skipping past sunset scene for $zoneKey at $whenMs")
+            Log.w(TAG, "Sunset scene for $zoneKey is already past at $whenMs; running catch-up now")
+            triggerSceneCatchUp(context, zoneKey)
             return
         }
         scheduleExactAlarm(context, zoneKeyAlarmRequestCode(zoneKey), buildSceneIntent(context, zoneKey), whenMs)
@@ -141,6 +142,20 @@ internal object SunsetAutomationScheduler {
         return Intent(context, SunsetAutomationReceiver::class.java).apply {
             action = ACTION_APPLY_SCENE
             putExtra(EXTRA_TARGET_ZONE, zoneKey)
+        }
+    }
+
+    private fun triggerSceneCatchUp(context: Context, zoneKey: String) {
+        val serviceIntent = Intent(context, SunsetSceneService::class.java).apply {
+            action = ACTION_APPLY_SCENE
+            putExtra(EXTRA_TARGET_ZONE, zoneKey)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent)
+        } else {
+            @Suppress("DEPRECATION")
+            context.startService(serviceIntent)
         }
     }
 
