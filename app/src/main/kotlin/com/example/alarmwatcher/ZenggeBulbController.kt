@@ -10,6 +10,7 @@ import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import androidx.annotation.WorkerThread
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
@@ -26,6 +27,7 @@ object ZenggeBulbController : BulbControllerApi {
     private val UUID_RGBW_NEW: UUID = UUID.fromString("0000ff01-0000-1000-8000-00805f9b34fb")
     private val UUID_RGBW_LEGACY: UUID = UUID.fromString("0000ffe9-0000-1000-8000-00805f9b34fb")
 
+    @WorkerThread
     override suspend fun openSession(context: Context, macAddress: String): BulbSession? {
         val adapter = getBluetoothAdapter(context) ?: run {
             Log.w(TAG, "Bluetooth adapter unavailable")
@@ -54,6 +56,7 @@ object ZenggeBulbController : BulbControllerApi {
         return Session(gatt, callback)
     }
 
+    @WorkerThread
     override suspend fun applyScene(
         context: Context,
         macAddress: String,
@@ -80,6 +83,7 @@ object ZenggeBulbController : BulbControllerApi {
         }
     }
 
+    @WorkerThread
     override suspend fun powerOff(context: Context, macAddress: String): Boolean {
         val adapter = getBluetoothAdapter(context) ?: return false
         val device = runCatching { adapter.getRemoteDevice(macAddress.trim()) }.getOrNull() ?: return false
@@ -95,6 +99,7 @@ object ZenggeBulbController : BulbControllerApi {
         }
     }
 
+    @WorkerThread
     override suspend fun diagnosticApplyScene(
         context: Context,
         macAddress: String,
@@ -152,6 +157,7 @@ object ZenggeBulbController : BulbControllerApi {
         internal val gatt: BluetoothGatt,
         internal val callback: SessionCallback
     ) : BulbSession {
+        @WorkerThread
         override suspend fun applyScene(red: Int, green: Int, blue: Int, white: Int): Boolean {
             return try {
                 writeRgbPacket(

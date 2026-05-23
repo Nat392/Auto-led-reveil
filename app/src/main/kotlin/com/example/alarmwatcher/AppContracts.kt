@@ -1,6 +1,7 @@
 package com.example.alarmwatcher
 
 import android.content.Context
+import androidx.annotation.WorkerThread
 import kotlinx.coroutines.Job
 
 interface AlarmSchedulerApi {
@@ -16,11 +17,15 @@ interface CrashReporterApi {
 }
 
 interface BulbSession : AutoCloseable {
+    @WorkerThread
     suspend fun applyScene(red: Int, green: Int, blue: Int, white: Int): Boolean
 }
 
 interface BulbControllerApi {
+    @WorkerThread
     suspend fun openSession(context: Context, macAddress: String): BulbSession?
+
+    @WorkerThread
     suspend fun applyScene(
         context: Context,
         macAddress: String,
@@ -31,8 +36,10 @@ interface BulbControllerApi {
         brightnessPercent: Int
     ): Boolean
 
+    @WorkerThread
     suspend fun powerOff(context: Context, macAddress: String): Boolean
 
+    @WorkerThread
     suspend fun diagnosticApplyScene(
         context: Context,
         macAddress: String,
