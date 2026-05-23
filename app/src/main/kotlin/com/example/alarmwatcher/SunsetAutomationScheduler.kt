@@ -89,20 +89,22 @@ internal object SunsetAutomationScheduler {
                 setRequestProperty("Accept", "application/json")
             }
 
-            connection.use { httpConnection ->
-                val responseCode = httpConnection.responseCode
+            try {
+                val responseCode = connection.responseCode
                 if (responseCode !in 200..299) {
                     Log.w(TAG, "Sunset API returned HTTP $responseCode")
                     return null
                 }
 
-                val body = BufferedReader(InputStreamReader(httpConnection.inputStream)).use { reader ->
+                val body = BufferedReader(InputStreamReader(connection.inputStream)).use { reader ->
                     reader.readText()
                 }
                 val sunsetIso = JSONObject(body)
                     .getJSONObject("results")
                     .getString("sunset")
                 Instant.parse(sunsetIso)
+            } finally {
+                connection.disconnect()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to fetch sunset time", e)
