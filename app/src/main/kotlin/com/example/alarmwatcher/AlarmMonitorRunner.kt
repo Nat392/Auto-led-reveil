@@ -3,7 +3,6 @@ package com.example.alarmwatcher
 import android.app.AlarmManager
 import android.content.Context
 import android.util.Log
-import kotlin.math.max
 
 internal class AlarmMonitorRunner(
     private val alarmScheduler: AlarmSchedulerApi,
@@ -28,11 +27,13 @@ internal class AlarmMonitorRunner(
                     return
                 }
 
-                val preWarnAt = trigger - AlarmScheduler.PREWARN_MS
-                val scheduleAt = max(preWarnAt, now)
-                val durationMs = max(trigger - scheduleAt, 1L)
+                val window = AlarmTimingSupport.computePreWarnWindow(trigger, now)
+                    ?: run {
+                        alarmScheduler.cancelPreWarn(context)
+                        return
+                    }
 
-                alarmScheduler.schedulePreWarn(context, scheduleAt, trigger, durationMs)
+                alarmScheduler.schedulePreWarn(context, window.scheduleAt, trigger, window.durationMs)
             } else {
                 alarmScheduler.cancelPreWarn(context)
             }

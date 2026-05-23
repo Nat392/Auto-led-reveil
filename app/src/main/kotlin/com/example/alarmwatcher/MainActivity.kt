@@ -17,7 +17,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import java.text.DateFormat
 import java.util.Date
-import kotlin.math.max
 
 class MainActivity : AppCompatActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -179,16 +178,13 @@ class MainActivity : AppCompatActivity() {
         } else {
             val triggerTime = nextAlarmClock.triggerTime
             val now = System.currentTimeMillis()
-            if (triggerTime <= now) {
+            val window = AlarmTimingSupport.computePreWarnWindow(triggerTime, now)
+            if (window == null) {
                 lines += "Prochaine alarme : déjà expirée"
                 lines += "Rampe : annulée"
             } else {
-                val preWarnAt = triggerTime - AlarmScheduler.PREWARN_MS
-                val scheduleAt = max(preWarnAt, now)
-                val durationMs = max(triggerTime - scheduleAt, 1L)
-
                 lines += "Prochaine alarme : ${formatDateTime(triggerTime)}"
-                lines += "Rampe : programmée pour ${formatDateTime(scheduleAt)} (${formatDuration(durationMs)})"
+                lines += "Rampe : programmée pour ${formatDateTime(window.scheduleAt)} (${formatDuration(window.durationMs)})"
             }
         }
 
