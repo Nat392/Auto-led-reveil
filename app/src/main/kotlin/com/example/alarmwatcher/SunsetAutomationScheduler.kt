@@ -41,6 +41,12 @@ internal object SunsetAutomationScheduler {
     private const val REQ_CHAMBRE = 7103
 
     private val schedulerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    internal var sunsetConnectionFactory: (String) -> HttpURLConnection = { urlString ->
+        URL(urlString).openConnection() as HttpURLConnection
+    }
+    internal var intentFactory: (Context, Class<*>) -> Intent = { context, targetClass ->
+        Intent(context, targetClass)
+    }
 
     fun requestRefreshAndSchedule(context: Context) {
         schedulerScope.launch {
@@ -79,9 +85,9 @@ internal object SunsetAutomationScheduler {
         Log.i(TAG, "Scheduled sunset scenes: bureau=$bureauMs chambre=$chambreMs sunset=$sunsetMs")
     }
 
-    private suspend fun fetchSunsetInstant(): Instant? {
+    internal suspend fun fetchSunsetInstant(): Instant? {
         return try {
-            val connection = (URL(SUNSET_API_URL).openConnection() as HttpURLConnection).apply {
+            val connection = sunsetConnectionFactory(SUNSET_API_URL).apply {
                 connectTimeout = 10_000
                 readTimeout = 10_000
                 requestMethod = "GET"
@@ -139,7 +145,7 @@ internal object SunsetAutomationScheduler {
     }
 
     private fun buildSceneIntent(context: Context, zoneKey: String): Intent {
-        return Intent(context, SunsetAutomationReceiver::class.java).apply {
+        return intentFactory(context, SunsetAutomationReceiver::class.java).apply {
             action = ACTION_APPLY_SCENE
             putExtra(EXTRA_TARGET_ZONE, zoneKey)
         }
@@ -165,7 +171,7 @@ internal object SunsetAutomationScheduler {
     }
 
     private fun buildRefreshIntent(context: Context): Intent {
-        return Intent(context, SunsetAutomationReceiver::class.java).apply {
+        return intentFactory(context, SunsetAutomationReceiver::class.java).apply {
             action = ACTION_REFRESH_SCHEDULE
         }
     }
@@ -210,7 +216,7 @@ internal object SunsetAutomationScheduler {
         pendingIntent.cancel()
     }
 
-    private fun computeNextRefreshAtMillis(zoneId: ZoneId = ZoneId.systemDefault()): Long {
+    internal fun computeNextRefreshAtMillis(zoneId: ZoneId = ZoneId.systemDefault()): Long {
         val nextRefresh = LocalDate.now(zoneId)
             .plusDays(1)
             .atTime(LocalTime.of(REFRESH_LOCAL_HOUR, REFRESH_LOCAL_MINUTE))

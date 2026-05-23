@@ -304,7 +304,7 @@ object ZenggeBulbController : BulbControllerApi {
 
     private fun ByteArray.toHexString(): String = joinToString(" ") { "%02X".format(it) }
 
-    private fun buildPowerPacket(powerOn: Boolean): ByteArray {
+    internal fun buildPowerPacket(powerOn: Boolean): ByteArray {
         val payload = ByteArray(12)
         payload[0] = 0x3B.toByte()
         payload[1] = if (powerOn) 0x23.toByte() else 0x24.toByte()
@@ -330,7 +330,7 @@ object ZenggeBulbController : BulbControllerApi {
     }
 
     @Suppress("UNUSED_PARAMETER")
-    private fun buildScenePacket(red: Int, green: Int, blue: Int, white: Int): ByteArray {
+    internal fun buildScenePacket(red: Int, green: Int, blue: Int, white: Int): ByteArray {
         val payload = byteArrayOf(
             0x31.toByte(),
             red.coerceIn(0, 255).toByte(),
@@ -447,7 +447,7 @@ object ZenggeBulbController : BulbControllerApi {
         return null
     }
 
-    private fun scaleScene(red: Int, green: Int, blue: Int, white: Int, brightnessPercent: Int): Scene {
+    internal fun scaleScene(red: Int, green: Int, blue: Int, white: Int, brightnessPercent: Int): Scene {
         val clampedBrightness = brightnessPercent.coerceIn(0, 100)
         val norm = clampedBrightness / 100.0
         val mapped = Math.pow(norm, GAMMA_EXP)
@@ -459,7 +459,7 @@ object ZenggeBulbController : BulbControllerApi {
         )
     }
 
-    private data class Scene(
+    internal data class Scene(
         val red: Int,
         val green: Int,
         val blue: Int,

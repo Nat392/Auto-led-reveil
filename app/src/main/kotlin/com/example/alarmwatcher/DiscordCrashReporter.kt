@@ -192,7 +192,7 @@ object DiscordCrashReporter : CrashReporterApi {
         }
     }
 
-    private fun buildPayload(
+    internal fun buildPayload(
         context: Context,
         stacktrace: String,
         source: String?,
@@ -239,7 +239,7 @@ object DiscordCrashReporter : CrashReporterApi {
             .put("embeds", JSONArray().put(embed))
     }
 
-    private fun buildDebugPayload(
+    internal fun buildDebugPayload(
         context: Context,
         source: String,
         details: String
