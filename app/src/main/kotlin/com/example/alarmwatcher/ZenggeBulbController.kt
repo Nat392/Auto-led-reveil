@@ -23,8 +23,6 @@ object ZenggeBulbController {
     private const val TAG = "ZenggeBulbController"
     private const val CONNECT_TIMEOUT_MS = 12_000L
     private const val OP_TIMEOUT_MS = 5_000L
-    private const val POWER_ON_SETTLE_MS = 800L
-    private const val NO_RESPONSE_SETTLE_MS = 300L
     private const val GAMMA_EXP = 1.0
 
     private val UUID_RGBW_NEW: UUID = UUID.fromString("0000ff01-0000-1000-8000-00805f9b34fb")
@@ -127,14 +125,13 @@ object ZenggeBulbController {
                     .put("error", "char_not_found")
                     .toString()
 
-                fun runAttempt(name: String, payload: ByteArray, forceType: Int? = null) {
-                    val ok = writeCharacteristic(gatt, callback, characteristic, payload, forceType)
-                    results.add("$name:${payload.toHexString()}:$ok:status=${callback.lastWriteStatus}")
-                }
-
-                runAttempt("power_on", buildPowerPacket(true))
+                val powerOnPayload = buildPowerPacket(true)
+                val powerOnOk = writeCharacteristic(gatt, callback, characteristic, powerOnPayload)
+                results.add("power_on:${powerOnPayload.toHexString()}:$powerOnOk:status=${callback.lastWriteStatus}")
                 delay(700)
-                runAttempt("scene", buildScenePacket(red, green, blue, white))
+                val scenePayload = buildScenePacket(red, green, blue, white)
+                val sceneOk = writeCharacteristic(gatt, callback, characteristic, scenePayload)
+                results.add("scene:${scenePayload.toHexString()}:$sceneOk:status=${callback.lastWriteStatus}")
 
                 JSONObject()
                     .put("results", JSONArray(results))
@@ -159,7 +156,7 @@ object ZenggeBulbController {
         internal val gatt: BluetoothGatt,
         internal val callback: SessionCallback
     ) : AutoCloseable {
-        fun applyScene(red: Int, green: Int, blue: Int, white: Int): Boolean {
+        suspend fun applyScene(red: Int, green: Int, blue: Int, white: Int): Boolean {
             return try {
                 writeRgbPacket(
                     gatt = gatt,
@@ -247,10 +244,6 @@ object ZenggeBulbController {
             return false
         }
         return true
-    }
-
-    private suspend fun powerOn(gatt: BluetoothGatt, callback: SessionCallback): Boolean {
-        return writeRgbPacket(gatt, callback, 0, 0, 0, 0, powerOn = true)
     }
 
     private suspend fun writeRgbPacket(
@@ -425,13 +418,6 @@ object ZenggeBulbController {
         }
     }
 
-    private fun describeWriteType(writeType: Int?): String = when (writeType) {
-        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT -> "WRITE_TYPE_DEFAULT"
-        BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE -> "WRITE_TYPE_NO_RESPONSE"
-        null -> "UNSUPPORTED"
-        else -> "WRITE_TYPE_$writeType"
-    }
-
     private fun BluetoothGatt.findCharacteristic(): BluetoothGattCharacteristic? {
         val uuidsToTry = listOf(UUID_RGBW_NEW, UUID_RGBW_LEGACY)
         for (uuid in uuidsToTry) {
@@ -446,16 +432,6 @@ object ZenggeBulbController {
             }
         }
         return null
-    }
-
-    private fun settleForBulb(delayMs: Long): Boolean {
-        return try {
-            Thread.sleep(delayMs)
-            true
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-            false
-        }
     }
 
     private fun scaleScene(red: Int, green: Int, blue: Int, white: Int, brightnessPercent: Int): Scene {
