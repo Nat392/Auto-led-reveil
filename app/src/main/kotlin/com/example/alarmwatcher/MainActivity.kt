@@ -10,6 +10,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import kotlinx.coroutines.runBlocking
 
 class MainActivity : AppCompatActivity() {
     private val tag = "MainActivity"
@@ -56,7 +57,9 @@ class MainActivity : AppCompatActivity() {
             Thread {
                 try {
                     val mac = BuildConfig.ZENGGE_BULB_MAC.trim()
-                    ZenggeBulbController.diagnosticApplyScene(this, mac, 255, 230, 210, 255)
+                    runBlocking {
+                        ZenggeBulbController.diagnosticApplyScene(this, mac, 255, 230, 210, 255)
+                    }
                 } catch (e: Exception) {
                     Log.e(tag, "Diagnostic failed", e)
                 }
