@@ -21,6 +21,12 @@ object AlarmMonitor {
                 val trigger = next.triggerTime
                 val now = System.currentTimeMillis()
 
+                if (trigger <= now) {
+                    Log.i(TAG, "Skipping expired nextAlarmClock at $trigger (now=$now)")
+                    AlarmScheduler.cancelPreWarn(context)
+                    return
+                }
+
                 val preWarnAt = trigger - AlarmScheduler.PREWARN_MS
                 val scheduleAt = max(preWarnAt, now)
                 val durationMs = max(trigger - scheduleAt, 1L)
