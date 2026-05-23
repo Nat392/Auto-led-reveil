@@ -45,7 +45,7 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
             Log.w("AlarmTriggerReceiver", "Direct BLE control failed: ${e.message}")
         }
 
-        // Always show fallback notification in case automation is not enabled or fails
+        // Show fallback notification only when automation is not configured or cannot be started
         NotificationHelper.showFallbackNotification(context)
     }
 }
