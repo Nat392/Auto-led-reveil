@@ -12,6 +12,8 @@ import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -108,13 +110,21 @@ object ZenggeBulbController {
     ): String {
         val results = mutableListOf<String>()
         return try {
-            val adapter = getBluetoothAdapter(context) ?: return "{\"error\":\"adapter_unavailable\"}"
+            val adapter = getBluetoothAdapter(context) ?: return JSONObject()
+                .put("error", "adapter_unavailable")
+                .toString()
             val device = adapter.getRemoteDevice(macAddress.trim())
             val callback = SessionCallback()
-            val gatt = connect(device, context, callback) ?: return "{\"error\":\"connect_failed\"}"
+            val gatt = connect(device, context, callback) ?: return JSONObject()
+                .put("error", "connect_failed")
+                .toString()
             try {
-                if (!discoverServices(gatt, callback)) return "{\"error\":\"discover_failed\"}"
-                val characteristic = gatt.findCharacteristic() ?: return "{\"error\":\"char_not_found\"}"
+                if (!discoverServices(gatt, callback)) return JSONObject()
+                    .put("error", "discover_failed")
+                    .toString()
+                val characteristic = gatt.findCharacteristic() ?: return JSONObject()
+                    .put("error", "char_not_found")
+                    .toString()
 
                 fun runAttempt(name: String, payload: ByteArray, forceType: Int? = null) {
                     val ok = writeCharacteristic(gatt, callback, characteristic, payload, forceType)
@@ -125,13 +135,17 @@ object ZenggeBulbController {
                 Thread.sleep(700)
                 runAttempt("scene", buildScenePacket(red, green, blue, white))
 
-                "{\"results\":[\"${results.joinToString("\",\"")}\"]}"
+                JSONObject()
+                    .put("results", JSONArray(results))
+                    .toString()
             } finally {
                 gatt.disconnect()
                 gatt.close()
             }
         } catch (e: Exception) {
-            "{\"error\":\"${e.message}\"}"
+            JSONObject()
+                .put("error", e.message ?: e::class.java.simpleName)
+                .toString()
         }
     }
 
@@ -460,7 +474,7 @@ object ZenggeBulbController {
         val white: Int
     )
 
-    private class SessionCallback : BluetoothGattCallback() {
+    internal class SessionCallback : BluetoothGattCallback() {
         val connectionLatch = CountDownLatch(1)
         @Volatile var connectionState: Int = BluetoothProfile.STATE_DISCONNECTED
         @Volatile var connectionStatus: Int = BluetoothGatt.GATT_FAILURE
