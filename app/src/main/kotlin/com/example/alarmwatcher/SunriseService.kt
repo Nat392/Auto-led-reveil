@@ -45,20 +45,25 @@ class SunriseService : Service() {
             try {
                 val steps = min(MAX_RAMP_STEPS, max(1L, durationMs / MIN_STEP_DELAY_MS).toInt())
                 val stepDelayMs = max(1L, durationMs / steps)
-                for (t in 0..steps) {
-                    val palette = reportSceneAtStep(t, steps)
-                    val brightnessPercentForController = 100
-                    ZenggeBulbController.applyScene(
-                        context = applicationContext,
-                        macAddress = macAddress,
-                        red = palette.red,
-                        green = palette.green,
-                        blue = palette.blue,
-                        white = 0,
-                        brightnessPercent = brightnessPercentForController
-                    )
-                    if (t < steps) {
-                        delay(stepDelayMs)
+                val session = ZenggeBulbController.openSession(applicationContext, macAddress)
+                if (session == null) {
+                    Log.w(TAG, "Impossible d'ouvrir une session BLE pour la rampe")
+                } else {
+                    try {
+                        for (t in 0..steps) {
+                            val palette = reportSceneAtStep(t, steps)
+                            session.applyScene(
+                                red = palette.red,
+                                green = palette.green,
+                                blue = palette.blue,
+                                white = 0
+                            )
+                            if (t < steps) {
+                                delay(stepDelayMs)
+                            }
+                        }
+                    } finally {
+                        session.close()
                     }
                 }
             } catch (e: Exception) {

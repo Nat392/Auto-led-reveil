@@ -26,6 +26,35 @@ object ZenggeBulbController {
 
     private val UUID_RGBW_NEW: UUID = UUID.fromString("0000ff01-0000-1000-8000-00805f9b34fb")
     private val UUID_RGBW_LEGACY: UUID = UUID.fromString("0000ffe9-0000-1000-8000-00805f9b34fb")
+
+    fun openSession(context: Context, macAddress: String): BulbSession? {
+        val adapter = getBluetoothAdapter(context) ?: run {
+            Log.w(TAG, "Bluetooth adapter unavailable")
+            return null
+        }
+
+        val normalizedMac = macAddress.trim()
+        if (normalizedMac.isBlank()) {
+            Log.w(TAG, "No bulb MAC configured")
+            return null
+        }
+
+        val device = runCatching { adapter.getRemoteDevice(normalizedMac) }.getOrNull() ?: run {
+            Log.w(TAG, "Invalid bulb MAC: $normalizedMac")
+            return null
+        }
+
+        val callback = SessionCallback()
+        val gatt = connect(device, context, callback) ?: return null
+        if (!discoverServices(gatt, callback)) {
+            runCatching { gatt.disconnect() }
+            runCatching { gatt.close() }
+            return null
+        }
+
+        return BulbSession(gatt, callback)
+    }
+
     fun applyScene(
         context: Context,
         macAddress: String,
@@ -35,50 +64,22 @@ object ZenggeBulbController {
         white: Int,
         brightnessPercent: Int
     ): Boolean {
-        val adapter = getBluetoothAdapter(context) ?: run {
-            Log.w(TAG, "Bluetooth adapter unavailable")
-            return false
-        }
-
-        val normalizedMac = macAddress.trim()
-        if (normalizedMac.isBlank()) {
-            Log.w(TAG, "No bulb MAC configured")
-            return false
-        }
-
-        val device = runCatching { adapter.getRemoteDevice(normalizedMac) }.getOrNull() ?: run {
-            Log.w(TAG, "Invalid bulb MAC: $normalizedMac")
-            return false
-        }
-
-        val callback = SessionCallback()
-        val gatt = connect(device, context, callback) ?: run {
-            return false
-        }
-
+        val session = openSession(context, macAddress) ?: return false
         return try {
-            if (!discoverServices(gatt, callback)) {
-                return false
-            }
-
             val scaled = scaleScene(red, green, blue, white, brightnessPercent)
-
-            val success = writeRgbPacket(
-                gatt = gatt,
-                callback = callback,
+            writeRgbPacket(
+                gatt = session.gatt,
+                callback = session.callback,
                 red = scaled.red,
                 green = scaled.green,
                 blue = scaled.blue,
                 white = scaled.white,
             )
-
-            success
         } catch (e: Exception) {
             Log.e(TAG, "Failed to apply scene", e)
             false
         } finally {
-            runCatching { gatt.disconnect() }
-            runCatching { gatt.close() }
+            session.close()
         }
     }
 
@@ -137,6 +138,32 @@ object ZenggeBulbController {
     private fun getBluetoothAdapter(context: Context): BluetoothAdapter? {
         val manager = context.getSystemService(BluetoothManager::class.java) ?: return null
         return manager.adapter
+    }
+
+    class BulbSession internal constructor(
+        internal val gatt: BluetoothGatt,
+        internal val callback: SessionCallback
+    ) : AutoCloseable {
+        fun applyScene(red: Int, green: Int, blue: Int, white: Int): Boolean {
+            return try {
+                writeRgbPacket(
+                    gatt = gatt,
+                    callback = callback,
+                    red = red,
+                    green = green,
+                    blue = blue,
+                    white = white,
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to apply scene", e)
+                false
+            }
+        }
+
+        override fun close() {
+            runCatching { gatt.disconnect() }
+            runCatching { gatt.close() }
+        }
     }
 
     private fun connect(
