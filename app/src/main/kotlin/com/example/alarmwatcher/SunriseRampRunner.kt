@@ -10,11 +10,13 @@ internal class SunriseRampRunner(
     private val bulbController: BulbControllerApi,
     private val crashReporter: CrashReporterApi
 ) {
-    suspend fun run(context: Context, macAddress: String, durationMs: Long) {
-        val steps = min(
-            SunriseRampSupport.MAX_RAMP_STEPS,
-            max(1L, durationMs / SunriseRampSupport.MIN_STEP_DELAY_MS).toInt()
-        )
+    suspend fun run(
+        context: Context,
+        macAddress: String,
+        durationMs: Long,
+        onProgress: (currentStep: Int, totalSteps: Int) -> Unit = { _, _ -> }
+    ) {
+        val steps = SunriseRampSupport.computeStepCount(durationMs)
         val stepDelayMs = max(1L, durationMs / steps)
         val session = bulbController.openSession(context, macAddress)
         if (session == null) {
@@ -31,6 +33,7 @@ internal class SunriseRampRunner(
                     blue = palette.blue,
                     white = 0
                 )
+                onProgress(step, steps)
                 if (step < steps) {
                     delay(stepDelayMs)
                 }

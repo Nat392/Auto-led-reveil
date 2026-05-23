@@ -1,5 +1,8 @@
 package com.example.alarmwatcher
 
+import kotlin.math.max
+import kotlin.math.min
+
 internal object SunriseRampSupport {
     const val MAX_RAMP_STEPS = 30
     const val MIN_STEP_DELAY_MS = 250L
@@ -43,6 +46,11 @@ internal object SunriseRampSupport {
         Scene(220, 237, 220),
         Scene(220, 240, 255)
     )
+
+    fun computeStepCount(durationMs: Long): Int {
+        val rawStepCount = max(1L, durationMs / MIN_STEP_DELAY_MS).toInt()
+        return min(MAX_RAMP_STEPS, rawStepCount)
+    }
 
     fun reportSceneAtStep(step: Int, steps: Int): Scene {
         val lastIndex = reportRgbTable.lastIndex

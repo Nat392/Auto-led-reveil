@@ -15,6 +15,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import java.text.DateFormat
+import java.util.Date
 
 class SunriseService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -33,15 +35,21 @@ class SunriseService : Service() {
             stopSelf(startId)
             return START_NOT_STICKY
         }
-        startForeground(NOTIFICATION_ID, buildNotification("Démarrage du lever de soleil"))
+
+        val originalAlarmMs = intent.getLongExtra(EXTRA_ORIGINAL_ALARM_MS, -1L)
 
         rampJob?.cancel()
         val macAddress = intent.getStringExtra(EXTRA_BULB_MAC).orEmpty().trim()
         val durationMs = intent.getLongExtra(EXTRA_DURATION_MS, AlarmScheduler.PREWARN_MS).coerceAtLeast(1L)
+        val totalSteps = SunriseRampSupport.computeStepCount(durationMs)
+
+        startForeground(NOTIFICATION_ID, buildRampNotification(0, totalSteps, originalAlarmMs))
 
         rampJob = serviceScope.launch {
             try {
-                rampRunner.run(applicationContext, macAddress, durationMs)
+                rampRunner.run(applicationContext, macAddress, durationMs) { currentStep, total ->
+                    updateRampNotification(currentStep + 1, total, originalAlarmMs)
+                }
             } catch (e: Exception) {
                 Log.e(TAG, "Erreur durant la rampe de luminosité", e)
                 DiscordCrashReporter.reportNonFatal(
@@ -75,14 +83,31 @@ class SunriseService : Service() {
         manager.createNotificationChannel(channel)
     }
 
-    private fun buildNotification(text: String) = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-        .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-        .setContentTitle("Alarm Watcher")
-        .setContentText(text)
-        .setOngoing(true)
-        .setOnlyAlertOnce(true)
-        .setPriority(NotificationCompat.PRIORITY_LOW)
-        .build()
+    private fun buildRampNotification(completedSteps: Int, totalSteps: Int, originalAlarmMs: Long) =
+        NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentTitle("Alarm Watcher")
+            .setContentText("Lever de soleil — $completedSteps / $totalSteps")
+            .setSubText(formatAlarmTime(originalAlarmMs))
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+
+    private fun updateRampNotification(completedSteps: Int, totalSteps: Int, originalAlarmMs: Long) {
+        getSystemService(NotificationManager::class.java)?.notify(
+            NOTIFICATION_ID,
+            buildRampNotification(completedSteps, totalSteps, originalAlarmMs)
+        )
+    }
+
+    private fun formatAlarmTime(originalAlarmMs: Long): String? {
+        if (originalAlarmMs <= 0L) {
+            return null
+        }
+        val formatter = DateFormat.getTimeInstance(DateFormat.SHORT)
+        return "Alarme cible : ${formatter.format(Date(originalAlarmMs))}"
+    }
 
     private data class Scene(
         val red: Int,
