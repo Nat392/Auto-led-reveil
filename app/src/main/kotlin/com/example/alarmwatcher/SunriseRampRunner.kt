@@ -2,13 +2,13 @@ package com.example.alarmwatcher
 
 import android.content.Context
 import android.util.Log
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlin.math.max
 import kotlin.math.min
 
 internal class SunriseRampRunner(
-    private val bulbController: BulbControllerApi,
-    private val crashReporter: CrashReporterApi
+    private val bulbController: BulbControllerApi
 ) {
     suspend fun run(
         context: Context,
@@ -41,13 +41,11 @@ internal class SunriseRampRunner(
                     delay(stepDelayMs)
                 }
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e(TAG, "Erreur durant la rampe de luminosité", e)
-            crashReporter.reportNonFatal(
-                context = context,
-                throwable = e,
-                source = "SunriseService.rampJob"
-            )
+            throw e
         } finally {
             session.close()
         }

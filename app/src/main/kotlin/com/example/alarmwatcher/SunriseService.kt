@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -21,7 +22,7 @@ import java.util.Date
 class SunriseService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var rampJob: Job? = null
-    private val rampRunner = SunriseRampRunner(ZenggeBulbController, DiscordCrashReporter)
+    private val rampRunner = SunriseRampRunner(ZenggeBulbController)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -50,6 +51,8 @@ class SunriseService : Service() {
                 rampRunner.run(applicationContext, macAddress, durationMs) { currentStep, total ->
                     updateRampNotification(currentStep + 1, total, originalAlarmMs)
                 }
+            } catch (e: CancellationException) {
+                Log.i(TAG, "Rampe sunrise annulée")
             } catch (e: Exception) {
                 Log.e(TAG, "Erreur durant la rampe de luminosité", e)
                 DiscordCrashReporter.reportNonFatal(
