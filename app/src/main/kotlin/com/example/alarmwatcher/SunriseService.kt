@@ -47,7 +47,24 @@ class SunriseService : Service() {
         val durationMs = intent.getLongExtra(EXTRA_DURATION_MS, AlarmScheduler.PREWARN_MS).coerceAtLeast(1L)
         val totalSteps = SunriseRampSupport.computeStepCount(durationMs)
 
-        startForeground(NOTIFICATION_ID, buildRampNotification(0, totalSteps, originalAlarmMs))
+        if (!BlePermissionSupport.hasBluetoothConnectPermission(applicationContext)) {
+            Log.w(TAG, "Stopping sunrise service: BLUETOOTH_CONNECT permission is not granted")
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+
+        try {
+            startForeground(NOTIFICATION_ID, buildRampNotification(0, totalSteps, originalAlarmMs))
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Unable to start foreground sunrise service", e)
+            DiscordCrashReporter.reportNonFatal(
+                context = applicationContext,
+                throwable = e,
+                source = "SunriseService.startForeground"
+            )
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
 
         rampJob = serviceScope.launch {
             try {

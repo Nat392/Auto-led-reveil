@@ -146,6 +146,11 @@ internal object SunsetAutomationScheduler {
     }
 
     private fun triggerSceneCatchUp(context: Context, zoneKey: String) {
+        if (!BlePermissionSupport.hasBluetoothConnectPermission(context)) {
+            Log.w(TAG, "Cannot run sunset catch-up for $zoneKey: BLUETOOTH_CONNECT permission missing")
+            return
+        }
+
         val serviceIntent = Intent(context, SunsetSceneService::class.java).apply {
             action = ACTION_APPLY_SCENE
             putExtra(EXTRA_TARGET_ZONE, zoneKey)

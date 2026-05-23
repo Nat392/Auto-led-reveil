@@ -11,6 +11,12 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
     }
 
     private fun handleAlarm(context: Context, intent: Intent) {
+        if (!BlePermissionSupport.hasBluetoothConnectPermission(context)) {
+            Log.w(TAG, "Cannot start sunrise service: BLUETOOTH_CONNECT permission missing")
+            NotificationHelper.showFallbackNotification(context)
+            return
+        }
+
         val originalAlarmMs = intent.getLongExtra("original_alarm_ms", -1L)
         val durationMs = intent.getLongExtra(SunriseService.EXTRA_DURATION_MS, AlarmScheduler.PREWARN_MS)
         val sunriseZones = SunriseZoneConfig.configuredZones()
@@ -51,5 +57,9 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
 
         // Show fallback notification only when automation is not configured or cannot be started
         NotificationHelper.showFallbackNotification(context)
+    }
+
+    private companion object {
+        const val TAG = "AlarmTriggerReceiver"
     }
 }

@@ -48,7 +48,25 @@ class SunsetSceneService : Service() {
             return START_NOT_STICKY
         }
 
-        startForeground(NOTIFICATION_ID, buildNotification(zone.label))
+        if (!BlePermissionSupport.hasBluetoothConnectPermission(applicationContext)) {
+            Log.w(TAG, "Stopping sunset scene: BLUETOOTH_CONNECT permission is not granted")
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+
+        try {
+            startForeground(NOTIFICATION_ID, buildNotification(zone.label))
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Unable to start foreground service for sunset scene", e)
+            DiscordCrashReporter.reportNonFatal(
+                context = applicationContext,
+                throwable = e,
+                source = "SunsetSceneService.startForeground"
+            )
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+
         sceneJob?.cancel()
         sceneJob = serviceScope.launch {
             try {

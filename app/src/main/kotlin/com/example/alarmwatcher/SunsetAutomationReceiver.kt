@@ -38,6 +38,11 @@ class SunsetAutomationReceiver : BroadcastReceiver() {
     }
 
     private fun handleApplyScene(context: Context, intent: Intent) {
+        if (!BlePermissionSupport.hasBluetoothConnectPermission(context)) {
+            Log.w(TAG, "Skipping sunset scene: BLUETOOTH_CONNECT permission is not granted")
+            return
+        }
+
         val serviceIntent = Intent(context, SunsetSceneService::class.java).apply {
             action = SunsetAutomationScheduler.ACTION_APPLY_SCENE
             putExtra(
