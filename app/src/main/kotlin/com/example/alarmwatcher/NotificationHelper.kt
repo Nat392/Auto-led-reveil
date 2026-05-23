@@ -6,9 +6,11 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 
 object NotificationHelper {
+    private const val TAG = "NotificationHelper"
     private const val CHANNEL_FALLBACK = "alarm_watcher_fallback"
     private const val ID_FALLBACK = 2001
 
@@ -19,11 +21,27 @@ object NotificationHelper {
         }
 
         val launch = context.packageManager.getLaunchIntentForPackage("com.zengge.blev2")
-        val pi = if (launch != null) PendingIntent.getActivity(context, 0, launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE) else null
+        val pi = if (launch != null) {
+            PendingIntent.getActivity(
+                context,
+                0,
+                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                PendingIntent.FLAG_IMMUTABLE
+            )
+        } else {
+            Log.w(TAG, "Impossible de créer l'action de notification: com.zengge.blev2 n'est pas installée")
+            null
+        }
+
+        val contentText = if (pi != null) {
+            "Taper pour ouvrir l'app cible"
+        } else {
+            "App cible non installée"
+        }
 
         val n = NotificationCompat.Builder(context, CHANNEL_FALLBACK)
             .setContentTitle("Pré-alarme")
-            .setContentText("Taper pour ouvrir l'app cible")
+            .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentIntent(pi)
             .setAutoCancel(true)
