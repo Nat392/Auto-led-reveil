@@ -1,31 +1,106 @@
 # Alarm Watcher
 
-Cette application surveille l'alarme système et lance une automatisation 30 minutes avant l'alarme.
+[![Build](https://img.shields.io/badge/build-Gradle-informational)](build.gradle.kts)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue)](app/build.gradle.kts)
 
-Quand une MAC Zengge est configurée dans `local.properties` via `ZENGGE_BULB_MAC`, l'application pilote directement le bulbe en BLE au lieu d'ouvrir `com.zengge.blev2`.
+Alarm Watcher est une application Android qui surveille l’alarme système la plus proche et déclenche des automatisations lumineuses autour du réveil. Elle peut piloter des ampoules Zengge en BLE pour lancer une rampe de lever de soleil avant l’alarme, puis appliquer un mode soirée autour du coucher du soleil.
 
-Étapes d'installation / configuration à suivre sur l'appareil (Samsung Galaxy A17 / Android 16):
+## Ce que fait le projet
 
-1. Installer l'APK.
-2. Ouvrir l'application `MainActivity` pour demander `SCHEDULE_EXACT_ALARM` si nécessaire.
-3. Autoriser `BLUETOOTH_CONNECT` si Android le demande.
-4. Si vous voulez le contrôle direct BLE, ajouter la MAC du bulbe dans `local.properties` avec `ZENGGE_BULB_MAC=00:21:4d:00:00:01`.
-5. Exempter l'application des optimisations batterie (One UI) pour fiabilité (paramètres Batterie -> Optimisations d'économie d'énergie).
+- Détecte la prochaine alarme système Android et planifie un pré-avertissement 30 minutes avant l’heure cible.
+- Lance une rampe sunrise sur une ou plusieurs ampoules Zengge configurées.
+- Applique un mode sunset séparé pour les zones configurées, basé sur une heure de coucher de soleil récupérée en ligne.
+- Redémarre et resynchronise automatiquement les programmations au boot, lors des changements d’heure et après les changements d’alarme.
+- Envoie les erreurs vers Discord si un webhook est configuré.
 
-Test rapide:
+## Pourquoi le projet est utile
 
-1. Créer une alarme réveil dans l'application Horloge, 31 minutes dans le futur.
-2. Vérifier que l'application rescanne l'alarme système au lancement, au boot et lors des changements d'heure/alarme, puis que le `AlarmTriggerReceiver` reçoit le pré-avertissement 30 minutes avant l'alarme.
-3. Si `ZENGGE_BULB_MAC` est défini, l'application envoie directement les commandes BLE pour allumer le bulbe et régler couleur / luminosité.
-4. Si la MAC n'est pas définie, l'application affiche une notification de secours pour ouvrir l'app cible manuellement.
+- Il automatise l’éclairage de réveil sans dépendre d’un service externe complexe.
+- Il garde un plan B simple: si le contrôle BLE n’est pas configuré ou échoue, une notification permet d’ouvrir l’application cible manuellement.
+- Il centralise la logique de réveil, de coucher de soleil et de diagnostic dans une seule app légère.
+- Il expose une configuration simple par fichier local, sans interface d’administration lourde.
 
-Notes techniques:
-- Le contrôle direct BLE suit le protocole Zengge / Flux BLE du module Python `python-zengge`.
-- Si la MAC n'est pas définie ou si la connexion BLE échoue, la notification de secours reste disponible.
+## Démarrage rapide
 
-Build APK:
+### Prérequis
 
-1. Ouvrir un terminal à la racine du projet.
-2. Lancer `./gradlew.bat assembleDebug` pour générer un APK de test.
-3. Lancer `./gradlew.bat assembleRelease` pour générer un APK installable signé avec la clé debug.
-4. Récupérer l'APK dans `app/build/outputs/apk/`.
+- Android 12 ou plus récent est requis par le code actuel (`minSdk = 31`).
+- JDK 17 et Android Studio ou le wrapper Gradle du dépôt.
+- Un téléphone avec Bluetooth LE si vous voulez piloter des ampoules Zengge.
+
+### Configuration
+
+Créez ou complétez `local.properties` à la racine du dépôt avec les valeurs souhaitées:
+
+```properties
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+ZENGGE_BULB_MAC=00:21:4d:00:00:01
+ZENGGE_BULB_MAC_CHAMBRE=00:21:4d:00:00:02
+ZENGGE_BULB_MAC_BUREAU=00:21:4d:00:00:03
+```
+
+Ces clés sont facultatives, mais elles changent le comportement de l’app:
+
+- `DISCORD_WEBHOOK_URL` active le reporting de crash et de logs de diagnostic.
+- `ZENGGE_BULB_MAC` peut servir au contrôle BLE principal.
+- `ZENGGE_BULB_MAC_CHAMBRE` et `ZENGGE_BULB_MAC_BUREAU` activent les zones chambre et bureau pour les scènes sunrise/sunset.
+
+### Installation et build
+
+Depuis la racine du projet:
+
+```powershell
+./gradlew.bat assembleDebug
+```
+
+L’APK de debug est généré dans `app/build/outputs/apk/`.
+
+Pour installer sur un appareil connecté:
+
+```powershell
+./gradlew.bat installDebug
+```
+
+### Premier lancement
+
+1. Ouvrez l’application une première fois.
+2. Accordez les permissions demandées: Bluetooth, notifications et alarmes exactes selon la version Android.
+3. Si nécessaire, autorisez l’app à fonctionner sans optimisation batterie pour fiabiliser les déclenchements en arrière-plan.
+4. Créez ensuite une alarme système normale dans l’application Horloge du téléphone.
+
+### Exemple d’utilisation
+
+1. Configurez au moins une MAC Zengge dans `local.properties`.
+2. Créez une alarme système à venir.
+3. L’app détecte la prochaine alarme et programme une pré-alarme 30 minutes avant.
+4. Au moment prévu, elle démarre la rampe sunrise sur les zones configurées.
+5. Si le BLE n’est pas configuré ou échoue, la notification de secours reste disponible.
+
+## Où trouver de l’aide
+
+- Consultez [AGENTS.md](AGENTS.md) pour les règles de contribution du dépôt, y compris la langue des messages de commit.
+- Consultez [scripts/install-git-hooks.sh](scripts/install-git-hooks.sh) si vous souhaitez activer les hooks Git fournis.
+- Regardez `app/src/main/AndroidManifest.xml` et `app/build.gradle.kts` pour les permissions, services et dépendances réellement utilisés.
+- Pour diagnostiquer un problème runtime, lancez l’app puis consultez les logs Android Studio ou `adb logcat`.
+
+## Qui maintient et contribue
+
+Le dépôt ne déclare pas de mainteneur nominatif dans les fichiers présents. Les contributions sont donc gérées par les contributeurs du projet.
+
+Pour contribuer:
+
+1. Créez une branche dédiée.
+2. Faites des changements ciblés.
+3. Ouvrez une pull request avec une description courte et claire.
+
+Avant d’envoyer une PR, lisez [AGENTS.md](AGENTS.md): les messages de commit doivent être rédigés en français.
+
+## Structure du dépôt
+
+- `app/` : code Android de l’application.
+- `scripts/` : scripts utilitaires et hooks Git.
+- `_apk_extract/` et `_apk_extract2/` : ressources extraites de l’APK pour référence.
+
+## Licence
+
+Aucune licence n’est déclarée pour le moment dans ce dépôt. Ajoutez un fichier `LICENSE` si vous souhaitez publier une licence explicite.
