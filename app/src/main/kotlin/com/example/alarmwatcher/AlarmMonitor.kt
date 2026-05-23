@@ -3,6 +3,7 @@ package com.example.alarmwatcher
 import android.app.AlarmManager
 import android.content.Context
 import android.util.Log
+import kotlin.math.max
 
 object AlarmMonitor {
     private const val TAG = "AlarmMonitor"
@@ -18,12 +19,13 @@ object AlarmMonitor {
             val next = alarmManager.nextAlarmClock
             if (next != null) {
                 val trigger = next.triggerTime
+                val now = System.currentTimeMillis()
 
                 val preWarnAt = trigger - AlarmScheduler.PREWARN_MS
+                val scheduleAt = max(preWarnAt, now)
+                val durationMs = max(trigger - scheduleAt, 1L)
 
-                if (preWarnAt > System.currentTimeMillis()) {
-                    AlarmScheduler.schedulePreWarn(context, preWarnAt, trigger)
-                }
+                AlarmScheduler.schedulePreWarn(context, scheduleAt, trigger, durationMs)
             } else {
                 AlarmScheduler.cancelPreWarn(context)
             }

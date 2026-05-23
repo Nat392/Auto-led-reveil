@@ -13,11 +13,12 @@ object AlarmScheduler {
     private const val ACTION_PREWARN = "com.example.alarmwatcher.ACTION_PREWARN"
     const val PREWARN_MS = 30 * 60 * 1000L
 
-    fun schedulePreWarn(context: Context, whenMs: Long, originalAlarmMs: Long) {
+    fun schedulePreWarn(context: Context, whenMs: Long, originalAlarmMs: Long, durationMs: Long = PREWARN_MS) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
         val intent = Intent(context, AlarmTriggerReceiver::class.java).apply {
             action = ACTION_PREWARN
             putExtra("original_alarm_ms", originalAlarmMs)
+            putExtra(SunriseService.EXTRA_DURATION_MS, durationMs)
         }
         val pi = PendingIntent.getBroadcast(context, REQ_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 

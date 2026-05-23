@@ -13,6 +13,7 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
 
     private fun handleAlarm(context: Context, intent: Intent) {
         val originalAlarmMs = intent.getLongExtra("original_alarm_ms", -1L)
+        val durationMs = intent.getLongExtra(SunriseService.EXTRA_DURATION_MS, AlarmScheduler.PREWARN_MS)
 
         val bulbMac = BuildConfig.ZENGGE_BULB_MAC.trim()
         try {
@@ -31,7 +32,7 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
                     putExtra(SunriseService.EXTRA_TARGET_B, targetB)
                     putExtra(SunriseService.EXTRA_TARGET_WHITE, targetWhite)
                     putExtra(SunriseService.EXTRA_INITIAL_BRIGHTNESS, initialBrightness)
-                    putExtra(SunriseService.EXTRA_DURATION_MS, AlarmScheduler.PREWARN_MS)
+                    putExtra(SunriseService.EXTRA_DURATION_MS, durationMs)
                 }
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                     context.startForegroundService(serviceIntent)
