@@ -27,12 +27,15 @@ internal class SunriseRampRunner(
         try {
             for (step in 0..steps) {
                 val palette = SunriseRampSupport.reportSceneAtStep(step, steps)
-                session.applyScene(
+                if (!session.applyScene(
                     red = palette.red,
                     green = palette.green,
                     blue = palette.blue,
                     white = 0
-                )
+                )) {
+                    Log.w(TAG, "Echec d'ecriture BLE pendant la rampe, arret de la sequence")
+                    break
+                }
                 onProgress(step, steps)
                 if (step < steps) {
                     delay(stepDelayMs)
