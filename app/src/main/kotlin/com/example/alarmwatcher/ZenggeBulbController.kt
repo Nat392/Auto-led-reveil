@@ -365,6 +365,8 @@ object ZenggeBulbController {
             return false
         }
 
+        callback.resetWriteLatch()
+
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val status = runCatching {
                 gatt.writeCharacteristic(characteristic, payload, preferredWriteType)
@@ -387,7 +389,6 @@ object ZenggeBulbController {
                 characteristic.writeType = preferredWriteType
                 @Suppress("DEPRECATION")
                 characteristic.value = payload
-                callback.resetWriteLatch()
                 @Suppress("DEPRECATION")
                 val started = runCatching { gatt.writeCharacteristic(characteristic) }.getOrDefault(false)
                 if (!started) {
