@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# commit-msg hook: refuse les messages contenant des mots anglais courants
+# Bypass: préfixer la première ligne du commit par "EN:" pour autoriser l'anglais
+
+MSG_FILE="$1"
+
+if [ -z "${MSG_FILE:-}" ] || [ ! -f "$MSG_FILE" ]; then
+  echo "commit-msg hook: fichier de message non fourni" >&2
+  exit 0
+fi
+
+# Si le message commence par EN: on passe
+if head -n1 "$MSG_FILE" | grep -qE '^[[:space:]]*(EN:|en:)'; then
+  exit 0
+fi
+
+MSG_LOWER=$(tr '[:upper:]' '[:lower:]' < "$MSG_FILE")
+
+# Liste non-exhaustive de mots anglais fréquents à détecter
+EN_REGEX='\b(the|and|or|for|with|add|adds|added|fix|fixes|fixed|update|updates|updated|remove|removes|removed|refactor|refactors|refactored|implement|implements|implemented|feature|features|bug|bugs|chore|docs|readme|test|tests|testing|release|upgrade)\b'
+
+if echo "$MSG_LOWER" | grep -E -q "$EN_REGEX"; then
+  echo "Erreur: le message de commit semble contenir de l'anglais." >&2
+  echo "Merci d'écrire le sujet et la description du commit en français." >&2
+  echo "Si nécessaire, préfixez la première ligne par 'EN:' pour forcer l'anglais." >&2
+  echo "Aperçu des premières lignes du message de commit :" >&2
+  sed -n '1,6p' "$MSG_FILE" >&2
+  exit 1
+fi
+
+exit 0
