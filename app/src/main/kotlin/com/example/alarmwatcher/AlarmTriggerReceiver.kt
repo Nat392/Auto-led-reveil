@@ -18,20 +18,10 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
         val bulbMac = BuildConfig.ZENGGE_BULB_MAC.trim()
         try {
             if (bulbMac.isNotBlank()) {
-                val targetR: Int = intent.getIntExtra("target_r", 220)
-                val targetG: Int = intent.getIntExtra("target_g", 240)
-                val targetB: Int = intent.getIntExtra("target_b", 255)
-                val targetWhite: Int = intent.getIntExtra("target_white", 0)
-                val initialBrightness: Int = intent.getIntExtra("brightness_percent", 1)
                 val serviceIntent = Intent(context, SunriseService::class.java).apply {
                     setAction(SunriseService.ACTION_START_SUNRISE)
                     putExtra(SunriseService.EXTRA_BULB_MAC, bulbMac)
                     putExtra(SunriseService.EXTRA_ORIGINAL_ALARM_MS, originalAlarmMs)
-                    putExtra(SunriseService.EXTRA_TARGET_R, targetR)
-                    putExtra(SunriseService.EXTRA_TARGET_G, targetG)
-                    putExtra(SunriseService.EXTRA_TARGET_B, targetB)
-                    putExtra(SunriseService.EXTRA_TARGET_WHITE, targetWhite)
-                    putExtra(SunriseService.EXTRA_INITIAL_BRIGHTNESS, initialBrightness)
                     putExtra(SunriseService.EXTRA_DURATION_MS, durationMs)
                 }
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {

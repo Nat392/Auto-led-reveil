@@ -18,7 +18,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.max
-import kotlin.math.roundToInt
 
 class SunriseService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -41,13 +40,6 @@ class SunriseService : Service() {
         rampJob?.cancel()
         val macAddress = intent.getStringExtra(EXTRA_BULB_MAC).orEmpty().trim()
         val durationMs = intent.getLongExtra(EXTRA_DURATION_MS, AlarmScheduler.PREWARN_MS).coerceAtLeast(1L)
-        val targetScene = Scene(
-            red = intent.getIntExtra(EXTRA_TARGET_R, REPORT_RGB_TABLE.last().red).coerceIn(0, 255),
-            green = intent.getIntExtra(EXTRA_TARGET_G, REPORT_RGB_TABLE.last().green).coerceIn(0, 255),
-            blue = intent.getIntExtra(EXTRA_TARGET_B, REPORT_RGB_TABLE.last().blue).coerceIn(0, 255),
-            white = intent.getIntExtra(EXTRA_TARGET_WHITE, 0).coerceIn(0, 255)
-        )
-        val initialBrightness = intent.getIntExtra(EXTRA_INITIAL_BRIGHTNESS, 1).coerceIn(1, 100)
 
         rampJob = serviceScope.launch {
             try {
@@ -56,15 +48,15 @@ class SunriseService : Service() {
                 // We want duration split into 30 intervals (ramp granularity), so divide by steps.
                 val stepDelayMs = max(1L, durationMs / steps)
                 for (t in 0..steps) {
-                    val palette = reportSceneAtStep(t, steps, targetScene)
-                    val brightnessPercentForController = lerpInt(initialBrightness, 100, t, steps)
+                    val palette = reportSceneAtStep(t)
+                    val brightnessPercentForController = 100
                     ZenggeBulbController.applyScene(
                         context = applicationContext,
                         macAddress = macAddress,
                         red = palette.red,
                         green = palette.green,
                         blue = palette.blue,
-                        white = palette.white,
+                        white = 0,
                         brightnessPercent = brightnessPercentForController
                     )
                     if (t < steps) {
@@ -116,8 +108,7 @@ class SunriseService : Service() {
     private data class Scene(
         val red: Int,
         val green: Int,
-        val blue: Int,
-        val white: Int = 0
+        val blue: Int
     )
 
     companion object {
@@ -125,11 +116,6 @@ class SunriseService : Service() {
         const val ACTION_START_SUNRISE = "com.example.alarmwatcher.ACTION_START_SUNRISE"
         const val EXTRA_BULB_MAC = "extra_bulb_mac"
         const val EXTRA_ORIGINAL_ALARM_MS = "extra_original_alarm_ms"
-        const val EXTRA_TARGET_R = "extra_target_r"
-        const val EXTRA_TARGET_G = "extra_target_g"
-        const val EXTRA_TARGET_B = "extra_target_b"
-        const val EXTRA_TARGET_WHITE = "extra_target_white"
-        const val EXTRA_INITIAL_BRIGHTNESS = "extra_initial_brightness"
         const val EXTRA_DURATION_MS = "extra_duration_ms"
 
         private const val NOTIFICATION_ID = 401
@@ -170,28 +156,7 @@ class SunriseService : Service() {
         )
     }
 
-    private fun reportSceneAtStep(t: Int, maxStep: Int, targetScene: Scene): Scene {
-        val baseScene = REPORT_RGB_TABLE.getOrElse(t) { REPORT_RGB_TABLE.last() }
-        val baseFinalScene = REPORT_RGB_TABLE.last()
-
-        return Scene(
-            red = scaleChannel(baseScene.red, baseFinalScene.red, targetScene.red),
-            green = scaleChannel(baseScene.green, baseFinalScene.green, targetScene.green),
-            blue = scaleChannel(baseScene.blue, baseFinalScene.blue, targetScene.blue),
-            white = lerpInt(0, targetScene.white, t, maxStep)
-        )
-    }
-
-    private fun scaleChannel(value: Int, baseMax: Int, targetMax: Int): Int {
-        if (baseMax <= 0) return targetMax.coerceIn(0, 255)
-        return ((value.toDouble() / baseMax.toDouble()) * targetMax.toDouble())
-            .roundToInt()
-            .coerceIn(0, 255)
-    }
-
-    private fun lerpInt(start: Int, end: Int, step: Int, maxStep: Int): Int {
-        if (maxStep <= 0) return end.coerceIn(0, 255)
-        val ratio = step.coerceIn(0, maxStep).toDouble() / maxStep.toDouble()
-        return (start + ((end - start) * ratio)).roundToInt().coerceIn(0, 255)
+    private fun reportSceneAtStep(t: Int): Scene {
+        return REPORT_RGB_TABLE.getOrElse(t) { REPORT_RGB_TABLE.last() }
     }
 }
