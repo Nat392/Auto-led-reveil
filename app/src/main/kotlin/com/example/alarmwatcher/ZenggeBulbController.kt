@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION")
-
 package com.example.alarmwatcher
 
 import android.bluetooth.BluetoothAdapter
