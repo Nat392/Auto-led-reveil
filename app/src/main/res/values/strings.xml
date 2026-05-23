@@ -1,5 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Alarm Watcher</string>
-    <string name="accessibility_desc">Automation service to control the target app for pre-alarm actions</string>
 </resources>

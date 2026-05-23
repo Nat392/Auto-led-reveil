@@ -50,19 +50,6 @@
         </receiver>
         <receiver android:name=".AlarmTriggerReceiver" android:exported="true" />
         
-        <!-- Accessibility automation service used to interact with the target app UI -->
-        <service
-            android:name=".AutomationService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
-        </service>
-
         <service
             android:name=".SunriseService"
             android:exported="false"
