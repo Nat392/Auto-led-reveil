@@ -18,6 +18,10 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { _ -> }
 
+    private val requestPostNotifications = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { _ -> }
+
     private val requestScheduleExact = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { /* handle result if needed */ }
@@ -29,6 +33,12 @@ class MainActivity : AppCompatActivity() {
             checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
         ) {
             requestBluetoothConnect.launch(Manifest.permission.BLUETOOTH_CONNECT)
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPostNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
         val am = getSystemService(AlarmManager::class.java)
