@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Application
 import android.os.Bundle
 import android.os.Process
+import android.util.Log
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -22,6 +23,9 @@ class AlarmWatcherApp : Application() {
                         throwable = throwable,
                         threadName = thread.name
                     )
+                } catch (reportingError: Throwable) {
+                    Log.e(TAG, "Erreur pendant l'envoi du crash fatal", reportingError)
+                    Log.e(TAG, "Exception fatale d'origine", throwable)
                 } finally {
                     fatalDispatchInProgress.set(false)
                 }
@@ -35,6 +39,7 @@ class AlarmWatcherApp : Application() {
     }
 
     companion object {
+        private const val TAG = "AlarmWatcherApp"
         private val fatalDispatchInProgress = AtomicBoolean(false)
     }
 }
