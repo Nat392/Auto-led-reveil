@@ -17,6 +17,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.min
 import kotlin.math.max
 
 class SunriseService : Service() {
@@ -43,12 +44,10 @@ class SunriseService : Service() {
 
         rampJob = serviceScope.launch {
             try {
-                // Steps: 0..30 inclusive (31 iterations). 'steps' is the max t value.
-                val steps = 30
-                // We want duration split into 30 intervals (ramp granularity), so divide by steps.
+                val steps = min(MAX_RAMP_STEPS, max(1L, durationMs / MIN_STEP_DELAY_MS).toInt())
                 val stepDelayMs = max(1L, durationMs / steps)
                 for (t in 0..steps) {
-                    val palette = reportSceneAtStep(t)
+                    val palette = reportSceneAtStep(t, steps)
                     val brightnessPercentForController = 100
                     ZenggeBulbController.applyScene(
                         context = applicationContext,
@@ -113,13 +112,15 @@ class SunriseService : Service() {
 
     companion object {
         private const val TAG = "SunriseService"
+        private const val NOTIFICATION_ID = 401
+        private const val NOTIFICATION_CHANNEL_ID = "sunrise_service"
+        private const val MAX_RAMP_STEPS = 30
+        private const val MIN_STEP_DELAY_MS = 250L
+
         const val ACTION_START_SUNRISE = "com.example.alarmwatcher.ACTION_START_SUNRISE"
         const val EXTRA_BULB_MAC = "extra_bulb_mac"
         const val EXTRA_ORIGINAL_ALARM_MS = "extra_original_alarm_ms"
         const val EXTRA_DURATION_MS = "extra_duration_ms"
-
-        private const val NOTIFICATION_ID = 401
-        private const val NOTIFICATION_CHANNEL_ID = "sunrise_service"
 
         private val REPORT_RGB_TABLE = listOf(
             Scene(0, 0, 0),
@@ -156,7 +157,13 @@ class SunriseService : Service() {
         )
     }
 
-    private fun reportSceneAtStep(t: Int): Scene {
-        return REPORT_RGB_TABLE.getOrElse(t) { REPORT_RGB_TABLE.last() }
+    private fun reportSceneAtStep(t: Int, steps: Int): Scene {
+        val lastIndex = REPORT_RGB_TABLE.lastIndex
+        val mappedIndex = if (steps <= 0) {
+            lastIndex
+        } else {
+            (t * lastIndex) / steps
+        }
+        return REPORT_RGB_TABLE[mappedIndex.coerceIn(0, lastIndex)]
     }
 }
