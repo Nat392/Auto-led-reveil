@@ -11,7 +11,7 @@ object AlarmScheduler : AlarmSchedulerApi {
     private const val TAG = "AlarmScheduler"
     private const val REQ_CODE = 5401
     private const val ACTION_PREWARN = "com.example.alarmwatcher.ACTION_PREWARN"
-    const val PREWARN_MS = 30 * 60 * 1000L
+    const val PREWARN_MS = DEFAULT_PREWARN_MS
 
     override fun schedulePreWarn(context: Context, whenMs: Long, originalAlarmMs: Long, durationMs: Long) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return

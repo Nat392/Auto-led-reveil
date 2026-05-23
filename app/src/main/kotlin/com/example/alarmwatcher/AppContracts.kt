@@ -4,8 +4,10 @@ import android.content.Context
 import androidx.annotation.WorkerThread
 import kotlinx.coroutines.Job
 
+const val DEFAULT_PREWARN_MS = 30 * 60 * 1000L
+
 interface AlarmSchedulerApi {
-    fun schedulePreWarn(context: Context, whenMs: Long, originalAlarmMs: Long, durationMs: Long = AlarmScheduler.PREWARN_MS)
+    fun schedulePreWarn(context: Context, whenMs: Long, originalAlarmMs: Long, durationMs: Long = DEFAULT_PREWARN_MS)
     fun cancelPreWarn(context: Context)
     fun stopSunriseService(context: Context)
 }
