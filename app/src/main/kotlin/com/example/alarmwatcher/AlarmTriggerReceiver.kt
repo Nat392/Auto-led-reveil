@@ -24,9 +24,9 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
 
                 sunriseZones.forEachIndexed { index, zone ->
                     macAddresses += zone.macAddress
-                    targetRValues[index] = zone.targetR
-                    targetGValues[index] = zone.targetG
-                    targetBValues[index] = zone.targetB
+                    targetRValues[index] = zone.sunriseR
+                    targetGValues[index] = zone.sunriseG
+                    targetBValues[index] = zone.sunriseB
                 }
 
                 val serviceIntent = Intent(context, SunriseService::class.java).apply {

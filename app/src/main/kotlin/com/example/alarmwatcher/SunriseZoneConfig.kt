@@ -3,9 +3,14 @@ package com.example.alarmwatcher
 internal data class SunriseBulbZone(
     val label: String,
     val macAddress: String,
-    val targetR: Int,
-    val targetG: Int,
-    val targetB: Int
+    val sunriseR: Int,
+    val sunriseG: Int,
+    val sunriseB: Int,
+    val sunsetR: Int,
+    val sunsetG: Int,
+    val sunsetB: Int,
+    val whiteChannel: Int = 0,
+    val brightnessPercent: Int = 100
 ) {
     val isConfigured: Boolean
         get() = macAddress.isNotBlank()
@@ -16,18 +21,28 @@ internal object SunriseZoneConfig {
         get() = SunriseBulbZone(
             label = "Bureau",
             macAddress = BuildConfig.ZENGGE_BULB_MAC_BUREAU.trim(),
-            targetR = 220,
-            targetG = 240,
-            targetB = 255
+            sunriseR = 255,
+            sunriseG = 255,
+            sunriseB = 255,
+            sunsetR = 255,
+            sunsetG = 140,
+            sunsetB = 0,
+            whiteChannel = 0,
+            brightnessPercent = 100
         )
 
     val chambre: SunriseBulbZone
         get() = SunriseBulbZone(
             label = "Chambre",
             macAddress = BuildConfig.ZENGGE_BULB_MAC_CHAMBRE.trim(),
-            targetR = 255,
-            targetG = 230,
-            targetB = 210
+            sunriseR = 255,
+            sunriseG = 240,
+            sunriseB = 210,
+            sunsetR = 180,
+            sunsetG = 50,
+            sunsetB = 0,
+            whiteChannel = 0,
+            brightnessPercent = 100
         )
 
     fun all(): List<SunriseBulbZone> = listOf(bureau, chambre)

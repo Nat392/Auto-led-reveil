@@ -57,9 +57,9 @@ class SunriseService : Service() {
                             rampRunner.run(
                                 applicationContext,
                                 zone.macAddress,
-                                zone.targetR,
-                                zone.targetG,
-                                zone.targetB,
+                                zone.sunriseR,
+                                zone.sunriseG,
+                                zone.sunriseB,
                                 durationMs
                             ) { currentStep, total ->
                                 updateRampNotification(currentStep + 1, total, originalAlarmMs)
@@ -162,9 +162,12 @@ class SunriseService : Service() {
                 SunriseBulbZone(
                     label = "Zone ${index + 1}",
                     macAddress = macAddress,
-                    targetR = targetRs[index],
-                    targetG = targetGs[index],
-                    targetB = targetBs[index]
+                    sunriseR = targetRs[index],
+                    sunriseG = targetGs[index],
+                    sunriseB = targetBs[index],
+                    sunsetR = targetRs[index],
+                    sunsetG = targetGs[index],
+                    sunsetB = targetBs[index]
                 )
             }
     }

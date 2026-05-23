@@ -10,5 +10,6 @@ import android.content.Intent
 class AlarmChangeReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         AlarmMonitor.scanNextAlarmAndSchedule(context)
+        SunsetAutomationScheduler.requestRefreshAndSchedule(context)
     }
 }

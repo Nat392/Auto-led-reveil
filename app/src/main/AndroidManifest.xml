@@ -48,9 +48,15 @@
             </intent-filter>
         </receiver>
         <receiver android:name=".AlarmTriggerReceiver" android:exported="false" />
+        <receiver android:name=".SunsetAutomationReceiver" android:exported="false" />
         
         <service
             android:name=".SunriseService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <service
+            android:name=".SunsetSceneService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
 

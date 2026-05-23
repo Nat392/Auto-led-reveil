@@ -119,6 +119,7 @@ class MainActivity : AppCompatActivity() {
 
         // Rescan and schedule the next pre-warn directly.
         AlarmMonitor.scanNextAlarmAndSchedule(this)
+        SunsetAutomationScheduler.requestRefreshAndSchedule(this)
 
         // If launched with diagnostic action, run BLE diagnostic routine.
         if (intent?.action == "com.example.alarmwatcher.DIAGNOSTIC") {
@@ -129,9 +130,9 @@ class MainActivity : AppCompatActivity() {
                             ZenggeBulbController.diagnosticApplyScene(
                                 applicationContext,
                                 zone.macAddress,
-                                zone.targetR,
-                                zone.targetG,
-                                zone.targetB,
+                                zone.sunriseR,
+                                zone.sunriseG,
+                                zone.sunriseB,
                                 0
                             )
                         }
@@ -226,7 +227,7 @@ class MainActivity : AppCompatActivity() {
             } else {
                 "MAC configurée"
             }
-            "BLE ${zone.label} : $status (${zone.targetR}, ${zone.targetG}, ${zone.targetB})"
+            "BLE ${zone.label} : $status matin(${zone.sunriseR}, ${zone.sunriseG}, ${zone.sunriseB}) soir(${zone.sunsetR}, ${zone.sunsetG}, ${zone.sunsetB})"
         }.toMutableList()
 
         val configuredZone = SunriseZoneConfig.primaryZone()
