@@ -26,6 +26,7 @@ object AlarmScheduler {
             val canScheduleExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) am.canScheduleExactAlarms() else true
             if (!canScheduleExact) {
                 Log.w(TAG, "App cannot schedule exact alarms: request user permission")
+                return
             }
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMs, pi)
         } catch (e: Exception) {
