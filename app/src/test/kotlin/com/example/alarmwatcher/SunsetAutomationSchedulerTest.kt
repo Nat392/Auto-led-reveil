@@ -3,10 +3,12 @@ package com.example.alarmwatcher
 import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.util.Log
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mockk.verify
@@ -20,6 +22,7 @@ import java.time.ZoneId
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -36,15 +39,20 @@ class SunsetAutomationSchedulerTest {
     fun setUp() {
         mockkStatic(Log::class)
         mockkStatic(PendingIntent::class)
+        mockkObject(BlePermissionSupport)
+        mockkObject(SunriseZoneConfig)
+        mockkObject(ZenggeBulbController)
         every { Log.w(any(), any<String>()) } returns 0
         every { Log.i(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>(), any<Throwable>()) } returns 0
         every { context.getSystemService(AlarmManager::class.java) } returns alarmManager
+        every { context.applicationContext } returns context
         every { alarmManager.canScheduleExactAlarms() } returns true
         every { PendingIntent.getBroadcast(any(), any(), any(), any()) } returns pendingIntent
         every { pendingIntent.cancel() } returns Unit
         every { alarmManager.cancel(any<PendingIntent>()) } returns Unit
+        every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
         SunsetAutomationScheduler.sunsetConnectionFactory = defaultConnectionFactory
         SunsetAutomationScheduler.intentFactory = defaultIntentFactory
     }
@@ -79,7 +87,42 @@ class SunsetAutomationSchedulerTest {
     }
 
     @Test
-    fun `refreshAndSchedule schedules bureau and chambre offsets from sunset`() = runTest {
+    fun `fetchSunsetInstant returns null when the API responds with an error status`() = runTest {
+        val connection = mockk<HttpURLConnection>(relaxed = true)
+
+        SunsetAutomationScheduler.sunsetConnectionFactory = { connection }
+        every { connection.responseCode } returns 503
+        every { connection.disconnect() } returns Unit
+
+        val sunsetInstant = SunsetAutomationScheduler.fetchSunsetInstant()
+
+        assertNull(sunsetInstant)
+        verify(exactly = 1) { connection.disconnect() }
+    }
+
+    @Test
+    fun `fetchSunsetInstant returns null when the payload is malformed`() = runTest {
+        val connection = mockk<HttpURLConnection>(relaxed = true)
+
+        SunsetAutomationScheduler.sunsetConnectionFactory = { connection }
+        every { connection.responseCode } returns HttpURLConnection.HTTP_OK
+        every { connection.inputStream } returns ByteArrayInputStream(
+            """
+                {
+                  "results": {}
+                }
+            """.trimIndent().toByteArray(Charsets.UTF_8)
+        )
+        every { connection.disconnect() } returns Unit
+
+        val sunsetInstant = SunsetAutomationScheduler.fetchSunsetInstant()
+
+        assertNull(sunsetInstant)
+        verify(exactly = 1) { connection.disconnect() }
+    }
+
+    @Test
+        fun `refreshAndSchedule schedules bureau and chambre offsets from sunset`() = runTest {
                 val sunsetInstant = Instant.parse("2030-05-23T20:00:00Z")
         val body = """
             {
@@ -108,6 +151,102 @@ class SunsetAutomationSchedulerTest {
         assertEquals(3, scheduledTimes.size)
         assertTrue(scheduledTimes.contains(sunsetInstant.toEpochMilli() - 60 * 60 * 1000L))
         assertTrue(scheduledTimes.contains(sunsetInstant.toEpochMilli() - 30 * 60 * 1000L))
+    }
+
+    @Test
+    fun `refreshAndSchedule catches up expired bureau scenes and keeps future alarms`() = runTest {
+        val now = System.currentTimeMillis()
+        val sunsetInstant = Instant.ofEpochMilli(now + 45 * 60 * 1000L)
+        val bureau = SunriseBulbZone(
+            label = "Bureau",
+            macAddress = "AA:BB:CC:DD:EE:FF",
+            sunriseR = 255,
+            sunriseG = 255,
+            sunriseB = 255,
+            sunsetR = 255,
+            sunsetG = 140,
+            sunsetB = 0,
+            whiteChannel = 0,
+            brightnessPercent = 100
+        )
+        val chambre = SunriseBulbZone(
+            label = "Chambre",
+            macAddress = "11:22:33:44:55:66",
+            sunriseR = 255,
+            sunriseG = 240,
+            sunriseB = 210,
+            sunsetR = 180,
+            sunsetG = 50,
+            sunsetB = 0,
+            whiteChannel = 0,
+            brightnessPercent = 100
+        )
+        val body = """
+            {
+              "results": {
+                "sunset": "${sunsetInstant}"
+              }
+            }
+        """.trimIndent()
+        val scheduledTimes = mutableListOf<Long>()
+
+        every { SunriseZoneConfig.bureau } returns bureau
+        every { SunriseZoneConfig.chambre } returns chambre
+        SunsetAutomationScheduler.intentFactory = { _, _ -> mockk(relaxed = true) }
+        SunsetAutomationScheduler.sunsetConnectionFactory = {
+            mockk<HttpURLConnection>(relaxed = true).also { connection ->
+                every { connection.responseCode } returns HttpURLConnection.HTTP_OK
+                every { connection.inputStream } returns ByteArrayInputStream(body.toByteArray(Charsets.UTF_8))
+                every { connection.disconnect() } returns Unit
+            }
+        }
+        every { alarmManager.setExactAndAllowWhileIdle(any(), any(), any()) } answers {
+            scheduledTimes.add(secondArg())
+            Unit
+        }
+        coEvery {
+            ZenggeBulbController.applyScene(
+                any(),
+                bureau.macAddress,
+                bureau.sunsetR,
+                bureau.sunsetG,
+                bureau.sunsetB,
+                bureau.whiteChannel,
+                bureau.brightnessPercent
+            )
+        } returns true
+
+        SunsetAutomationScheduler.refreshAndSchedule(context)
+
+        assertEquals(2, scheduledTimes.size)
+        assertTrue(scheduledTimes.contains(sunsetInstant.toEpochMilli() - 30 * 60 * 1000L))
+        coVerify(exactly = 1) {
+            ZenggeBulbController.applyScene(
+                any(),
+                bureau.macAddress,
+                bureau.sunsetR,
+                bureau.sunsetG,
+                bureau.sunsetB,
+                bureau.whiteChannel,
+                bureau.brightnessPercent
+            )
+        }
+    }
+
+    @Test
+    fun `computeNextRefreshAtMillis rolls to the next day at the exact cutoff`() {
+        val zoneId = ZoneId.of("UTC")
+        val now = LocalDate.of(2026, 5, 24)
+            .atTime(0, 5)
+            .atZone(zoneId)
+            .toInstant()
+            .toEpochMilli()
+
+        val refreshAt = SunsetAutomationScheduler.computeNextRefreshAtMillis(now, zoneId)
+        val refreshInstant = Instant.ofEpochMilli(refreshAt).atZone(zoneId)
+
+        assertEquals(LocalDate.of(2026, 5, 25), refreshInstant.toLocalDate())
+        assertEquals(LocalTime.of(0, 5), refreshInstant.toLocalTime())
     }
 
     @Test
