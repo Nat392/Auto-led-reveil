@@ -111,13 +111,34 @@ class SunsetAutomationSchedulerTest {
     }
 
     @Test
-    fun `computeNextRefreshAtMillis returns the next day at zero hours and five minutes`() {
+    fun `computeNextRefreshAtMillis returns same day at zero hours and five minutes before the cutoff`() {
         val zoneId = ZoneId.of("UTC")
+        val now = LocalDate.of(2026, 5, 24)
+            .atTime(0, 4)
+            .atZone(zoneId)
+            .toInstant()
+            .toEpochMilli()
 
-        val refreshAt = SunsetAutomationScheduler.computeNextRefreshAtMillis(zoneId)
+        val refreshAt = SunsetAutomationScheduler.computeNextRefreshAtMillis(now, zoneId)
         val refreshInstant = Instant.ofEpochMilli(refreshAt).atZone(zoneId)
 
-        assertEquals(LocalDate.now(zoneId).plusDays(1), refreshInstant.toLocalDate())
+        assertEquals(LocalDate.of(2026, 5, 24), refreshInstant.toLocalDate())
+        assertEquals(LocalTime.of(0, 5), refreshInstant.toLocalTime())
+    }
+
+    @Test
+    fun `computeNextRefreshAtMillis rolls over to the next day after the cutoff`() {
+        val zoneId = ZoneId.of("UTC")
+        val now = LocalDate.of(2026, 5, 24)
+            .atTime(0, 6)
+            .atZone(zoneId)
+            .toInstant()
+            .toEpochMilli()
+
+        val refreshAt = SunsetAutomationScheduler.computeNextRefreshAtMillis(now, zoneId)
+        val refreshInstant = Instant.ofEpochMilli(refreshAt).atZone(zoneId)
+
+        assertEquals(LocalDate.of(2026, 5, 25), refreshInstant.toLocalDate())
         assertEquals(LocalTime.of(0, 5), refreshInstant.toLocalTime())
     }
 

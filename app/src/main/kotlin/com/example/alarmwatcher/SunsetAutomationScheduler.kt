@@ -6,6 +6,10 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkManager
+import androidx.work.workDataOf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,6 +23,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
+import java.util.concurrent.TimeUnit
 
 internal object SunsetAutomationScheduler {
     private const val TAG = "SunsetAutomation"
@@ -166,10 +171,22 @@ internal object SunsetAutomationScheduler {
 
         val applied = SunsetSceneService.applySunsetScene(context.applicationContext, zoneKey)
         if (!applied) {
-            val retryAtMs = System.currentTimeMillis() + CATCH_UP_RETRY_MS
-            Log.w(TAG, "Sunset catch-up for $zoneKey did not apply; retrying at $retryAtMs")
-            scheduleRefreshRetry(context, retryAtMs)
+            scheduleCatchUpRetry(context, zoneKey)
         }
+    }
+
+    private fun scheduleCatchUpRetry(context: Context, zoneKey: String) {
+        val workRequest = OneTimeWorkRequestBuilder<SunsetCatchUpWorker>()
+            .setInitialDelay(CATCH_UP_RETRY_MS, TimeUnit.MILLISECONDS)
+            .setInputData(workDataOf(SunsetCatchUpWorker.KEY_ZONE_KEY to zoneKey))
+            .build()
+
+        Log.w(TAG, "Sunset catch-up for $zoneKey did not apply; retrying in $CATCH_UP_RETRY_MS ms")
+        WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
+            SunsetCatchUpWorker.uniqueWorkName(zoneKey),
+            ExistingWorkPolicy.REPLACE,
+            workRequest
+        )
     }
 
     private fun buildRefreshIntent(context: Context): Intent {
@@ -218,11 +235,22 @@ internal object SunsetAutomationScheduler {
         pendingIntent.cancel()
     }
 
-    internal fun computeNextRefreshAtMillis(zoneId: ZoneId = ZoneId.systemDefault()): Long {
-        val nextRefresh = LocalDate.now(zoneId)
-            .plusDays(1)
+    internal fun computeNextRefreshAtMillis(
+        nowMillis: Long = System.currentTimeMillis(),
+        zoneId: ZoneId = ZoneId.systemDefault()
+    ): Long {
+        val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
+        val today = now.toLocalDate()
+        val todayRefresh = today
             .atTime(LocalTime.of(REFRESH_LOCAL_HOUR, REFRESH_LOCAL_MINUTE))
             .atZone(zoneId)
+        val nextRefresh = if (todayRefresh.isAfter(now)) {
+            todayRefresh
+        } else {
+            today.plusDays(1)
+                .atTime(LocalTime.of(REFRESH_LOCAL_HOUR, REFRESH_LOCAL_MINUTE))
+                .atZone(zoneId)
+        }
         return nextRefresh.toInstant().toEpochMilli()
     }
 
