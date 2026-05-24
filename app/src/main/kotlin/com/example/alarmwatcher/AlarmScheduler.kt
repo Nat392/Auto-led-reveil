@@ -12,10 +12,13 @@ object AlarmScheduler : AlarmSchedulerApi {
     private const val REQ_CODE = 5401
     private const val ACTION_PREWARN = "com.example.alarmwatcher.ACTION_PREWARN"
     const val PREWARN_MS = DEFAULT_PREWARN_MS
+    internal var intentFactory: (Context, Class<*>) -> Intent = { context, targetClass ->
+        Intent(context, targetClass)
+    }
 
     override fun schedulePreWarn(context: Context, whenMs: Long, originalAlarmMs: Long, durationMs: Long) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
-        val intent = Intent(context, AlarmTriggerReceiver::class.java).apply {
+        val intent = intentFactory(context, AlarmTriggerReceiver::class.java).apply {
             action = ACTION_PREWARN
             putExtra("original_alarm_ms", originalAlarmMs)
             putExtra(SunriseService.EXTRA_DURATION_MS, durationMs)
@@ -36,7 +39,7 @@ object AlarmScheduler : AlarmSchedulerApi {
 
     override fun cancelPreWarn(context: Context) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
-        val intent = Intent(context, AlarmTriggerReceiver::class.java).apply { action = ACTION_PREWARN }
+        val intent = intentFactory(context, AlarmTriggerReceiver::class.java).apply { action = ACTION_PREWARN }
         val pi = PendingIntent.getBroadcast(context, REQ_CODE, intent, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
         if (pi != null) {
             am.cancel(pi)

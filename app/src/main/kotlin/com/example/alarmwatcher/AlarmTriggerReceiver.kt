@@ -6,6 +6,14 @@ import android.content.Intent
 import android.util.Log
 
 class AlarmTriggerReceiver : BroadcastReceiver() {
+    internal companion object {
+        var intentFactory: (Context, Class<*>) -> Intent = { context, targetClass ->
+            Intent(context, targetClass)
+        }
+
+        private const val TAG = "AlarmTriggerReceiver"
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         handleAlarm(context, intent)
     }
@@ -35,7 +43,7 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
                     targetBValues[index] = zone.sunriseB
                 }
 
-                val serviceIntent = Intent(context, SunriseService::class.java).apply {
+                    val serviceIntent = intentFactory(context, SunriseService::class.java).apply {
                     setAction(SunriseService.ACTION_START_SUNRISE)
                     putStringArrayListExtra(SunriseService.EXTRA_BULB_MACS, macAddresses)
                     putExtra(SunriseService.EXTRA_TARGET_RS, targetRValues)
@@ -57,9 +65,5 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
 
         // Show fallback notification only when automation is not configured or cannot be started
         NotificationHelper.showFallbackNotification(context)
-    }
-
-    private companion object {
-        const val TAG = "AlarmTriggerReceiver"
     }
 }

@@ -13,6 +13,9 @@ object NotificationHelper {
     private const val TAG = "NotificationHelper"
     private const val CHANNEL_FALLBACK = "alarm_watcher_fallback"
     private const val ID_FALLBACK = 2001
+    internal var notificationBuilderFactory: (Context, String) -> NotificationCompat.Builder = { context, channelId ->
+        NotificationCompat.Builder(context, channelId)
+    }
 
     fun showFallbackNotification(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
@@ -39,7 +42,7 @@ object NotificationHelper {
             "App cible non installée"
         }
 
-        val n = NotificationCompat.Builder(context, CHANNEL_FALLBACK)
+        val n = notificationBuilderFactory(context, CHANNEL_FALLBACK)
             .setContentTitle("Pré-alarme")
             .setContentText(contentText)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
