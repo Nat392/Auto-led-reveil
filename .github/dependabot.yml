@@ -1,0 +1,80 @@
+version: 2
+updates:
+  - package-ecosystem: "gradle"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "08:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "android"
+    commit-message:
+      prefix: "build"
+      include: "scope"
+    groups:
+      kotlin-ecosystem-safe:
+        patterns:
+          - "org.jetbrains.kotlin*"
+          - "org.jetbrains.kotlinx*"
+        update-types:
+          - "minor"
+          - "patch"
+      
+      androidx-core-safe:
+        patterns:
+          - "androidx.core:*"
+          - "androidx.lifecycle:*"
+          - "androidx.activity:*"
+          - "androidx.fragment:*"
+        update-types:
+          - "minor"
+          - "patch"
+          
+      androidx-ui-safe:
+        patterns:
+          - "androidx.appcompat:*"
+          - "androidx.constraintlayout:*"
+          - "com.google.android.material:*"
+        update-types:
+          - "minor"
+          - "patch"
+          
+      androidx-architecture-safe:
+        patterns:
+          - "androidx.work:*"
+          - "androidx.room:*"
+          - "androidx.navigation:*"
+          - "androidx.datastore:*"
+        update-types:
+          - "minor"
+          - "patch"
+          
+      testing-safe:
+        patterns:
+          - "junit*"
+          - "org.junit*"
+          - "io.mockk*"
+          - "androidx.test.*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "08:00"
+      timezone: "Europe/Paris"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    groups:
+      github-actions-all:
+        patterns:
+          - "*"
