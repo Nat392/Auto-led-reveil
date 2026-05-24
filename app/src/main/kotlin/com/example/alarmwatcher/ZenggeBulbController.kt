@@ -272,14 +272,14 @@ object ZenggeBulbController : BulbControllerApi {
                 callback,
                 characteristic,
                 buildPowerPacket(false),
-                forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
             )
             powerOn -> writeCharacteristic(
                 gatt,
                 callback,
                 characteristic,
                 buildPowerPacket(true),
-                forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
             )
             else -> tryAllSceneWrites(gatt, callback, characteristic, red, green, blue, white)
         }
@@ -455,10 +455,9 @@ object ZenggeBulbController : BulbControllerApi {
         return null
     }
 
+    @Suppress("UNUSED_PARAMETER")
     internal fun scaleScene(red: Int, green: Int, blue: Int, white: Int, brightnessPercent: Int): Scene {
-        val clampedBrightness = brightnessPercent.coerceIn(0, 100)
-        val norm = clampedBrightness / 100.0
-        val mapped = Math.pow(norm, GAMMA_EXP)
+        val mapped = 1.0
         return Scene(
             red = (red.coerceIn(0, 255) * mapped).toInt().coerceIn(0, 255),
             green = (green.coerceIn(0, 255) * mapped).toInt().coerceIn(0, 255),

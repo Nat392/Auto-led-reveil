@@ -50,24 +50,18 @@ class ZenggeBulbControllerTest {
     }
 
     @Test
-    fun `scaleScene applies gamma and clamps rgbw outputs`() {
+    fun `scaleScene clamps rgbw outputs and ignores brightnessPercent`() {
         val scene = ZenggeBulbController.scaleScene(
             red = 300,
             green = -20,
             blue = 128,
             white = 999,
-            brightnessPercent = 50
+            brightnessPercent = 0
         )
 
-        val mapped = 0.5.pow(2.4)
-
-        assertEquals(expectedChannel(300, mapped), scene.red)
-        assertEquals(expectedChannel(-20, mapped), scene.green)
-        assertEquals(expectedChannel(128, mapped), scene.blue)
-        assertEquals(expectedChannel(999, mapped), scene.white)
-    }
-
-    private fun expectedChannel(input: Int, mapped: Double): Int {
-        return (input.coerceIn(0, 255) * mapped).toInt().coerceIn(0, 255)
+        assertEquals(255, scene.red)
+        assertEquals(0, scene.green)
+        assertEquals(128, scene.blue)
+        assertEquals(255, scene.white)
     }
 }

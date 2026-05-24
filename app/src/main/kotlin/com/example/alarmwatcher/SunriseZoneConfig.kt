@@ -24,8 +24,8 @@ internal object SunriseZoneConfig {
             sunriseR = 220,
             sunriseG = 240,
             sunriseB = 255,
-            sunsetR = 255,
-            sunsetG = 140,
+            sunsetR = 40,
+            sunsetG = 0,
             sunsetB = 0,
             whiteChannel = 0,
             brightnessPercent = 100
@@ -38,8 +38,8 @@ internal object SunriseZoneConfig {
             sunriseR = 255,
             sunriseG = 230,
             sunriseB = 210,
-            sunsetR = 180,
-            sunsetG = 50,
+            sunsetR = 20,
+            sunsetG = 0,
             sunsetB = 0,
             whiteChannel = 0,
             brightnessPercent = 100

@@ -44,6 +44,21 @@ class SunriseRampSupportTest {
     }
 
     @Test
+    fun `computeSceneAtStep applies the same gamma curve to every channel`() {
+        val scene = SunriseRampSupport.computeSceneAtStep(
+            step = 1,
+            totalSteps = 4,
+            targetR = 100,
+            targetG = 100,
+            targetB = 100
+        )
+
+        assertEquals(4, scene.red)
+        assertEquals(scene.red, scene.green)
+        assertEquals(scene.green, scene.blue)
+    }
+
+    @Test
     fun `computeSceneAtStep clamps invalid input values before scaling`() {
         val scene = SunriseRampSupport.computeSceneAtStep(
             step = 5,
