@@ -10,9 +10,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.view.Gravity
-import android.widget.LinearLayout
+import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import java.text.DateFormat
@@ -22,9 +22,11 @@ class MainActivity : AppCompatActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var pendingStartupPrompts = 0
     private var startupFlowStarted = false
-    private var finishRunnable: Runnable? = null
 
-    private lateinit var statusTextView: TextView
+    // Composants de l'interface utilisateur
+    private lateinit var tvAlarmStatus: TextView
+    private lateinit var tvBleStatus: TextView
+    private lateinit var btnTriggerNightMode: Button
 
     private val requestBluetoothConnect = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -46,29 +48,19 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // On attache la vue XML qu'on vient de créer
+        setContentView(R.layout.activity_main)
 
-        statusTextView = TextView(this).apply {
-            textSize = 16f
-            gravity = Gravity.CENTER_HORIZONTAL
-            setLineSpacing(0f, 1.15f)
-            setPadding(48, 48, 48, 48)
-            text = "Analyse du réveil système…"
+        tvAlarmStatus = findViewById(R.id.tvAlarmStatus)
+        tvBleStatus = findViewById(R.id.tvBleStatus)
+        btnTriggerNightMode = findViewById(R.id.btnTriggerNightMode)
+
+        // Action du bouton
+        btnTriggerNightMode.setOnClickListener {
+            triggerNightMode()
         }
 
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER
-            setPadding(48, 96, 48, 96)
-            addView(
-                statusTextView,
-                LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-            )
-        }
-        setContentView(root)
-
+        // --- Gestion des permissions (inchangée) ---
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
         ) {
@@ -86,7 +78,6 @@ class MainActivity : AppCompatActivity() {
         val am = getSystemService(AlarmManager::class.java)
         if (am != null && !am.canScheduleExactAlarms()) {
             pendingStartupPrompts++
-            // open system UI to grant SCHEDULE_EXACT_ALARM to this app
             val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
             requestScheduleExact.launch(intent)
         }
@@ -94,20 +85,40 @@ class MainActivity : AppCompatActivity() {
         if (pendingStartupPrompts == 0) {
             startStartupFlow()
         } else {
-            statusTextView.text = buildPendingPermissionText()
+            tvAlarmStatus.text = "Configuration et demande des permissions en cours..."
+            tvBleStatus.text = "En attente des permissions..."
         }
     }
 
-    override fun onDestroy() {
-        finishRunnable?.let { mainHandler.removeCallbacks(it) }
-        super.onDestroy()
+    private fun triggerNightMode() {
+        Toast.makeText(this, "Envoi des commandes de soirée (séquentiel)...", Toast.LENGTH_SHORT).show()
+
+        // On utilise un Thread et runBlocking pour appliquer les scènes l'une après l'autre
+        // sans que la deuxième n'annule la première dans le cycle de vie du Service.
+        Thread {
+            try {
+                kotlinx.coroutines.runBlocking {
+                    // 1. On applique d'abord le Bureau directement via la méthode suspendue du compagnon
+                    android.util.Log.i("MainActivity", "Application manuelle soirée : Bureau")
+                    SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_BUREAU)
+                    
+                    // Petite pause de sécurité pour laisser le contrôleur BLE respirer
+                    kotlinx.coroutines.delay(1000)
+
+                    // 2. On applique ensuite la Chambre
+                    android.util.Log.i("MainActivity", "Application manuelle soirée : Chambre")
+                    SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_CHAMBRE)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Échec de l'application manuelle du mode soirée", e)
+            }
+        }.start()
     }
 
     private fun onStartupPromptResolved() {
         if (pendingStartupPrompts > 0) {
             pendingStartupPrompts--
         }
-
         if (pendingStartupPrompts == 0) {
             startStartupFlow()
         }
@@ -121,7 +132,7 @@ class MainActivity : AppCompatActivity() {
         AlarmMonitor.scanNextAlarmAndSchedule(this)
         SunsetAutomationScheduler.requestRefreshAndSchedule(this)
 
-        // If launched with diagnostic action, run BLE diagnostic routine.
+        // Diagnostic routine
         if (intent?.action == "com.example.alarmwatcher.DIAGNOSTIC") {
             Thread {
                 try {
@@ -138,100 +149,79 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e(TAG, "Diagnostic failed", e)
+                    android.util.Log.e("MainActivity", "Diagnostic failed", e)
                 }
             }.start()
         }
 
-        statusTextView.text = buildStartupStatusText()
-        scheduleAutoClose()
+        updateUIWithStatus()
     }
 
-    private fun scheduleAutoClose() {
-        finishRunnable?.let { mainHandler.removeCallbacks(it) }
-        finishRunnable = Runnable {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                finishAndRemoveTask()
-            } else {
-                finish()
-            }
-        }
-        mainHandler.postDelayed(finishRunnable!!, STATUS_VISIBLE_MS)
-    }
-
-    private fun buildPendingPermissionText(): String {
-        return """
-            Configuration en cours…
-
-            L’application demande les autorisations nécessaires, puis affichera le statut de la prochaine alarme et du bulbe BLE.
-        """.trimIndent()
-    }
-
-    private fun buildStartupStatusText(): String {
-        val lines = mutableListOf(
-            "Alarm Watcher prêt"
-        )
-
+    private fun updateUIWithStatus() {
         val alarmManager = getSystemService(AlarmManager::class.java)
         val nextAlarmClock = alarmManager?.nextAlarmClock
+
+        val alarmText = java.lang.StringBuilder()
         if (nextAlarmClock == null) {
-            lines += "Prochaine alarme : aucune alarme système détectée"
-            lines += "Rampe : aucune rampe programmée"
+            alarmText.append("⏰ Prochaine alarme : Aucune détectée\n")
+            alarmText.append("🌅 Rampe lumineuse : Aucune programmée\n\n")
         } else {
             val triggerTime = nextAlarmClock.triggerTime
             val now = System.currentTimeMillis()
             val window = AlarmTimingSupport.computePreWarnWindow(triggerTime, now)
             if (window == null) {
-                lines += "Prochaine alarme : déjà expirée"
-                lines += "Rampe : annulée"
+                alarmText.append("⏰ Prochaine alarme : Déjà expirée\n")
+                alarmText.append("🌅 Rampe lumineuse : Annulée\n\n")
             } else {
-                lines += "Prochaine alarme : ${formatDateTime(triggerTime)}"
-                lines += "Rampe : programmée pour ${formatDateTime(window.scheduleAt)} (${formatDuration(window.durationMs)})"
+                alarmText.append("⏰ Prochaine alarme : ${formatDateTime(triggerTime)}\n")
+                alarmText.append("🌅 Rampe (Simulateur d'Aube) : Programmée pour ${formatDateTime(window.scheduleAt)} (${formatDuration(window.durationMs)})\n\n")
             }
         }
+        alarmText.append(exactAlarmStatusLine(alarmManager))
+        tvAlarmStatus.text = alarmText.toString()
 
-        lines += exactAlarmStatusLine(alarmManager)
-        lines += bleStatusLines()
-        lines += "Fermeture automatique dans 2 secondes."
-
-        return lines.joinToString("\n\n")
+        val bleText = java.lang.StringBuilder()
+        bleStatusLines().forEach { line ->
+            bleText.append("• ").append(line).append("\n\n")
+        }
+        tvBleStatus.text = bleText.toString().trim()
     }
 
     private fun exactAlarmStatusLine(alarmManager: AlarmManager?): String {
         if (alarmManager == null) {
-            return "Alarme exacte : AlarmManager indisponible"
+            return "⚙️ Autorisation 'Alarme Exacte' : Indisponible"
         }
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) {
-            return "Alarme exacte : autorisation accordée"
+            return "⚙️ Autorisation 'Alarme Exacte' : Accordée ✅"
         }
-        return "Alarme exacte : autorisation à accorder"
+        return "⚙️ Autorisation 'Alarme Exacte' : À accorder ⚠️"
     }
 
     private fun bleStatusLines(): List<String> {
         val bluetoothManager = getSystemService(BluetoothManager::class.java)
-            ?: return listOf("BLE : Bluetooth indisponible")
-        val adapter = bluetoothManager.adapter ?: return listOf("BLE : Bluetooth indisponible")
+            ?: return listOf("Bluetooth indisponible sur cet appareil")
+        val adapter = bluetoothManager.adapter ?: return listOf("Bluetooth indisponible")
         if (!adapter.isEnabled) {
-            return listOf("BLE : Bluetooth désactivé")
+            return listOf("Le Bluetooth est désactivé")
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
             checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
         ) {
-            return listOf("BLE : permission BLUETOOTH_CONNECT manquante")
+            return listOf("Permission BLUETOOTH_CONNECT manquante")
         }
 
         val lines = SunriseZoneConfig.all().map { zone ->
             val status = if (zone.macAddress.isBlank()) {
-                "MAC manquante"
+                "MAC manquante ❌"
             } else {
-                "MAC configurée"
+                "Prêt ✅"
             }
-            "BLE ${zone.label} : $status matin(${zone.sunriseR}, ${zone.sunriseG}, ${zone.sunriseB}) soir(${zone.sunsetR}, ${zone.sunsetG}, ${zone.sunsetB})"
+            "Zone [${zone.label}]\nStatut : $status\nCible Aube : RGB(${zone.sunriseR}, ${zone.sunriseG}, ${zone.sunriseB})\nCible Soirée : RGB(${zone.sunsetR}, ${zone.sunsetG}, ${zone.sunsetB})"
         }.toMutableList()
 
         val configuredZone = SunriseZoneConfig.primaryZone()
-        lines += "Zone sunrise par défaut : ${configuredZone.label}"
+        lines += "Zone prioritaire : ${configuredZone.label}"
         return lines
     }
 
@@ -243,10 +233,5 @@ class MainActivity : AppCompatActivity() {
     private fun formatDuration(durationMs: Long): String {
         val minutes = (durationMs / 60_000L).coerceAtLeast(1L)
         return if (minutes == 1L) "1 min" else "$minutes min"
-    }
-
-    private companion object {
-        const val TAG = "MainActivity"
-        const val STATUS_VISIBLE_MS = 2_000L
     }
 }
