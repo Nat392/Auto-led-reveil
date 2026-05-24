@@ -24,6 +24,7 @@ internal object SunsetAutomationScheduler {
     private const val TAG = "SunsetAutomation"
     private const val SUNSET_API_URL = "https://api.sunrise-sunset.org/json?lat=46.6644&lng=5.5619&formatted=0"
     private const val REFRESH_RETRY_MS = 60 * 60 * 1000L
+    private const val CATCH_UP_RETRY_MS = 5 * 60 * 1000L
     private const val SUNSET_OFFSET_BUREAU_MS = 60 * 60 * 1000L
     private const val SUNSET_OFFSET_CHAMBRE_MS = 30 * 60 * 1000L
     private const val REFRESH_LOCAL_HOUR = 0
@@ -118,7 +119,7 @@ internal object SunsetAutomationScheduler {
         }
     }
 
-    private fun scheduleSceneAlarmIfNeeded(context: Context, zoneKey: String, whenMs: Long) {
+    private suspend fun scheduleSceneAlarmIfNeeded(context: Context, zoneKey: String, whenMs: Long) {
         if (whenMs <= System.currentTimeMillis()) {
             Log.w(TAG, "Sunset scene for $zoneKey is already past at $whenMs; running catch-up now")
             triggerSceneCatchUp(context, zoneKey)
@@ -151,22 +152,23 @@ internal object SunsetAutomationScheduler {
         }
     }
 
-    private fun triggerSceneCatchUp(context: Context, zoneKey: String) {
+    private suspend fun triggerSceneCatchUp(context: Context, zoneKey: String) {
+        val zone = SunsetSceneService.resolveZone(zoneKey)
+        if (zone == null || !zone.isConfigured) {
+            Log.w(TAG, "Cannot run sunset catch-up for $zoneKey: zone is missing or not configured")
+            return
+        }
+
         if (!BlePermissionSupport.hasBluetoothConnectPermission(context)) {
             Log.w(TAG, "Cannot run sunset catch-up for $zoneKey: BLUETOOTH_CONNECT permission missing")
             return
         }
 
-        val serviceIntent = Intent(context, SunsetSceneService::class.java).apply {
-            action = ACTION_APPLY_SCENE
-            putExtra(EXTRA_TARGET_ZONE, zoneKey)
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(serviceIntent)
-        } else {
-            @Suppress("DEPRECATION")
-            context.startService(serviceIntent)
+        val applied = SunsetSceneService.applySunsetScene(context.applicationContext, zoneKey)
+        if (!applied) {
+            val retryAtMs = System.currentTimeMillis() + CATCH_UP_RETRY_MS
+            Log.w(TAG, "Sunset catch-up for $zoneKey did not apply; retrying at $retryAtMs")
+            scheduleRefreshRetry(context, retryAtMs)
         }
     }
 

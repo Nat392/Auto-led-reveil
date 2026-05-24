@@ -35,13 +35,9 @@ class SunsetSceneService : Service() {
         }
 
         val zoneKey = intent.getStringExtra(SunsetAutomationScheduler.EXTRA_TARGET_ZONE)
-        val zone = when (zoneKey) {
-            SunsetAutomationScheduler.ZONE_BUREAU -> SunriseZoneConfig.bureau
-            SunsetAutomationScheduler.ZONE_CHAMBRE -> SunriseZoneConfig.chambre
-            else -> null
-        }
+        val zone = resolveZone(zoneKey)
 
-        if (zone == null || !zone.isConfigured) {
+        if (zoneKey == null || zone == null || !zone.isConfigured) {
             Log.w(TAG, "Missing configured zone for sunset scene: $zoneKey")
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf(startId)
@@ -70,28 +66,9 @@ class SunsetSceneService : Service() {
         sceneJob?.cancel()
         sceneJob = serviceScope.launch {
             try {
-                val applied = ZenggeBulbController.applyScene(
-                    context = applicationContext,
-                    macAddress = zone.macAddress,
-                    red = zone.sunsetR,
-                    green = zone.sunsetG,
-                    blue = zone.sunsetB,
-                    white = zone.whiteChannel,
-                    brightnessPercent = zone.brightnessPercent
-                )
-
-                if (!applied) {
+                if (!applySunsetScene(applicationContext, zoneKey)) {
                     Log.w(TAG, "Failed to apply sunset scene for ${zone.label}")
                 }
-            } catch (e: CancellationException) {
-                Log.i(TAG, "Sunset scene cancelled")
-            } catch (e: Exception) {
-                Log.e(TAG, "Unexpected error while applying sunset scene", e)
-                DiscordCrashReporter.reportNonFatal(
-                    context = applicationContext,
-                    throwable = e,
-                    source = "SunsetSceneService.sceneJob"
-                )
             } finally {
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf(startId)
@@ -128,9 +105,59 @@ class SunsetSceneService : Service() {
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
 
-    private companion object {
+    companion object {
         private const val TAG = "SunsetSceneService"
         private const val NOTIFICATION_ID = 402
         private const val NOTIFICATION_CHANNEL_ID = "sunset_scene_service"
+
+        internal fun resolveZone(zoneKey: String?): SunriseBulbZone? {
+            return when (zoneKey) {
+                SunsetAutomationScheduler.ZONE_BUREAU -> SunriseZoneConfig.bureau
+                SunsetAutomationScheduler.ZONE_CHAMBRE -> SunriseZoneConfig.chambre
+                else -> null
+            }
+        }
+
+        internal suspend fun applySunsetScene(context: Context, zoneKey: String): Boolean {
+            val zone = resolveZone(zoneKey)
+            if (zone == null || !zone.isConfigured) {
+                Log.w(TAG, "Missing configured zone for sunset scene: $zoneKey")
+                return false
+            }
+
+            if (!BlePermissionSupport.hasBluetoothConnectPermission(context)) {
+                Log.w(TAG, "Stopping sunset scene: BLUETOOTH_CONNECT permission is not granted")
+                return false
+            }
+
+            return try {
+                val applied = ZenggeBulbController.applyScene(
+                    context = context,
+                    macAddress = zone.macAddress,
+                    red = zone.sunsetR,
+                    green = zone.sunsetG,
+                    blue = zone.sunsetB,
+                    white = zone.whiteChannel,
+                    brightnessPercent = zone.brightnessPercent
+                )
+
+                if (!applied) {
+                    Log.w(TAG, "Failed to apply sunset scene for ${zone.label}")
+                }
+
+                applied
+            } catch (e: CancellationException) {
+                Log.i(TAG, "Sunset scene cancelled")
+                throw e
+            } catch (e: Exception) {
+                Log.e(TAG, "Unexpected error while applying sunset scene", e)
+                DiscordCrashReporter.reportNonFatal(
+                    context = context,
+                    throwable = e,
+                    source = "SunsetSceneService.applySunsetScene"
+                )
+                false
+            }
+        }
     }
 }
