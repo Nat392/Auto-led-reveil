@@ -1,5 +1,6 @@
 package com.example.alarmwatcher
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
@@ -27,6 +28,7 @@ object ZenggeBulbController : BulbControllerApi {
     private val UUID_RGBW_NEW: UUID = UUID.fromString("0000ff01-0000-1000-8000-00805f9b34fb")
     private val UUID_RGBW_LEGACY: UUID = UUID.fromString("0000ffe9-0000-1000-8000-00805f9b34fb")
 
+    @SuppressLint("MissingPermission")
     @WorkerThread
     override suspend fun openSession(context: Context, macAddress: String): BulbSession? {
         val adapter = getBluetoothAdapter(context) ?: run {
@@ -83,6 +85,7 @@ object ZenggeBulbController : BulbControllerApi {
         }
     }
 
+    @SuppressLint("MissingPermission")
     @WorkerThread
     override suspend fun powerOff(context: Context, macAddress: String): Boolean {
         val adapter = getBluetoothAdapter(context) ?: return false
@@ -99,6 +102,7 @@ object ZenggeBulbController : BulbControllerApi {
         }
     }
 
+    @SuppressLint("MissingPermission")
     @WorkerThread
     override suspend fun diagnosticApplyScene(
         context: Context,
@@ -174,12 +178,14 @@ object ZenggeBulbController : BulbControllerApi {
             }
         }
 
+        @SuppressLint("MissingPermission")
         override fun close() {
             runCatching { gatt.disconnect() }
             runCatching { gatt.close() }
         }
     }
 
+    @SuppressLint("MissingPermission")
     private suspend fun connect(
         device: BluetoothDevice,
         context: Context,
@@ -232,6 +238,7 @@ object ZenggeBulbController : BulbControllerApi {
         }
     }
 
+    @SuppressLint("MissingPermission")
     private suspend fun discoverServices(gatt: BluetoothGatt, callback: SessionCallback): Boolean {
         callback.resetServicesAwaiter()
         if (!gatt.discoverServices()) {
@@ -361,6 +368,7 @@ object ZenggeBulbController : BulbControllerApi {
     }
 
     @Suppress("DEPRECATION")
+    @SuppressLint("MissingPermission")
     private suspend fun writeCharacteristic(
         gatt: BluetoothGatt,
         callback: SessionCallback,
