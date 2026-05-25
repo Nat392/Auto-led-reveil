@@ -130,7 +130,7 @@ internal object SunsetAutomationScheduler {
         val now = System.currentTimeMillis()
         if (whenMs <= now) {
             val missedByMs = now - whenMs
-            val maxCatchUpDelay = 4 * 60 * 60 * 1000L // 4 hours maximum catch-up window
+            val maxCatchUpDelay = 1 * 60 * 60 * 1000L
             if (missedByMs <= maxCatchUpDelay) {
                 Log.w(TAG, "Sunset scene for $zoneKey is already past at $whenMs; running catch-up now")
                 triggerSceneCatchUp(context, zoneKey)
