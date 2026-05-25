@@ -60,6 +60,7 @@ class AlarmMonitorRunnerTest {
     fun `cancels the prewarn alarm when the next alarm is already expired`() {
         val alarmManager = mockk<AlarmManager>()
         val alarmClock = mockk<AlarmManager.AlarmClockInfo>()
+        every { alarmClock.showIntent } returns null
         every { context.getSystemService(AlarmManager::class.java) } returns alarmManager
         every { alarmManager.nextAlarmClock } returns alarmClock
         every { alarmClock.triggerTime } returns 1L
@@ -74,9 +75,15 @@ class AlarmMonitorRunnerTest {
     fun `cancels the prewarn alarm when the computed window is invalid`() {
         val alarmManager = mockk<AlarmManager>()
         val alarmClock = mockk<AlarmManager.AlarmClockInfo>()
+        every { alarmClock.showIntent } returns null
         every { context.getSystemService(AlarmManager::class.java) } returns alarmManager
         every { alarmManager.nextAlarmClock } returns alarmClock
-        every { alarmClock.triggerTime } returns 42_000L
+        
+        // Use a future 8 AM time
+        val triggerTime = java.time.LocalDate.now().plusDays(1)
+            .atTime(8, 0).atZone(java.time.ZoneId.systemDefault())
+            .toInstant().toEpochMilli()
+        every { alarmClock.triggerTime } returns triggerTime
 
         mockkObject(AlarmTimingSupport)
         every { AlarmTimingSupport.computePreWarnWindow(any(), any()) } returns null
@@ -88,10 +95,61 @@ class AlarmMonitorRunnerTest {
     }
 
     @Test
+    fun `cancels the prewarn alarm when alarm is not in the morning window`() {
+        val alarmManager = mockk<AlarmManager>()
+        val alarmClock = mockk<AlarmManager.AlarmClockInfo>()
+        every { alarmClock.showIntent } returns null
+        every { context.getSystemService(AlarmManager::class.java) } returns alarmManager
+        every { alarmManager.nextAlarmClock } returns alarmClock
+        
+        // 9 PM alarm (21:00) which should be skipped
+        val triggerTime = java.time.LocalDate.now().plusDays(1)
+            .atTime(21, 0).atZone(java.time.ZoneId.systemDefault())
+            .toInstant().toEpochMilli()
+        every { alarmClock.triggerTime } returns triggerTime
+
+        runner.scanNextAlarmAndSchedule(context)
+
+        // It should skip and cancel pre-warn without computing window
+        verify(exactly = 1) { alarmScheduler.cancelPreWarn(context) }
+        confirmVerified(alarmScheduler, crashReporter)
+    }
+
+    @Test
+    fun `cancels the prewarn alarm when alarm is from unauthorized package`() {
+        val alarmManager = mockk<AlarmManager>()
+        val alarmClock = mockk<AlarmManager.AlarmClockInfo>()
+        val pendingIntent = mockk<android.app.PendingIntent>()
+        every { pendingIntent.creatorPackage } returns "com.google.android.calendar"
+        every { alarmClock.showIntent } returns pendingIntent
+        every { context.getSystemService(AlarmManager::class.java) } returns alarmManager
+        every { alarmManager.nextAlarmClock } returns alarmClock
+        
+        val triggerTime = java.time.LocalDate.now().plusDays(1)
+            .atTime(8, 0).atZone(java.time.ZoneId.systemDefault())
+            .toInstant().toEpochMilli()
+        every { alarmClock.triggerTime } returns triggerTime
+
+        runner.scanNextAlarmAndSchedule(context)
+
+        verify(exactly = 1) { alarmScheduler.cancelPreWarn(context) }
+        confirmVerified(alarmScheduler, crashReporter)
+    }
+
+    @Test
     fun `schedules the prewarn alarm when a valid window is computed`() {
         val alarmManager = mockk<AlarmManager>()
         val alarmClock = mockk<AlarmManager.AlarmClockInfo>()
-        val triggerTime = System.currentTimeMillis() + AlarmScheduler.PREWARN_MS + 60_000L
+        
+        val pendingIntent = mockk<android.app.PendingIntent>()
+        every { pendingIntent.creatorPackage } returns "com.google.android.deskclock"
+        every { alarmClock.showIntent } returns pendingIntent
+        
+        // 8 AM alarm
+        val triggerTime = java.time.LocalDate.now().plusDays(1)
+            .atTime(8, 0).atZone(java.time.ZoneId.systemDefault())
+            .toInstant().toEpochMilli()
+        
         val window = AlarmPreWarnWindow(preWarnAt = 12_000L, scheduleAt = 13_000L, durationMs = 4_200L)
 
         every { context.getSystemService(AlarmManager::class.java) } returns alarmManager

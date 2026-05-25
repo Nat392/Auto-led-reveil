@@ -18,11 +18,28 @@ internal class AlarmMonitorRunner(
 
             val next = alarmManager.nextAlarmClock
             if (next != null) {
+                val creatorPackage = next.showIntent?.creatorPackage
+                if (creatorPackage != null && creatorPackage !in ALLOWED_CLOCK_PACKAGES) {
+                    Log.i(TAG, "Skipping alarm from unauthorized package: $creatorPackage")
+                    alarmScheduler.cancelPreWarn(context)
+                    return
+                }
+
                 val trigger = next.triggerTime
                 val now = System.currentTimeMillis()
 
                 if (trigger <= now) {
                     Log.i(TAG, "Skipping expired nextAlarmClock at $trigger (now=$now)")
+                    alarmScheduler.cancelPreWarn(context)
+                    return
+                }
+
+                // Check if the alarm is in the morning/noon
+                val hour = java.time.Instant.ofEpochMilli(trigger)
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .hour
+                if (hour < 2 || hour >= 14) {
+                    Log.i(TAG, "Skipping non-morning alarm at $trigger (hour=$hour)")
                     alarmScheduler.cancelPreWarn(context)
                     return
                 }
@@ -54,7 +71,15 @@ internal class AlarmMonitorRunner(
         }
     }
 
-    private companion object {
-        const val TAG = "AlarmMonitor"
-    }
+    private val ALLOWED_ALARM_PACKAGES = setOf(
+        "com.google.android.deskclock",     // Horloge Google (Pixel, etc.)
+        "com.sec.android.app.clockpackage", // Horloge Samsung
+        "com.android.deskclock",            // Horloge AOSP (utilisée par Xiaomi, Motorola, Nothing, etc.)
+        "com.oneplus.deskclock",            // Horloge OnePlus
+        "com.coloros.alarmclock",           // Horloge Oppo / Realme (ColorOS)
+        "com.miui.deskclock",               // Horloge Xiaomi (sur certaines versions de MIUI)
+        "com.android.alarmclock",           // Anciennes versions Android
+        "com.lge.clock",                    // Horloge LG
+        "com.asus.deskclock"                // Horloge Asus
+    )
 }
