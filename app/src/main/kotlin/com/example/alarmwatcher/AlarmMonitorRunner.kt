@@ -38,7 +38,12 @@ internal class AlarmMonitorRunner(
                 alarmScheduler.cancelPreWarn(context)
             }
         } catch (e: SecurityException) {
-            Log.w(TAG, "Missing permission to read alarms: ${e.message}")
+            Log.w(TAG, "Permission manquante pour lire les alarmes : ${e.message}")
+            crashReporter.reportNonFatal(
+                context = context,
+                throwable = e,
+                source = "AlarmMonitor.scanNextAlarmAndSchedule"
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Unexpected alarm scan failure", e)
             crashReporter.reportNonFatal(

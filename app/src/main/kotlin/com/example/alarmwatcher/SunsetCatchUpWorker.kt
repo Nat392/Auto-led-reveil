@@ -14,7 +14,19 @@ class SunsetCatchUpWorker(
             ?: return Result.failure()
 
         val applied = SunsetSceneService.applySunsetScene(applicationContext, zoneKey)
-        return if (applied) Result.success() else Result.failure()
+
+        return if (applied) {
+            Result.success()
+        } else {
+            DiscordCrashReporter.reportNonFatal(
+                context = applicationContext,
+                throwable = IllegalStateException(
+                    "Echec de l'application de la scene de coucher de soleil pour la zone $zoneKey"
+                ),
+                source = "SunsetCatchUpWorker"
+            )
+            Result.failure()
+        }
     }
 
     companion object {

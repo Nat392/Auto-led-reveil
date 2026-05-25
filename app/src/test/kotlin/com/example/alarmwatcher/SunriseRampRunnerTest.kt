@@ -20,7 +20,8 @@ class SunriseRampRunnerTest {
     private val context = mockk<Context>()
     private val bulbController = mockk<BulbControllerApi>()
     private val session = mockk<BulbSession>(relaxUnitFun = true)
-    private val runner = SunriseRampRunner(bulbController)
+    private val crashReporter = mockk<CrashReporterApi>(relaxed = true)
+    private val runner = SunriseRampRunner(bulbController, crashReporter)
 
     @BeforeEach
     fun setUp() {

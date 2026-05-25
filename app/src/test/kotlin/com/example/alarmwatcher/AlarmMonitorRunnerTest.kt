@@ -125,11 +125,18 @@ class AlarmMonitorRunnerTest {
     }
 
     @Test
-    fun `ignores permission errors while reading the alarm clock`() {
+    fun `reports security exceptions while reading the alarm clock as non fatal`() {
         every { context.getSystemService(AlarmManager::class.java) } throws SecurityException("denied")
 
         runner.scanNextAlarmAndSchedule(context)
 
-        confirmVerified(alarmScheduler, crashReporter)
+        verify(exactly = 1) {
+            crashReporter.reportNonFatal(
+                context = context,
+                throwable = any<SecurityException>(),
+                source = "AlarmMonitor.scanNextAlarmAndSchedule"
+            )
+        }
+        confirmVerified(alarmScheduler)
     }
 }

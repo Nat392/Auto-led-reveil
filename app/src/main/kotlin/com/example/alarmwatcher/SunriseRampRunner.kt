@@ -8,7 +8,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 internal class SunriseRampRunner(
-    private val bulbController: BulbControllerApi
+    private val bulbController: BulbControllerApi,
+    private val crashReporter: CrashReporterApi = DiscordCrashReporter
 ) {
     suspend fun run(
         context: Context,
@@ -24,6 +25,14 @@ internal class SunriseRampRunner(
         val session = bulbController.openSession(context, macAddress)
         if (session == null) {
             Log.w(TAG, "Impossible d'ouvrir une session BLE pour la rampe")
+            crashReporter.reportNonFatal(
+                context = context,
+                throwable = IllegalStateException(
+                    "Impossible d'ouvrir une session BLE pour la rampe" + 
+                    "macAddress=$macAddress - durationMs=$durationMs - steps=$steps - targetR=$targetR - targetG=$targetG - targetB=$targetB"
+            ),
+            source = TAG
+            )
             return
         }
 

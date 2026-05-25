@@ -228,6 +228,11 @@ internal object SunsetAutomationScheduler {
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMs, pendingIntent)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule exact sunset alarm", e)
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = e,
+                source = "SunsetAutomationScheduler.scheduleExactAlarm(requestCode=$requestCode, whenMs=$whenMs)"
+            )
         }
     }
 
