@@ -93,7 +93,9 @@ internal object SunsetAutomationScheduler {
 
     internal suspend fun fetchSunsetInstant(): Instant? {
         return try {
-            val connection = sunsetConnectionFactory(SUNSET_API_URL).apply {
+            val todayDate = LocalDate.now(ZoneId.systemDefault()).toString()
+            val url = "$SUNSET_API_URL&date=$todayDate"
+            val connection = sunsetConnectionFactory(url).apply {
                 connectTimeout = 10_000
                 readTimeout = 10_000
                 requestMethod = "GET"
@@ -125,9 +127,16 @@ internal object SunsetAutomationScheduler {
     }
 
     private suspend fun scheduleSceneAlarmIfNeeded(context: Context, zoneKey: String, whenMs: Long) {
-        if (whenMs <= System.currentTimeMillis()) {
-            Log.w(TAG, "Sunset scene for $zoneKey is already past at $whenMs; running catch-up now")
-            triggerSceneCatchUp(context, zoneKey)
+        val now = System.currentTimeMillis()
+        if (whenMs <= now) {
+            val missedByMs = now - whenMs
+            val maxCatchUpDelay = 4 * 60 * 60 * 1000L // 4 hours maximum catch-up window
+            if (missedByMs <= maxCatchUpDelay) {
+                Log.w(TAG, "Sunset scene for $zoneKey is already past at $whenMs; running catch-up now")
+                triggerSceneCatchUp(context, zoneKey)
+            } else {
+                Log.w(TAG, "Sunset scene for $zoneKey passed $missedByMs ms ago, skipping catch-up as it is too late.")
+            }
             return
         }
         scheduleExactAlarm(context, zoneKeyAlarmRequestCode(zoneKey), buildSceneIntent(context, zoneKey), whenMs)
