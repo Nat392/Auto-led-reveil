@@ -71,15 +71,20 @@ internal class AlarmMonitorRunner(
         }
     }
 
-    private val ALLOWED_ALARM_PACKAGES = setOf(
-        "com.google.android.deskclock",     // Horloge Google (Pixel, etc.)
-        "com.sec.android.app.clockpackage", // Horloge Samsung
-        "com.android.deskclock",            // Horloge AOSP (utilisée par Xiaomi, Motorola, Nothing, etc.)
-        "com.oneplus.deskclock",            // Horloge OnePlus
-        "com.coloros.alarmclock",           // Horloge Oppo / Realme (ColorOS)
-        "com.miui.deskclock",               // Horloge Xiaomi (sur certaines versions de MIUI)
-        "com.android.alarmclock",           // Anciennes versions Android
-        "com.lge.clock",                    // Horloge LG
-        "com.asus.deskclock"                // Horloge Asus
-    )
+    private companion object {
+        const val TAG = "AlarmMonitor"
+
+        val ALLOWED_CLOCK_PACKAGES = setOf(
+            "com.google.android.deskclock",     // Horloge Google (Pixel, etc.)
+            "com.sec.android.app.clockpackage", // Horloge Samsung
+            "com.android.deskclock",            // Horloge AOSP (utilisée par Xiaomi, Motorola, Nothing, etc.)
+            "com.oneplus.deskclock",            // Horloge OnePlus
+            "com.coloros.alarmclock",           // Horloge Oppo / Realme (ColorOS)
+            "com.miui.deskclock",               // Horloge Xiaomi (sur certaines versions de MIUI)
+            "com.android.alarmclock",           // Anciennes versions Android
+            "com.lge.clock",                    // Horloge LG
+            "com.asus.deskclock",               // Horloge Asus
+            "com.sonyericsson.organizer"        // Horloge Sony
+        )
+    }
 }
