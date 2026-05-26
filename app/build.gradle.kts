@@ -29,7 +29,12 @@ android {
         buildConfig = true
     }
 
-    packagingOptions {
+    packaging {
+        resources {
+            excludes += "META-INF/LICENSE.md"
+            excludes += "META-INF/LICENSE-notice.md"
+        }
+
         jniLibs {
             // Empêche le stripping de la librairie native utilisée par mockk
             pickFirsts += listOf("**/libmockkjvmtiagent.so")
