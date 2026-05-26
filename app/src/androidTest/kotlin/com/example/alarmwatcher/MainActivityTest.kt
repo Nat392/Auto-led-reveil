@@ -11,7 +11,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.rule.GrantPermissionRule
 import io.mockk.coEvery
 import io.mockk.mockkObject
-import io.mockk.unmockkAll
+import io.mockk.unmockkObject
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -26,8 +26,7 @@ class MainActivityTest {
     val permissionRule: GrantPermissionRule = GrantPermissionRule.grant(
         Manifest.permission.BLUETOOTH_CONNECT,
         Manifest.permission.BLUETOOTH_SCAN,
-        Manifest.permission.POST_NOTIFICATIONS,
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) Manifest.permission.SCHEDULE_EXACT_ALARM else Manifest.permission.VIBRATE
+        Manifest.permission.POST_NOTIFICATIONS
     )
 
     @get:Rule
@@ -43,8 +42,7 @@ class MainActivityTest {
 
     @After
     fun tearDown() {
-        // Toujours retirer les mocks globaux (object mocks) apr?s chaque test
-        unmockkAll()
+        unmockkObject(ZenggeBulbController)
     }
 
     @Test
