@@ -59,7 +59,14 @@ jobs:
         force-avd-creation: false
         emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
         disable-animations: true
-        script: ./gradlew --build-cache connectedDebugAndroidTest
+        script: |
+          # wait for emulator and grant runtime permissions to debug app (best-effort)
+          adb wait-for-device
+          adb -s emulator-5554 wait-for-device
+          adb -s emulator-5554 shell pm grant com.example.alarmwatcher.debug android.permission.BLUETOOTH_CONNECT || true
+          adb -s emulator-5554 shell pm grant com.example.alarmwatcher.debug android.permission.BLUETOOTH_SCAN || true
+          adb -s emulator-5554 shell pm grant com.example.alarmwatcher.debug android.permission.POST_NOTIFICATIONS || true
+          ./gradlew --build-cache connectedDebugAndroidTest
 
     - name: Upload Debug APK
       uses: actions/upload-artifact@v7

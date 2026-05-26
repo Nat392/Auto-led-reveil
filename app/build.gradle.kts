@@ -115,6 +115,10 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-intents:3.5.1")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
     androidTestImplementation("io.mockk:mockk-android:1.13.5")
+    // Ensure MockK runtime agents are available for instrumented tests on CI
+    androidTestImplementation("io.mockk:mockk-agent-android:1.13.5")
+    androidTestImplementation("io.mockk:mockk-agent-jvm:1.13.5")
+    androidTestImplementation("io.mockk:mockk-agent-api-jvm:1.13.5")
 }
 
 tasks.withType<Test>().configureEach {
