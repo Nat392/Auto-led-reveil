@@ -41,9 +41,15 @@ class AlarmTriggerReceiverTest {
 
     @After
     fun tearDown() {
-        unmockkObject(ZenggeBulbController)
-        unmockkObject(BlePermissionSupport)
-        unmockkObject(SunriseZoneConfig)
+        try {
+            unmockkObject(ZenggeBulbController)
+        } catch (_: Throwable) {}
+        try {
+            unmockkObject(BlePermissionSupport)
+        } catch (_: Throwable) {}
+        try {
+            unmockkObject(SunriseZoneConfig)
+        } catch (_: Throwable) {}
     }
 
     @Test

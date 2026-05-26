@@ -30,8 +30,12 @@ class SunsetAutomationReceiverTest {
 
     @After
     fun tearDown() {
-        unmockkObject(ZenggeBulbController)
-        unmockkObject(BlePermissionSupport)
+        try {
+            unmockkObject(ZenggeBulbController)
+        } catch (_: Throwable) {}
+        try {
+            unmockkObject(BlePermissionSupport)
+        } catch (_: Throwable) {}
     }
 
     @Test
