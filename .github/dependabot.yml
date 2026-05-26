@@ -1,4 +1,4 @@
-# Commentaire pour relancer les mises à jour de dépendances après l'incident de github
+# Commentaire pour relancer les mises à jour de dépendances après l'incident de github 2
 version: 2
 updates:
   - package-ecosystem: "gradle"
