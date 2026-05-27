@@ -65,18 +65,21 @@ jobs:
               core.info(`Triggered Android CI for PR #${pullRequest.number} from ${androidWorkflowRef} using ${pullRequest.head.ref} (${pullRequest.head.sha}).`);
             };
 
-            const waitForAndroidCiRun = async (pullRequest) => {
+            const waitForAndroidCiRun = async (triggeredAfterIso) => {
               const timeoutAt = Date.now() + 45 * 60 * 1000;
 
               while (Date.now() < timeoutAt) {
                 const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  head_sha: pullRequest.head.sha,
                   per_page: 100,
                 });
 
-                const androidRun = workflowRuns.workflow_runs.find((run) => run.name === androidWorkflowName);
+                const androidRun = workflowRuns.workflow_runs.find((run) => {
+                  return run.name === androidWorkflowName
+                    && run.event === 'workflow_dispatch'
+                    && new Date(run.created_at).getTime() >= new Date(triggeredAfterIso).getTime();
+                });
 
                 if (!androidRun) {
                   await new Promise((resolve) => setTimeout(resolve, 30000));
@@ -147,9 +150,10 @@ jobs:
 
                 if (!androidCiSucceeded) {
                   core.info(`Android CI is not green for PR #${pullRequest.number}, triggering a fresh run before enabling auto-merge.`);
+                  const dispatchRequestedAt = new Date().toISOString();
                   await triggerAndroidCiRun(pullRequest);
 
-                  const androidCiFinishedGreen = await waitForAndroidCiRun(pullRequest);
+                  const androidCiFinishedGreen = await waitForAndroidCiRun(dispatchRequestedAt);
 
                   if (!androidCiFinishedGreen) {
                     core.info(`Skipping PR #${pullRequest.number} because Android CI did not finish green.`);
