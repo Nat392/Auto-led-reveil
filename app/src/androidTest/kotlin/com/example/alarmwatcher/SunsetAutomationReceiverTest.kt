@@ -16,13 +16,16 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-// Même chose ici, le wrapper natif est indispensable
 class SunsetTestContextWrapper(base: Context) : ContextWrapper(base) {
     val startedServices = mutableListOf<Intent>()
+    
     override fun startForegroundService(service: Intent?): ComponentName? {
-        if (service != null) {
-            startedServices.add(service)
-        }
+        if (service != null) startedServices.add(service)
+        return service?.component
+    }
+
+    override fun startService(service: Intent?): ComponentName? {
+        if (service != null) startedServices.add(service)
         return service?.component
     }
 }
@@ -59,7 +62,6 @@ class SunsetAutomationReceiverTest {
 
         receiver.onReceive(testContext, sunsetIntent)
 
-        // Vérification avec la liste interne du ContextWrapper
         assertEquals("Le service n'a pas été lancé", 1, testContext.startedServices.size)
         val serviceIntent = testContext.startedServices.first()
 

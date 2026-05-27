@@ -18,10 +18,14 @@ import org.junit.runner.RunWith
 
 class AlarmTestContextWrapper(base: Context) : ContextWrapper(base) {
     val startedServices = mutableListOf<Intent>()
+    
     override fun startForegroundService(service: Intent?): ComponentName? {
-        if (service != null) {
-            startedServices.add(service)
-        }
+        if (service != null) startedServices.add(service)
+        return service?.component
+    }
+
+    override fun startService(service: Intent?): ComponentName? {
+        if (service != null) startedServices.add(service)
         return service?.component
     }
 }
@@ -48,7 +52,6 @@ class AlarmTriggerReceiverTest {
             sunsetB = 50
         )
 
-        // LA SOLUTION : On utilise notre porte dérobée sans faire appel à MockK !
         SunriseZoneConfig.testZones = listOf(realZone)
     }
 
@@ -57,7 +60,6 @@ class AlarmTriggerReceiverTest {
         try { unmockkObject(ZenggeBulbController) } catch (_: Throwable) {}
         try { unmockkObject(BlePermissionSupport) } catch (_: Throwable) {}
         
-        // On n'oublie pas de nettoyer l'injection pour ne pas fausser les autres tests
         SunriseZoneConfig.testZones = null
     }
 
