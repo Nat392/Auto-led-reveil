@@ -1,9 +1,15 @@
 import java.util.Properties
 import org.gradle.api.tasks.testing.Test
+import org.gradle.testing.jacoco.tasks.JacocoReport
 
 plugins {
     id("com.android.application")
     kotlin("android")
+    jacoco
+}
+
+jacoco {
+    toolVersion = "0.8.12"
 }
 
 val localProperties = Properties().apply {
@@ -121,4 +127,49 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+}
+
+val coverageExclusions = listOf(
+    "**/R.class",
+    "**/R$*.class",
+    "**/BuildConfig.*",
+    "**/Manifest*.*",
+    "**/*Test*.*",
+    "**/*\$Companion*.*",
+    "**/*\$Lambda\$*.*",
+    "**/*\$inlined\$*.*",
+    "**/*_Factory*.*",
+    "**/*_MembersInjector*.*",
+    "**/*Hilt*.*",
+    "**/*Dagger*.*",
+    "**/di/**",
+    "**/databinding/**"
+)
+
+fun androidCoverageClassTree() =
+    fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug").get().asFile) {
+        exclude(coverageExclusions)
+    } + fileTree(layout.buildDirectory.dir("intermediates/javac/debug/classes").get().asFile) {
+        exclude(coverageExclusions)
+    }
+
+fun androidCoverageExecutionData() =
+    fileTree(layout.buildDirectory.get().asFile) {
+        include("jacoco/testDebugUnitTest.exec")
+    }
+
+tasks.register<JacocoReport>("jacocoDebugUnitTestReport") {
+    dependsOn("testDebugUnitTest")
+
+    reports {
+        xml.required.set(true)
+        xml.outputLocation.set(layout.buildDirectory.file("reports/jacoco/jacocoDebugUnitTestReport/jacocoDebugUnitTestReport.xml"))
+        html.required.set(true)
+        html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco/jacocoDebugUnitTestReport/html"))
+        csv.required.set(false)
+    }
+
+    sourceDirectories.setFrom(files("src/main/kotlin", "src/main/java"))
+    classDirectories.setFrom(androidCoverageClassTree())
+    executionData.setFrom(androidCoverageExecutionData())
 }

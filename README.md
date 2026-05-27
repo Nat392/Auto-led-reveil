@@ -55,6 +55,8 @@ Depuis la racine du projet:
 
 L’APK de debug est généré dans `app/build/outputs/apk/`.
 
+La CI exécute aussi JaCoCo sur les tests JVM du module `app`, publie un commentaire de couverture sur les PR, puis compare la couverture globale de la PR avec celle de `main`. Le job échoue uniquement si la PR fait baisser cette couverture. Le rapport HTML correspondant est généré dans `app/build/reports/jacoco/jacocoDebugUnitTestReport/html/`.
+
 Pour installer sur un appareil connecté:
 
 ```powershell
