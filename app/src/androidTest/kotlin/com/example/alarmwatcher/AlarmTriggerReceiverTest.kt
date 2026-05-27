@@ -41,17 +41,18 @@ class AlarmTriggerReceiverTest {
         
         mockkObject(SunriseZoneConfig)
         
-        // --- LA CORRECTION DÉFINITIVE EST ICI ---
-        // On n'utilise PLUS mockk<SunriseBulbZone>(). 
-        // On crée une VRAIE instance (adapte les paramètres à ton constructeur si besoin).
+        // On instancie la vraie data class avec tous les paramètres requis par ton modèle
         val realZone = SunriseBulbZone(
+            label = "Test Zone",
             macAddress = "00:11:22:33:44:55",
             sunriseR = 255,
             sunriseG = 200,
-            sunriseB = 100
+            sunriseB = 100,
+            sunsetR = 200,
+            sunsetG = 150,
+            sunsetB = 50
         )
 
-        // On passe notre vrai objet dans la liste
         every { SunriseZoneConfig.configuredZones() } returns listOf(realZone)
     }
 
