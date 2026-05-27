@@ -17,6 +17,9 @@ internal data class SunriseBulbZone(
 }
 
 internal object SunriseZoneConfig {
+    // La porte dérobée pour nos tests
+    var testZones: List<SunriseBulbZone>? = null
+
     val bureau: SunriseBulbZone
         get() = SunriseBulbZone(
             label = "Bureau",
@@ -45,7 +48,9 @@ internal object SunriseZoneConfig {
             brightnessPercent = 100
         )
 
-    fun all(): List<SunriseBulbZone> = listOf(bureau, chambre)
+    // Si testZones n'est pas nul (pendant un test), on le renvoie. 
+    // Sinon (en production), on renvoie la vraie liste.
+    fun all(): List<SunriseBulbZone> = testZones ?: listOf(bureau, chambre)
 
     fun configuredZones(): List<SunriseBulbZone> = all().filter { it.isConfigured }
 

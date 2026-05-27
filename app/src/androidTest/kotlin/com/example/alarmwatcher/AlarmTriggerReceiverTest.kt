@@ -16,7 +16,6 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-// 1. Notre faux contexte qui capture les lancements de service sans crasher
 class AlarmTestContextWrapper(base: Context) : ContextWrapper(base) {
     val startedServices = mutableListOf<Intent>()
     override fun startForegroundService(service: Intent?): ComponentName? {
@@ -38,9 +37,6 @@ class AlarmTriggerReceiverTest {
         mockkObject(BlePermissionSupport)
         every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
         
-        mockkObject(SunriseZoneConfig)
-        
-        // On instancie la vraie data class avec tous les paramètres requis par ton modèle
         val realZone = SunriseBulbZone(
             label = "Test Zone",
             macAddress = "00:11:22:33:44:55",
@@ -52,17 +48,17 @@ class AlarmTriggerReceiverTest {
             sunsetB = 50
         )
 
-        // SÉCURITÉ MAXIMALE : On force MockK à retourner notre vraie zone pour TOUTES les fonctions
-        every { SunriseZoneConfig.all() } returns listOf(realZone)
-        every { SunriseZoneConfig.configuredZones() } returns listOf(realZone)
-        every { SunriseZoneConfig.primaryZone() } returns realZone
+        // LA SOLUTION : On utilise notre porte dérobée sans faire appel à MockK !
+        SunriseZoneConfig.testZones = listOf(realZone)
     }
 
     @After
     fun tearDown() {
         try { unmockkObject(ZenggeBulbController) } catch (_: Throwable) {}
         try { unmockkObject(BlePermissionSupport) } catch (_: Throwable) {}
-        try { unmockkObject(SunriseZoneConfig) } catch (_: Throwable) {}
+        
+        // On n'oublie pas de nettoyer l'injection pour ne pas fausser les autres tests
+        SunriseZoneConfig.testZones = null
     }
 
     @Test
@@ -78,7 +74,6 @@ class AlarmTriggerReceiverTest {
 
         receiver.onReceive(testContext, alarmIntent)
 
-        // 2. Vérification classique avec JUnit, MockK n'intervient plus ici !
         assertEquals("Le service n'a pas été lancé", 1, testContext.startedServices.size)
         val serviceIntent = testContext.startedServices.first()
         
