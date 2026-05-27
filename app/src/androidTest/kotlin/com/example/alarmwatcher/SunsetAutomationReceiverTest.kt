@@ -41,19 +41,23 @@ class SunsetAutomationReceiverTest {
 
     @Test
     fun testSunsetAutomationReceiverStartsSunsetSceneService() {
-        val mockContext = mockk<Context>(relaxed = true)
+        val realContext = ApplicationProvider.getApplicationContext<Context>()
+        val spyContext = spyk(realContext)
+        
+        // LA CORRECTION EST ICI : On intercepte et on bloque le démarrage réel du service
+        every { spyContext.startForegroundService(any()) } returns null
+
         val receiver = SunsetAutomationReceiver()
         
-        val realContext = ApplicationProvider.getApplicationContext<Context>()
-        val sunsetIntent = Intent(realContext, SunsetAutomationReceiver::class.java).apply {
+        val sunsetIntent = Intent(spyContext, SunsetAutomationReceiver::class.java).apply {
             action = SunsetAutomationScheduler.ACTION_APPLY_SCENE
             putExtra(SunsetAutomationScheduler.EXTRA_TARGET_ZONE, "BUREAU")
         }
 
-        receiver.onReceive(mockContext, sunsetIntent)
+        receiver.onReceive(spyContext, sunsetIntent)
 
         verify {
-            mockContext.startForegroundService(withArg { serviceIntent ->
+            spyContext.startForegroundService(withArg { serviceIntent ->
                 assertEquals(SunsetSceneService::class.java.name, serviceIntent.component?.className)
                 assertEquals(SunsetAutomationScheduler.ACTION_APPLY_SCENE, serviceIntent.action)
                 assertEquals("BUREAU", serviceIntent.getStringExtra(SunsetAutomationScheduler.EXTRA_TARGET_ZONE))
