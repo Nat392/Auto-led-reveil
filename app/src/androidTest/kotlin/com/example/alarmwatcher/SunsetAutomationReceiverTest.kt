@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockkObject
+import io.mockk.mockk
 import io.mockk.spyk
 import io.mockk.unmockkObject
 import io.mockk.verify
@@ -40,17 +41,19 @@ class SunsetAutomationReceiverTest {
 
     @Test
     fun testSunsetAutomationReceiverStartsSunsetSceneService() {
-        val spyContext = spyk(ApplicationProvider.getApplicationContext<Context>())
+        val mockContext = mockk<Context>(relaxed = true)
         val receiver = SunsetAutomationReceiver()
-        val sunsetIntent = Intent(spyContext, SunsetAutomationReceiver::class.java).apply {
+        
+        val realContext = ApplicationProvider.getApplicationContext<Context>()
+        val sunsetIntent = Intent(realContext, SunsetAutomationReceiver::class.java).apply {
             action = SunsetAutomationScheduler.ACTION_APPLY_SCENE
             putExtra(SunsetAutomationScheduler.EXTRA_TARGET_ZONE, "BUREAU")
         }
 
-        receiver.onReceive(spyContext, sunsetIntent)
+        receiver.onReceive(mockContext, sunsetIntent)
 
         verify {
-            spyContext.startForegroundService(withArg { serviceIntent ->
+            mockContext.startForegroundService(withArg { serviceIntent ->
                 assertEquals(SunsetSceneService::class.java.name, serviceIntent.component?.className)
                 assertEquals(SunsetAutomationScheduler.ACTION_APPLY_SCENE, serviceIntent.action)
                 assertEquals("BUREAU", serviceIntent.getStringExtra(SunsetAutomationScheduler.EXTRA_TARGET_ZONE))
