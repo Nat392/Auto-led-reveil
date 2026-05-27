@@ -2,6 +2,7 @@ package com.example.alarmwatcher
 
 import android.app.AlarmManager
 import android.content.Context
+import android.util.Log
 import io.mockk.confirmVerified
 import io.mockk.every
 import io.mockk.mockk
@@ -9,13 +10,11 @@ import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mockk.verify
-import android.util.Log
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class AlarmMonitorRunnerTest {
-
     private val context = mockk<Context>()
     private val alarmScheduler = mockk<AlarmSchedulerApi>(relaxed = true)
     private val crashReporter = mockk<CrashReporterApi>(relaxed = true)
@@ -78,11 +77,12 @@ class AlarmMonitorRunnerTest {
         every { alarmClock.showIntent } returns null
         every { context.getSystemService(AlarmManager::class.java) } returns alarmManager
         every { alarmManager.nextAlarmClock } returns alarmClock
-        
+
         // Use a future 8 AM time
-        val triggerTime = java.time.LocalDate.now().plusDays(1)
-            .atTime(8, 0).atZone(java.time.ZoneId.systemDefault())
-            .toInstant().toEpochMilli()
+        val triggerTime =
+            java.time.LocalDate.now().plusDays(1)
+                .atTime(8, 0).atZone(java.time.ZoneId.systemDefault())
+                .toInstant().toEpochMilli()
         every { alarmClock.triggerTime } returns triggerTime
 
         mockkObject(AlarmTimingSupport)
@@ -101,11 +101,12 @@ class AlarmMonitorRunnerTest {
         every { alarmClock.showIntent } returns null
         every { context.getSystemService(AlarmManager::class.java) } returns alarmManager
         every { alarmManager.nextAlarmClock } returns alarmClock
-        
+
         // 9 PM alarm (21:00) which should be skipped
-        val triggerTime = java.time.LocalDate.now().plusDays(1)
-            .atTime(21, 0).atZone(java.time.ZoneId.systemDefault())
-            .toInstant().toEpochMilli()
+        val triggerTime =
+            java.time.LocalDate.now().plusDays(1)
+                .atTime(21, 0).atZone(java.time.ZoneId.systemDefault())
+                .toInstant().toEpochMilli()
         every { alarmClock.triggerTime } returns triggerTime
 
         runner.scanNextAlarmAndSchedule(context)
@@ -124,10 +125,11 @@ class AlarmMonitorRunnerTest {
         every { alarmClock.showIntent } returns pendingIntent
         every { context.getSystemService(AlarmManager::class.java) } returns alarmManager
         every { alarmManager.nextAlarmClock } returns alarmClock
-        
-        val triggerTime = java.time.LocalDate.now().plusDays(1)
-            .atTime(8, 0).atZone(java.time.ZoneId.systemDefault())
-            .toInstant().toEpochMilli()
+
+        val triggerTime =
+            java.time.LocalDate.now().plusDays(1)
+                .atTime(8, 0).atZone(java.time.ZoneId.systemDefault())
+                .toInstant().toEpochMilli()
         every { alarmClock.triggerTime } returns triggerTime
 
         runner.scanNextAlarmAndSchedule(context)
@@ -140,16 +142,17 @@ class AlarmMonitorRunnerTest {
     fun `schedules the prewarn alarm when a valid window is computed`() {
         val alarmManager = mockk<AlarmManager>()
         val alarmClock = mockk<AlarmManager.AlarmClockInfo>()
-        
+
         val pendingIntent = mockk<android.app.PendingIntent>()
         every { pendingIntent.creatorPackage } returns "com.google.android.deskclock"
         every { alarmClock.showIntent } returns pendingIntent
-        
+
         // 8 AM alarm
-        val triggerTime = java.time.LocalDate.now().plusDays(1)
-            .atTime(8, 0).atZone(java.time.ZoneId.systemDefault())
-            .toInstant().toEpochMilli()
-        
+        val triggerTime =
+            java.time.LocalDate.now().plusDays(1)
+                .atTime(8, 0).atZone(java.time.ZoneId.systemDefault())
+                .toInstant().toEpochMilli()
+
         val window = AlarmPreWarnWindow(preWarnAt = 12_000L, scheduleAt = 13_000L, durationMs = 4_200L)
 
         every { context.getSystemService(AlarmManager::class.java) } returns alarmManager
@@ -177,7 +180,7 @@ class AlarmMonitorRunnerTest {
             crashReporter.reportNonFatal(
                 context = context,
                 throwable = any(),
-                source = "AlarmMonitor.scanNextAlarmAndSchedule"
+                source = "AlarmMonitor.scanNextAlarmAndSchedule",
             )
         }
     }
@@ -192,7 +195,7 @@ class AlarmMonitorRunnerTest {
             crashReporter.reportNonFatal(
                 context = context,
                 throwable = any<SecurityException>(),
-                source = "AlarmMonitor.scanNextAlarmAndSchedule"
+                source = "AlarmMonitor.scanNextAlarmAndSchedule",
             )
         }
         confirmVerified(alarmScheduler)

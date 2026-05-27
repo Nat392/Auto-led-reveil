@@ -6,24 +6,22 @@ import androidx.work.WorkerParameters
 
 class SunsetCatchUpWorker(
     appContext: Context,
-    workerParams: WorkerParameters
+    workerParams: WorkerParameters,
 ) : CoroutineWorker(appContext, workerParams) {
-
     override suspend fun doWork(): Result {
-        val zoneKey = inputData.getString(KEY_ZONE_KEY)
-            ?: return Result.failure()
+        val zoneKey = inputData.getString(KEY_ZONE_KEY) ?: return Result.failure()
 
         val applied = SunsetSceneService.applySunsetScene(applicationContext, zoneKey)
 
         return if (applied) {
             Result.success()
         } else {
+            val errorMessage =
+                "Echec de l'application de la scene de coucher de soleil pour la zone $zoneKey"
             crashReporter.reportNonFatal(
                 context = applicationContext,
-                throwable = IllegalStateException(
-                    "Echec de l'application de la scene de coucher de soleil pour la zone $zoneKey"
-                ),
-                source = "SunsetCatchUpWorker"
+                throwable = IllegalStateException(errorMessage),
+                source = "SunsetCatchUpWorker",
             )
             Result.failure()
         }

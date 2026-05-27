@@ -5,11 +5,14 @@ import kotlin.math.max
 internal data class AlarmPreWarnWindow(
     val preWarnAt: Long,
     val scheduleAt: Long,
-    val durationMs: Long
+    val durationMs: Long,
 )
 
 internal object AlarmTimingSupport {
-    fun computePreWarnWindow(triggerTime: Long, now: Long = System.currentTimeMillis()): AlarmPreWarnWindow? {
+    fun computePreWarnWindow(
+        triggerTime: Long,
+        now: Long = System.currentTimeMillis(),
+    ): AlarmPreWarnWindow? {
         if (triggerTime <= now) {
             return null
         }
@@ -21,7 +24,7 @@ internal object AlarmTimingSupport {
         return AlarmPreWarnWindow(
             preWarnAt = preWarnAt,
             scheduleAt = scheduleAt,
-            durationMs = durationMs
+            durationMs = durationMs,
         )
     }
 }

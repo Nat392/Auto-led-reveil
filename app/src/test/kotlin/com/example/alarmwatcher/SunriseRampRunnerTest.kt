@@ -16,7 +16,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class SunriseRampRunnerTest {
-
     private val context = mockk<Context>()
     private val bulbController = mockk<BulbControllerApi>()
     private val session = mockk<BulbSession>(relaxUnitFun = true)
@@ -32,62 +31,65 @@ class SunriseRampRunnerTest {
     }
 
     @Test
-    fun `runs the full ramp and reports every step`() = runTest {
-        val progress = mutableListOf<Pair<Int, Int>>()
+    fun `runs the full ramp and reports every step`() =
+        runTest {
+            val progress = mutableListOf<Pair<Int, Int>>()
 
-        coEvery { bulbController.openSession(context, "AA:BB:CC:DD:EE:FF") } returns session
-        coEvery { session.applyScene(any(), any(), any(), any()) } returns true
+            coEvery { bulbController.openSession(context, "AA:BB:CC:DD:EE:FF") } returns session
+            coEvery { session.applyScene(any(), any(), any(), any()) } returns true
 
-        runner.run(
-            context = context,
-            macAddress = "AA:BB:CC:DD:EE:FF",
-            targetR = 255,
-            targetG = 128,
-            targetB = 64,
-            durationMs = SunriseRampSupport.MIN_STEP_DELAY_MS,
-            onProgress = { currentStep, totalSteps -> progress += currentStep to totalSteps }
-        )
+            runner.run(
+                context = context,
+                macAddress = "AA:BB:CC:DD:EE:FF",
+                targetR = 255,
+                targetG = 128,
+                targetB = 64,
+                durationMs = SunriseRampSupport.MIN_STEP_DELAY_MS,
+                onProgress = { currentStep, totalSteps -> progress += currentStep to totalSteps },
+            )
 
-        assertEquals(listOf(0 to 1, 1 to 1), progress)
-        verify(exactly = 1) { session.close() }
-        coVerify(exactly = 1) { session.applyScene(0, 0, 0, 0) }
-        coVerify(exactly = 1) { session.applyScene(255, 128, 64, 0) }
-    }
-
-    @Test
-    fun `returns immediately when no BLE session can be opened`() = runTest {
-        coEvery { bulbController.openSession(context, any()) } returns null
-
-        runner.run(
-            context = context,
-            macAddress = "AA:BB:CC:DD:EE:FF",
-            targetR = 255,
-            targetG = 128,
-            targetB = 64,
-            durationMs = SunriseRampSupport.MIN_STEP_DELAY_MS
-        )
-
-        coVerify(exactly = 0) { session.applyScene(any(), any(), any(), any()) }
-        verify(exactly = 0) { session.close() }
-    }
+            assertEquals(listOf(0 to 1, 1 to 1), progress)
+            verify(exactly = 1) { session.close() }
+            coVerify(exactly = 1) { session.applyScene(0, 0, 0, 0) }
+            coVerify(exactly = 1) { session.applyScene(255, 128, 64, 0) }
+        }
 
     @Test
-    fun `stops the ramp and closes the session when a BLE write fails softly`() = runTest {
-        coEvery { bulbController.openSession(context, any()) } returns session
-        coEvery { session.applyScene(any(), any(), any(), any()) } returns false
+    fun `returns immediately when no BLE session can be opened`() =
+        runTest {
+            coEvery { bulbController.openSession(context, any()) } returns null
 
-        runner.run(
-            context = context,
-            macAddress = "AA:BB:CC:DD:EE:FF",
-            targetR = 255,
-            targetG = 128,
-            targetB = 64,
-            durationMs = SunriseRampSupport.MIN_STEP_DELAY_MS
-        )
+            runner.run(
+                context = context,
+                macAddress = "AA:BB:CC:DD:EE:FF",
+                targetR = 255,
+                targetG = 128,
+                targetB = 64,
+                durationMs = SunriseRampSupport.MIN_STEP_DELAY_MS,
+            )
 
-        coVerify(exactly = 1) { session.applyScene(any(), any(), any(), any()) }
-        verify(exactly = 1) { session.close() }
-    }
+            coVerify(exactly = 0) { session.applyScene(any(), any(), any(), any()) }
+            verify(exactly = 0) { session.close() }
+        }
+
+    @Test
+    fun `stops the ramp and closes the session when a BLE write fails softly`() =
+        runTest {
+            coEvery { bulbController.openSession(context, any()) } returns session
+            coEvery { session.applyScene(any(), any(), any(), any()) } returns false
+
+            runner.run(
+                context = context,
+                macAddress = "AA:BB:CC:DD:EE:FF",
+                targetR = 255,
+                targetG = 128,
+                targetB = 64,
+                durationMs = SunriseRampSupport.MIN_STEP_DELAY_MS,
+            )
+
+            coVerify(exactly = 1) { session.applyScene(any(), any(), any(), any()) }
+            verify(exactly = 1) { session.close() }
+        }
 
     @Test
     fun `propagates cancellation and still closes the session`() {
@@ -102,7 +104,7 @@ class SunriseRampRunnerTest {
                     targetR = 255,
                     targetG = 128,
                     targetB = 64,
-                    durationMs = SunriseRampSupport.MIN_STEP_DELAY_MS
+                    durationMs = SunriseRampSupport.MIN_STEP_DELAY_MS,
                 )
             }
         }
@@ -123,7 +125,7 @@ class SunriseRampRunnerTest {
                     targetR = 255,
                     targetG = 128,
                     targetB = 64,
-                    durationMs = SunriseRampSupport.MIN_STEP_DELAY_MS
+                    durationMs = SunriseRampSupport.MIN_STEP_DELAY_MS,
                 )
             }
         }

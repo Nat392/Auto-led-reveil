@@ -7,8 +7,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.provider.Settings
 import android.widget.Button
 import android.widget.TextView
@@ -19,7 +17,6 @@ import java.text.DateFormat
 import java.util.Date
 
 class MainActivity : AppCompatActivity() {
-    private val mainHandler = Handler(Looper.getMainLooper())
     private var pendingStartupPrompts = 0
     private var startupFlowStarted = false
 
@@ -28,23 +25,26 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvBleStatus: TextView
     private lateinit var btnTriggerNightMode: Button
 
-    private val requestBluetoothConnect = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) {
-        onStartupPromptResolved()
-    }
+    private val requestBluetoothConnect =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) {
+            onStartupPromptResolved()
+        }
 
-    private val requestPostNotifications = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) {
-        onStartupPromptResolved()
-    }
+    private val requestPostNotifications =
+        registerForActivityResult(
+            ActivityResultContracts.RequestPermission(),
+        ) {
+            onStartupPromptResolved()
+        }
 
-    private val requestScheduleExact = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
-        onStartupPromptResolved()
-    }
+    private val requestScheduleExact =
+        registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+        ) {
+            onStartupPromptResolved()
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,18 +99,18 @@ class MainActivity : AppCompatActivity() {
             try {
                 kotlinx.coroutines.runBlocking {
                     // 1. On applique d'abord le Bureau directement via la méthode suspendue du compagnon
-                    android.util.Log.i("MainActivity", "Application manuelle soirée : Bureau")
+                    android.util.Log.i(TAG, "Application manuelle soirée : Bureau")
                     SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_BUREAU)
-                    
+
                     // Petite pause de sécurité pour laisser le contrôleur BLE respirer
-                    kotlinx.coroutines.delay(1000)
+                    kotlinx.coroutines.delay(MANUAL_SEQUENCE_DELAY_MS)
 
                     // 2. On applique ensuite la Chambre
-                    android.util.Log.i("MainActivity", "Application manuelle soirée : Chambre")
+                    android.util.Log.i(TAG, "Application manuelle soirée : Chambre")
                     SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_CHAMBRE)
                 }
             } catch (e: Exception) {
-                android.util.Log.e("MainActivity", "Échec de l'application manuelle du mode soirée", e)
+                android.util.Log.e(TAG, "Échec de l'application manuelle du mode soirée", e)
             }
         }.start()
     }
@@ -144,7 +144,7 @@ class MainActivity : AppCompatActivity() {
                                 zone.sunriseR,
                                 zone.sunriseG,
                                 zone.sunriseB,
-                                0
+                                0,
                             )
                         }
                     }
@@ -174,7 +174,11 @@ class MainActivity : AppCompatActivity() {
                 alarmText.append("🌅 Rampe lumineuse : Annulée\n\n")
             } else {
                 alarmText.append("⏰ Prochaine alarme : ${formatDateTime(triggerTime)}\n")
-                alarmText.append("🌅 Rampe (Simulateur d'Aube) : Programmée pour ${formatDateTime(window.scheduleAt)} (${formatDuration(window.durationMs)})\n\n")
+                alarmText.append(
+                    "🌅 Rampe (Simulateur d'Aube) : Programmée pour ${formatDateTime(
+                        window.scheduleAt,
+                    )} (${formatDuration(window.durationMs)})\n\n",
+                )
             }
         }
         alarmText.append(exactAlarmStatusLine(alarmManager))
@@ -188,37 +192,46 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun exactAlarmStatusLine(alarmManager: AlarmManager?): String {
-        if (alarmManager == null) {
-            return "⚙️ Autorisation 'Alarme Exacte' : Indisponible"
+        return when {
+            alarmManager == null -> "⚙️ Autorisation 'Alarme Exacte' : Indisponible"
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms() -> {
+                "⚙️ Autorisation 'Alarme Exacte' : Accordée ✅"
+            }
+            else -> "⚙️ Autorisation 'Alarme Exacte' : À accorder ⚠️"
         }
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) {
-            return "⚙️ Autorisation 'Alarme Exacte' : Accordée ✅"
-        }
-        return "⚙️ Autorisation 'Alarme Exacte' : À accorder ⚠️"
     }
 
     private fun bleStatusLines(): List<String> {
         val bluetoothManager = getSystemService(BluetoothManager::class.java)
-            ?: return listOf("Bluetooth indisponible sur cet appareil")
-        val adapter = bluetoothManager.adapter ?: return listOf("Bluetooth indisponible")
-        if (!adapter.isEnabled) {
-            return listOf("Le Bluetooth est désactivé")
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return listOf("Permission BLUETOOTH_CONNECT manquante")
-        }
-
-        val lines = SunriseZoneConfig.all().map { zone ->
-            val status = if (zone.macAddress.isBlank()) {
-                "MAC manquante ❌"
-            } else {
-                "Prêt ✅"
+        val adapter = bluetoothManager?.adapter
+        val staticMessage =
+            when {
+                bluetoothManager == null -> "Bluetooth indisponible sur cet appareil"
+                adapter == null -> "Bluetooth indisponible"
+                !adapter.isEnabled -> "Le Bluetooth est désactivé"
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+                    checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED -> {
+                    "Permission BLUETOOTH_CONNECT manquante"
+                }
+                else -> null
             }
-            "Zone [${zone.label}]\nStatut : $status\nCible Aube : RGB(${zone.sunriseR}, ${zone.sunriseG}, ${zone.sunriseB})\nCible Soirée : RGB(${zone.sunsetR}, ${zone.sunsetG}, ${zone.sunsetB})"
-        }.toMutableList()
+        if (staticMessage != null) {
+            return listOf(staticMessage)
+        }
+
+        val lines =
+            SunriseZoneConfig.all().map { zone ->
+                val status =
+                    if (zone.macAddress.isBlank()) {
+                        "MAC manquante ❌"
+                    } else {
+                        "Prêt ✅"
+                    }
+                "Zone [${zone.label}]\n" +
+                    "Statut : $status\n" +
+                    "Cible Aube : RGB(${zone.sunriseR}, ${zone.sunriseG}, ${zone.sunriseB})\n" +
+                    "Cible Soirée : RGB(${zone.sunsetR}, ${zone.sunsetG}, ${zone.sunsetB})"
+            }.toMutableList()
 
         val configuredZone = SunriseZoneConfig.primaryZone()
         lines += "Zone prioritaire : ${configuredZone.label}"
@@ -231,7 +244,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun formatDuration(durationMs: Long): String {
-        val minutes = (durationMs / 60_000L).coerceAtLeast(1L)
+        val minutes = (durationMs / ONE_MINUTE_MS).coerceAtLeast(1L)
         return if (minutes == 1L) "1 min" else "$minutes min"
+    }
+
+    private companion object {
+        const val TAG = "MainActivity"
+        const val MANUAL_SEQUENCE_DELAY_MS = 1_000L
+        const val ONE_MINUTE_MS = 60_000L
     }
 }

@@ -9,7 +9,6 @@ import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 
 class AlarmWatcherApp : Application() {
-
     override fun onCreate() {
         super.onCreate()
         CrashScreenshotStore.install(this)
@@ -21,7 +20,7 @@ class AlarmWatcherApp : Application() {
                     DiscordCrashReporter.reportFatalBlocking(
                         context = this,
                         throwable = throwable,
-                        threadName = thread.name
+                        threadName = thread.name,
                     )
                 } catch (reportingError: Throwable) {
                     Log.e(TAG, "Erreur pendant l'envoi du crash fatal", reportingError)
@@ -33,13 +32,14 @@ class AlarmWatcherApp : Application() {
 
             previousHandler?.uncaughtException(thread, throwable) ?: run {
                 Process.killProcess(Process.myPid())
-                kotlin.system.exitProcess(10)
+                kotlin.system.exitProcess(FATAL_EXIT_CODE)
             }
         }
     }
 
     companion object {
         private const val TAG = "AlarmWatcherApp"
+        private const val FATAL_EXIT_CODE = 10
         private val fatalDispatchInProgress = AtomicBoolean(false)
     }
 }
@@ -62,7 +62,10 @@ object CrashScreenshotStore : Application.ActivityLifecycleCallbacks {
         return ScreenshotCapture.capture(activity, timeoutMs)
     }
 
-    override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+    override fun onActivityCreated(
+        activity: Activity,
+        savedInstanceState: Bundle?,
+    ) {
         currentActivity = WeakReference(activity)
     }
 
@@ -78,7 +81,10 @@ object CrashScreenshotStore : Application.ActivityLifecycleCallbacks {
 
     override fun onActivityStopped(activity: Activity) = Unit
 
-    override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+    override fun onActivitySaveInstanceState(
+        activity: Activity,
+        outState: Bundle,
+    ) = Unit
 
     override fun onActivityDestroyed(activity: Activity) {
         if (currentActivity?.get() == activity) {

@@ -15,7 +15,6 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class BootReceiverTest {
-
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val receiver = BootReceiver()
 

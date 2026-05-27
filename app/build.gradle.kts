@@ -1,26 +1,46 @@
-import java.util.Properties
+import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 import org.gradle.api.tasks.testing.Test
 import org.gradle.testing.jacoco.tasks.JacocoReport
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jlleitschuh.gradle.ktlint.KtlintExtension
+import java.util.Properties
 
 plugins {
     id("com.android.application")
     kotlin("android")
     jacoco
+    id("org.jlleitschuh.gradle.ktlint")
+    id("io.gitlab.arturbosch.detekt")
 }
 
 jacoco {
     toolVersion = "0.8.12"
 }
 
-val localProperties = Properties().apply {
-    val localPropertiesFile = rootProject.file("local.properties")
-    if (localPropertiesFile.exists()) {
-        localPropertiesFile.inputStream().use { load(it) }
-    }
+configure<KtlintExtension> {
+    android.set(true)
+    ignoreFailures.set(false)
+    outputToConsole.set(true)
 }
 
-fun String.escapeForBuildConfig(): String =
-    replace("\\", "\\\\").replace("\"", "\\\"")
+configure<DetektExtension> {
+    toolVersion = "1.23.8"
+    buildUponDefaultConfig = true
+    allRules = false
+    parallel = true
+    ignoreFailures = false
+    baseline = file("detekt-baseline.xml")
+}
+
+val localProperties =
+    Properties().apply {
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            localPropertiesFile.inputStream().use { load(it) }
+        }
+    }
+
+fun String.escapeForBuildConfig(): String = replace("\\", "\\\\").replace("\"", "\\\"")
 
 val discordWebhookUrl = localProperties.getProperty("DISCORD_WEBHOOK_URL", "").trim().trim('"')
 val zenggeBulbMac = localProperties.getProperty("ZENGGE_BULB_MAC", "").trim().trim('"')
@@ -58,22 +78,22 @@ android {
         buildConfigField(
             "String",
             "DISCORD_WEBHOOK_URL",
-            "\"${discordWebhookUrl.escapeForBuildConfig()}\""
+            "\"${discordWebhookUrl.escapeForBuildConfig()}\"",
         )
         buildConfigField(
             "String",
             "ZENGGE_BULB_MAC",
-            "\"${zenggeBulbMac.escapeForBuildConfig()}\""
+            "\"${zenggeBulbMac.escapeForBuildConfig()}\"",
         )
         buildConfigField(
             "String",
             "ZENGGE_BULB_MAC_CHAMBRE",
-            "\"${zenggeBulbMacChambre.escapeForBuildConfig()}\""
+            "\"${zenggeBulbMacChambre.escapeForBuildConfig()}\"",
         )
         buildConfigField(
             "String",
             "ZENGGE_BULB_MAC_BUREAU",
-            "\"${zenggeBulbMacBureau.escapeForBuildConfig()}\""
+            "\"${zenggeBulbMacBureau.escapeForBuildConfig()}\"",
         )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -84,8 +104,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
     }
 
     buildTypes {
@@ -123,35 +145,43 @@ dependencies {
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
     androidTestImplementation("io.mockk:mockk-android:1.13.5")
     androidTestImplementation("androidx.work:work-testing:2.11.2")
+
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
+}
+
+tasks.named("check").configure {
+    dependsOn("ktlintCheck", "detekt")
 }
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 }
 
-val coverageExclusions = listOf(
-    "**/R.class",
-    "**/R$*.class",
-    "**/BuildConfig.*",
-    "**/Manifest*.*",
-    "**/*Test*.*",
-    "**/*\$Companion*.*",
-    "**/*\$Lambda\$*.*",
-    "**/*\$inlined\$*.*",
-    "**/*_Factory*.*",
-    "**/*_MembersInjector*.*",
-    "**/*Hilt*.*",
-    "**/*Dagger*.*",
-    "**/di/**",
-    "**/databinding/**"
-)
+val coverageExclusions =
+    listOf(
+        "**/R.class",
+        "**/R$*.class",
+        "**/BuildConfig.*",
+        "**/Manifest*.*",
+        "**/*Test*.*",
+        "**/*\$Companion*.*",
+        "**/*\$Lambda\$*.*",
+        "**/*\$inlined\$*.*",
+        "**/*_Factory*.*",
+        "**/*_MembersInjector*.*",
+        "**/*Hilt*.*",
+        "**/*Dagger*.*",
+        "**/di/**",
+        "**/databinding/**",
+    )
 
 fun androidCoverageClassTree() =
     fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug").get().asFile) {
         exclude(coverageExclusions)
-    } + fileTree(layout.buildDirectory.dir("intermediates/javac/debug/classes").get().asFile) {
-        exclude(coverageExclusions)
-    }
+    } +
+        fileTree(layout.buildDirectory.dir("intermediates/javac/debug/classes").get().asFile) {
+            exclude(coverageExclusions)
+        }
 
 fun androidCoverageExecutionData() =
     fileTree(layout.buildDirectory.get().asFile) {

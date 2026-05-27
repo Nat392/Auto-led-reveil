@@ -18,7 +18,7 @@ import org.junit.runner.RunWith
 
 class SunsetTestContextWrapper(base: Context) : ContextWrapper(base) {
     val startedServices = mutableListOf<Intent>()
-    
+
     override fun startForegroundService(service: Intent?): ComponentName? {
         if (service != null) startedServices.add(service)
         return service?.component
@@ -32,20 +32,25 @@ class SunsetTestContextWrapper(base: Context) : ContextWrapper(base) {
 
 @RunWith(AndroidJUnit4::class)
 class SunsetAutomationReceiverTest {
-
     @Before
     fun setUp() {
         mockkObject(ZenggeBulbController)
         coEvery { ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any()) } returns true
-        
+
         mockkObject(BlePermissionSupport)
         every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
     }
 
     @After
     fun tearDown() {
-        try { unmockkObject(ZenggeBulbController) } catch (_: Throwable) {}
-        try { unmockkObject(BlePermissionSupport) } catch (_: Throwable) {}
+        try {
+            unmockkObject(ZenggeBulbController)
+        } catch (_: Throwable) {
+        }
+        try {
+            unmockkObject(BlePermissionSupport)
+        } catch (_: Throwable) {
+        }
     }
 
     @Test
@@ -54,11 +59,12 @@ class SunsetAutomationReceiverTest {
         val testContext = SunsetTestContextWrapper(baseContext)
 
         val receiver = SunsetAutomationReceiver()
-        
-        val sunsetIntent = Intent(testContext, SunsetAutomationReceiver::class.java).apply {
-            action = SunsetAutomationScheduler.ACTION_APPLY_SCENE
-            putExtra(SunsetAutomationScheduler.EXTRA_TARGET_ZONE, "BUREAU")
-        }
+
+        val sunsetIntent =
+            Intent(testContext, SunsetAutomationReceiver::class.java).apply {
+                action = SunsetAutomationScheduler.ACTION_APPLY_SCENE
+                putExtra(SunsetAutomationScheduler.EXTRA_TARGET_ZONE, "BUREAU")
+            }
 
         receiver.onReceive(testContext, sunsetIntent)
 

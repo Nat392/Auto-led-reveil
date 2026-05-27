@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
 class AlarmTimingSupportTest {
-
     @Test
     fun `returns null when trigger time is not in the future`() {
         val now = 1_700_000_000_000L

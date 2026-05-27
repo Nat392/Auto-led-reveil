@@ -18,7 +18,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class NotificationHelperTest {
-
     private val context = mockk<Context>()
     private val notificationManager = mockk<NotificationManager>(relaxed = true)
     private val packageManager = mockk<PackageManager>()

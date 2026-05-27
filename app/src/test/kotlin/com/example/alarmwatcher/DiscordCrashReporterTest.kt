@@ -17,7 +17,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class DiscordCrashReporterTest {
-
     private val context = mockk<Context>()
     private val packageManager = mockk<PackageManager>()
 
@@ -44,13 +43,14 @@ class DiscordCrashReporterTest {
 
     @Test
     fun `buildPayload assembles the expected fatal embed`() {
-        val payload = DiscordCrashReporter.buildPayload(
-            context = context,
-            stacktrace = "ligne 1\nligne 2",
-            source = "MainActivity",
-            fatal = true,
-            hasScreenshot = false
-        )
+        val payload =
+            DiscordCrashReporter.buildPayload(
+                context = context,
+                stacktrace = "ligne 1\nligne 2",
+                source = "MainActivity",
+                fatal = true,
+                hasScreenshot = false,
+            )
 
         assertEquals("Une exception fatale a été capturée.", payload.getString("content"))
 
@@ -66,13 +66,14 @@ class DiscordCrashReporterTest {
     fun `buildPayload chunks long stacktraces in 900 character blocks and keeps the discord field limit`() {
         val stacktrace = "S".repeat(30 * 900 + 137)
 
-        val payload = DiscordCrashReporter.buildPayload(
-            context = context,
-            stacktrace = stacktrace,
-            source = null,
-            fatal = false,
-            hasScreenshot = true
-        )
+        val payload =
+            DiscordCrashReporter.buildPayload(
+                context = context,
+                stacktrace = stacktrace,
+                source = null,
+                fatal = false,
+                hasScreenshot = true,
+            )
 
         val fields = firstEmbed(payload).getJSONArray("fields")
         val stackFields = jsonObjects(fields).filter { it.getString("name").startsWith("Stacktrace ") }
@@ -85,11 +86,12 @@ class DiscordCrashReporterTest {
 
     @Test
     fun `buildDebugPayload assembles the debug embed`() {
-        val payload = DiscordCrashReporter.buildDebugPayload(
-            context = context,
-            source = "Startup",
-            details = "Détail de debug"
-        )
+        val payload =
+            DiscordCrashReporter.buildDebugPayload(
+                context = context,
+                source = "Startup",
+                details = "Détail de debug",
+            )
 
         assertEquals("Un log de debug au démarrage a été capturé.", payload.getString("content"))
 
@@ -102,11 +104,12 @@ class DiscordCrashReporterTest {
     fun `buildDebugPayload chunks long debug details without exceeding the discord limit`() {
         val details = "D".repeat(30 * 900 + 11)
 
-        val payload = DiscordCrashReporter.buildDebugPayload(
-            context = context,
-            source = "Startup",
-            details = details
-        )
+        val payload =
+            DiscordCrashReporter.buildDebugPayload(
+                context = context,
+                source = "Startup",
+                details = details,
+            )
 
         val fields = firstEmbed(payload).getJSONArray("fields")
         val debugFields = jsonObjects(fields).filter { it.getString("name").startsWith("Debug ") }
@@ -120,7 +123,10 @@ class DiscordCrashReporterTest {
         return payload.getJSONArray("embeds").getJSONObject(0)
     }
 
-    private fun fieldValue(fields: JSONArray, fieldName: String): String {
+    private fun fieldValue(
+        fields: JSONArray,
+        fieldName: String,
+    ): String {
         return jsonObjects(fields)
             .first { it.getString("name") == fieldName }
             .getString("value")

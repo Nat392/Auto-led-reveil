@@ -1,8 +1,8 @@
 package com.example.alarmwatcher
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import android.content.ComponentName
 import android.os.Build
 import android.util.Log
 import io.mockk.every
@@ -12,12 +12,10 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mockk.verify
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class AlarmTriggerReceiverTest {
-
     private val context = mockk<Context>()
     private val incomingIntent = mockk<Intent>()
     private val serviceIntent = mockk<Intent>(relaxed = true)
@@ -47,7 +45,12 @@ class AlarmTriggerReceiverTest {
         AlarmTriggerReceiver.intentFactory = { _, _ -> serviceIntent }
 
         every { incomingIntent.getLongExtra("original_alarm_ms", -1L) } returns 1_700_000_900_000L
-        every { incomingIntent.getLongExtra(SunriseService.EXTRA_DURATION_MS, AlarmScheduler.PREWARN_MS) } returns 90_000L
+        every {
+            incomingIntent.getLongExtra(
+                SunriseService.EXTRA_DURATION_MS,
+                AlarmScheduler.PREWARN_MS,
+            )
+        } returns 90_000L
     }
 
     @AfterEach
@@ -80,30 +83,32 @@ class AlarmTriggerReceiverTest {
 
     @Test
     fun `starts the sunrise service with the configured zones and extras`() {
-        val bureau = SunriseBulbZone(
-            label = "Bureau",
-            macAddress = "AA:BB:CC:DD:EE:FF",
-            sunriseR = 220,
-            sunriseG = 240,
-            sunriseB = 255,
-            sunsetR = 40,
-            sunsetG = 10,
-            sunsetB = 0,
-            whiteChannel = 0,
-            brightnessPercent = 100
-        )
-        val chambre = SunriseBulbZone(
-            label = "Chambre",
-            macAddress = "11:22:33:44:55:66",
-            sunriseR = 255,
-            sunriseG = 230,
-            sunriseB = 210,
-            sunsetR = 20,
-            sunsetG = 0,
-            sunsetB = 0,
-            whiteChannel = 0,
-            brightnessPercent = 100
-        )
+        val bureau =
+            SunriseBulbZone(
+                label = "Bureau",
+                macAddress = "AA:BB:CC:DD:EE:FF",
+                sunriseR = 220,
+                sunriseG = 240,
+                sunriseB = 255,
+                sunsetR = 40,
+                sunsetG = 10,
+                sunsetB = 0,
+                whiteChannel = 0,
+                brightnessPercent = 100,
+            )
+        val chambre =
+            SunriseBulbZone(
+                label = "Chambre",
+                macAddress = "11:22:33:44:55:66",
+                sunriseR = 255,
+                sunriseG = 230,
+                sunriseB = 210,
+                sunsetR = 20,
+                sunsetG = 0,
+                sunsetB = 0,
+                whiteChannel = 0,
+                brightnessPercent = 100,
+            )
         every { SunriseZoneConfig.configuredZones() } returns listOf(bureau, chambre)
 
         receiver.onReceive(context, incomingIntent)
@@ -113,12 +118,27 @@ class AlarmTriggerReceiverTest {
         verify(exactly = 1) {
             serviceIntent.putStringArrayListExtra(
                 SunriseService.EXTRA_BULB_MACS,
-                arrayListOf(bureau.macAddress, chambre.macAddress)
+                arrayListOf(bureau.macAddress, chambre.macAddress),
             )
         }
-        verify(exactly = 1) { serviceIntent.putExtra(SunriseService.EXTRA_TARGET_RS, intArrayOf(bureau.sunriseR, chambre.sunriseR)) }
-        verify(exactly = 1) { serviceIntent.putExtra(SunriseService.EXTRA_TARGET_GS, intArrayOf(bureau.sunriseG, chambre.sunriseG)) }
-        verify(exactly = 1) { serviceIntent.putExtra(SunriseService.EXTRA_TARGET_BS, intArrayOf(bureau.sunriseB, chambre.sunriseB)) }
+        verify(exactly = 1) {
+            serviceIntent.putExtra(
+                SunriseService.EXTRA_TARGET_RS,
+                intArrayOf(bureau.sunriseR, chambre.sunriseR),
+            )
+        }
+        verify(exactly = 1) {
+            serviceIntent.putExtra(
+                SunriseService.EXTRA_TARGET_GS,
+                intArrayOf(bureau.sunriseG, chambre.sunriseG),
+            )
+        }
+        verify(exactly = 1) {
+            serviceIntent.putExtra(
+                SunriseService.EXTRA_TARGET_BS,
+                intArrayOf(bureau.sunriseB, chambre.sunriseB),
+            )
+        }
         verify(exactly = 1) { serviceIntent.putExtra(SunriseService.EXTRA_ORIGINAL_ALARM_MS, 1_700_000_900_000L) }
         verify(exactly = 1) { serviceIntent.putExtra(SunriseService.EXTRA_DURATION_MS, 90_000L) }
 
@@ -133,20 +153,21 @@ class AlarmTriggerReceiverTest {
 
     @Test
     fun `falls back when starting the sunrise service throws`() {
-        every { SunriseZoneConfig.configuredZones() } returns listOf(
-            SunriseBulbZone(
-                label = "Bureau",
-                macAddress = "AA:BB:CC:DD:EE:FF",
-                sunriseR = 220,
-                sunriseG = 240,
-                sunriseB = 255,
-                sunsetR = 40,
-                sunsetG = 10,
-                sunsetB = 0,
-                whiteChannel = 0,
-                brightnessPercent = 100
+        every { SunriseZoneConfig.configuredZones() } returns
+            listOf(
+                SunriseBulbZone(
+                    label = "Bureau",
+                    macAddress = "AA:BB:CC:DD:EE:FF",
+                    sunriseR = 220,
+                    sunriseG = 240,
+                    sunriseB = 255,
+                    sunsetR = 40,
+                    sunsetG = 10,
+                    sunsetB = 0,
+                    whiteChannel = 0,
+                    brightnessPercent = 100,
+                ),
             )
-        )
         every { context.startForegroundService(any()) } throws IllegalStateException("boom")
         every { context.startService(any()) } throws IllegalStateException("boom")
 

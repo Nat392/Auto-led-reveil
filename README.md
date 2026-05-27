@@ -63,6 +63,24 @@ Pour installer sur un appareil connecté:
 ./gradlew.bat installDebug
 ```
 
+### Controles qualite (formatage et analyse statique)
+
+Le projet integre aussi `ktlint` et `detekt` pour faire respecter les standards Kotlin avant fusion.
+
+Commandes utiles en local:
+
+```powershell
+./gradlew.bat ktlintCheck detekt
+```
+
+Pour corriger automatiquement le formatage Kotlin:
+
+```powershell
+./gradlew.bat ktlintFormat
+```
+
+Ces verifications sont aussi lancees dans la CI sur les PR vers `main`.
+
 ### Premier lancement
 
 1. Ouvrez l’application une première fois.

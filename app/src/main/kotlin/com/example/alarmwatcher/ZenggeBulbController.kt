@@ -23,18 +23,21 @@ object ZenggeBulbController : BulbControllerApi {
     private const val TAG = "ZenggeBulbController"
     private const val CONNECT_TIMEOUT_MS = 12_000L
     private const val OP_TIMEOUT_MS = 5_000L
-    private const val GAMMA_EXP = 2.4
 
     private val UUID_RGBW_NEW: UUID = UUID.fromString("0000ff01-0000-1000-8000-00805f9b34fb")
     private val UUID_RGBW_LEGACY: UUID = UUID.fromString("0000ffe9-0000-1000-8000-00805f9b34fb")
 
     @SuppressLint("MissingPermission")
     @WorkerThread
-    override suspend fun openSession(context: Context, macAddress: String): BulbSession? {
-        val adapter = getBluetoothAdapter(context) ?: run {
-            Log.w(TAG, "Bluetooth adapter unavailable")
-            return null
-        }
+    override suspend fun openSession(
+        context: Context,
+        macAddress: String,
+    ): BulbSession? {
+        val adapter =
+            getBluetoothAdapter(context) ?: run {
+                Log.w(TAG, "Bluetooth adapter unavailable")
+                return null
+            }
 
         val normalizedMac = macAddress.trim()
         if (normalizedMac.isBlank()) {
@@ -42,10 +45,11 @@ object ZenggeBulbController : BulbControllerApi {
             return null
         }
 
-        val device = runCatching { adapter.getRemoteDevice(normalizedMac) }.getOrNull() ?: run {
-            Log.w(TAG, "Invalid bulb MAC: $normalizedMac")
-            return null
-        }
+        val device =
+            runCatching { adapter.getRemoteDevice(normalizedMac) }.getOrNull() ?: run {
+                Log.w(TAG, "Invalid bulb MAC: $normalizedMac")
+                return null
+            }
 
         val callback = SessionCallback()
         val gatt = connect(device, context, callback) ?: return null
@@ -66,7 +70,7 @@ object ZenggeBulbController : BulbControllerApi {
         green: Int,
         blue: Int,
         white: Int,
-        brightnessPercent: Int
+        brightnessPercent: Int,
     ): Boolean {
         val session = openSession(context, macAddress) ?: return false
         return try {
@@ -87,7 +91,10 @@ object ZenggeBulbController : BulbControllerApi {
 
     @SuppressLint("MissingPermission")
     @WorkerThread
-    override suspend fun powerOff(context: Context, macAddress: String): Boolean {
+    override suspend fun powerOff(
+        context: Context,
+        macAddress: String,
+    ): Boolean {
         val adapter = getBluetoothAdapter(context) ?: return false
         val device = runCatching { adapter.getRemoteDevice(macAddress.trim()) }.getOrNull() ?: return false
         val callback = SessionCallback()
@@ -110,25 +117,30 @@ object ZenggeBulbController : BulbControllerApi {
         red: Int,
         green: Int,
         blue: Int,
-        white: Int
+        white: Int,
     ): String {
         val results = mutableListOf<String>()
         return try {
-            val adapter = getBluetoothAdapter(context) ?: return JSONObject()
-                .put("error", "adapter_unavailable")
-                .toString()
+            val adapter =
+                getBluetoothAdapter(context) ?: return JSONObject()
+                    .put("error", "adapter_unavailable")
+                    .toString()
             val device = adapter.getRemoteDevice(macAddress.trim())
             val callback = SessionCallback()
-            val gatt = connect(device, context, callback) ?: return JSONObject()
-                .put("error", "connect_failed")
-                .toString()
+            val gatt =
+                connect(device, context, callback) ?: return JSONObject()
+                    .put("error", "connect_failed")
+                    .toString()
             try {
-                if (!discoverServices(gatt, callback)) return JSONObject()
-                    .put("error", "discover_failed")
-                    .toString()
-                val characteristic = gatt.findCharacteristic() ?: return JSONObject()
-                    .put("error", "char_not_found")
-                    .toString()
+                if (!discoverServices(gatt, callback)) {
+                    return JSONObject()
+                        .put("error", "discover_failed")
+                        .toString()
+                }
+                val characteristic =
+                    gatt.findCharacteristic() ?: return JSONObject()
+                        .put("error", "char_not_found")
+                        .toString()
 
                 val powerOnPayload = buildPowerPacket(true)
                 val powerOnOk = writeCharacteristic(gatt, callback, characteristic, powerOnPayload)
@@ -159,10 +171,15 @@ object ZenggeBulbController : BulbControllerApi {
 
     class Session internal constructor(
         internal val gatt: BluetoothGatt,
-        internal val callback: SessionCallback
+        internal val callback: SessionCallback,
     ) : BulbSession {
         @WorkerThread
-        override suspend fun applyScene(red: Int, green: Int, blue: Int, white: Int): Boolean {
+        override suspend fun applyScene(
+            red: Int,
+            green: Int,
+            blue: Int,
+            white: Int,
+        ): Boolean {
             return try {
                 writeRgbPacket(
                     gatt = gatt,
@@ -189,11 +206,14 @@ object ZenggeBulbController : BulbControllerApi {
     private suspend fun connect(
         device: BluetoothDevice,
         context: Context,
-        callback: SessionCallback
+        callback: SessionCallback,
     ): BluetoothGatt? {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             try {
-                if (context.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                if (
+                    context.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) !=
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
                     Log.w(TAG, "Missing BLUETOOTH_CONNECT permission")
                     return null
                 }
@@ -204,12 +224,13 @@ object ZenggeBulbController : BulbControllerApi {
 
         callback.resetConnectionAwaiter()
 
-        val gatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
-        } else {
-            @Suppress("DEPRECATION")
-            device.connectGatt(context, false, callback)
-        }
+        val gatt =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                device.connectGatt(context, false, callback, BluetoothDevice.TRANSPORT_LE)
+            } else {
+                @Suppress("DEPRECATION")
+                device.connectGatt(context, false, callback)
+            }
 
         if (gatt == null) {
             Log.w(TAG, "connectGatt returned null")
@@ -224,7 +245,11 @@ object ZenggeBulbController : BulbControllerApi {
             }
 
             if (callback.connectionState != BluetoothProfile.STATE_CONNECTED) {
-                Log.w(TAG, "Bulb connection failed status=${callback.connectionStatus} state=${callback.connectionState}")
+                Log.w(
+                    TAG,
+                    "Bulb connection failed status=${callback.connectionStatus} " +
+                        "state=${callback.connectionState}",
+                )
                 return null
             }
 
@@ -239,7 +264,10 @@ object ZenggeBulbController : BulbControllerApi {
     }
 
     @SuppressLint("MissingPermission")
-    private suspend fun discoverServices(gatt: BluetoothGatt, callback: SessionCallback): Boolean {
+    private suspend fun discoverServices(
+        gatt: BluetoothGatt,
+        callback: SessionCallback,
+    ): Boolean {
         callback.resetServicesAwaiter()
         if (!gatt.discoverServices()) {
             return false
@@ -267,20 +295,22 @@ object ZenggeBulbController : BulbControllerApi {
     ): Boolean {
         val characteristic = gatt.findCharacteristic() ?: return false
         return when {
-            powerOff -> writeCharacteristic(
-                gatt,
-                callback,
-                characteristic,
-                buildPowerPacket(false),
-                forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-            )
-            powerOn -> writeCharacteristic(
-                gatt,
-                callback,
-                characteristic,
-                buildPowerPacket(true),
-                forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-            )
+            powerOff ->
+                writeCharacteristic(
+                    gatt,
+                    callback,
+                    characteristic,
+                    buildPowerPacket(false),
+                    forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE,
+                )
+            powerOn ->
+                writeCharacteristic(
+                    gatt,
+                    callback,
+                    characteristic,
+                    buildPowerPacket(true),
+                    forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE,
+                )
             else -> tryAllSceneWrites(gatt, callback, characteristic, red, green, blue, white)
         }
     }
@@ -305,7 +335,7 @@ object ZenggeBulbController : BulbControllerApi {
             callback = callback,
             characteristic = characteristic,
             payload = scene,
-            forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+            forceWriteType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE,
         )
     }
 
@@ -322,47 +352,55 @@ object ZenggeBulbController : BulbControllerApi {
         }
         val checksum = (sum and 0xFF).toByte()
 
-        val header = byteArrayOf(
-            0x00.toByte(),
-            0x01.toByte(),
-            0x80.toByte(),
-            0x00.toByte(),
-            0x00.toByte(),
-            0x0D.toByte(),
-            0x0E.toByte(),
-            0x0B.toByte()
-        )
+        val header =
+            byteArrayOf(
+                0x00.toByte(),
+                0x01.toByte(),
+                0x80.toByte(),
+                0x00.toByte(),
+                0x00.toByte(),
+                0x0D.toByte(),
+                0x0E.toByte(),
+                0x0B.toByte(),
+            )
 
         return header + payload + checksum
     }
 
     @Suppress("UNUSED_PARAMETER")
-    internal fun buildScenePacket(red: Int, green: Int, blue: Int, white: Int): ByteArray {
-        val payload = byteArrayOf(
-            0x31.toByte(),
-            red.coerceIn(0, 255).toByte(),
-            green.coerceIn(0, 255).toByte(),
-            blue.coerceIn(0, 255).toByte(),
-            0x00.toByte(),
-            0x00.toByte(),
-            0x0F.toByte()
-        )
+    internal fun buildScenePacket(
+        red: Int,
+        green: Int,
+        blue: Int,
+        white: Int,
+    ): ByteArray {
+        val payload =
+            byteArrayOf(
+                0x31.toByte(),
+                red.coerceIn(0, 255).toByte(),
+                green.coerceIn(0, 255).toByte(),
+                blue.coerceIn(0, 255).toByte(),
+                0x00.toByte(),
+                0x00.toByte(),
+                0x0F.toByte(),
+            )
         var sum = 0
         for (b in payload) {
             sum += (b.toInt() and 0xFF)
         }
         val checksum = (sum and 0xFF).toByte()
 
-        val header = byteArrayOf(
-            0x00.toByte(),
-            0x01.toByte(),
-            0x80.toByte(),
-            0x00.toByte(),
-            0x00.toByte(),
-            0x08.toByte(),
-            0x09.toByte(),
-            0x0B.toByte()
-        )
+        val header =
+            byteArrayOf(
+                0x00.toByte(),
+                0x01.toByte(),
+                0x80.toByte(),
+                0x00.toByte(),
+                0x00.toByte(),
+                0x08.toByte(),
+                0x09.toByte(),
+                0x0B.toByte(),
+            )
 
         return header + payload + checksum
     }
@@ -374,7 +412,7 @@ object ZenggeBulbController : BulbControllerApi {
         callback: SessionCallback,
         characteristic: BluetoothGattCharacteristic,
         payload: ByteArray,
-        forceWriteType: Int? = null
+        forceWriteType: Int? = null,
     ): Boolean {
         val props = characteristic.properties
         val supportsWrite = (props and BluetoothGattCharacteristic.PROPERTY_WRITE) != 0
@@ -384,12 +422,13 @@ object ZenggeBulbController : BulbControllerApi {
             callback.lastWriteStatus = BluetoothGatt.GATT_FAILURE
             return false
         }
-        val preferredWriteType = when {
-            forceWriteType != null -> forceWriteType
-            supportsWriteNoResponse -> BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-            supportsWrite -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-            else -> null
-        }
+        val preferredWriteType =
+            when {
+                forceWriteType != null -> forceWriteType
+                supportsWriteNoResponse -> BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                supportsWrite -> BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                else -> null
+            }
 
         if (preferredWriteType == null) {
             callback.lastWriteStatus = BluetoothGatt.GATT_FAILURE
@@ -399,19 +438,21 @@ object ZenggeBulbController : BulbControllerApi {
         callback.resetWriteAwaiter()
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val status = runCatching {
-                gatt.writeCharacteristic(characteristic, payload, preferredWriteType)
-            }.getOrDefault(BluetoothGatt.GATT_FAILURE)
+            val status =
+                runCatching {
+                    gatt.writeCharacteristic(characteristic, payload, preferredWriteType)
+                }.getOrDefault(BluetoothGatt.GATT_FAILURE)
             callback.lastWriteStatus = status
             if (status != BluetoothGatt.GATT_SUCCESS) {
                 return false
             }
-            val result = if (preferredWriteType == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) {
-                true
-            } else {
-                withTimeoutOrNull(OP_TIMEOUT_MS) { callback.awaitWrite() } != null &&
-                    callback.lastWriteStatus == BluetoothGatt.GATT_SUCCESS
-            }
+            val result =
+                if (preferredWriteType == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) {
+                    true
+                } else {
+                    withTimeoutOrNull(OP_TIMEOUT_MS) { callback.awaitWrite() } != null &&
+                        callback.lastWriteStatus == BluetoothGatt.GATT_SUCCESS
+                }
             result
         } else {
             val originalWriteType = characteristic.writeType
@@ -425,12 +466,13 @@ object ZenggeBulbController : BulbControllerApi {
                 if (!started) {
                     return false
                 }
-                val result = if (preferredWriteType == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) {
-                    true
-                } else {
-                    withTimeoutOrNull(OP_TIMEOUT_MS) { callback.awaitWrite() } != null &&
-                        callback.lastWriteStatus == BluetoothGatt.GATT_SUCCESS
-                }
+                val result =
+                    if (preferredWriteType == BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE) {
+                        true
+                    } else {
+                        withTimeoutOrNull(OP_TIMEOUT_MS) { callback.awaitWrite() } != null &&
+                            callback.lastWriteStatus == BluetoothGatt.GATT_SUCCESS
+                    }
                 result
             } finally {
                 @Suppress("DEPRECATION")
@@ -456,13 +498,19 @@ object ZenggeBulbController : BulbControllerApi {
     }
 
     @Suppress("UNUSED_PARAMETER")
-    internal fun scaleScene(red: Int, green: Int, blue: Int, white: Int, brightnessPercent: Int): Scene {
+    internal fun scaleScene(
+        red: Int,
+        green: Int,
+        blue: Int,
+        white: Int,
+        brightnessPercent: Int,
+    ): Scene {
         val mapped = 1.0
         return Scene(
             red = (red.coerceIn(0, 255) * mapped).toInt().coerceIn(0, 255),
             green = (green.coerceIn(0, 255) * mapped).toInt().coerceIn(0, 255),
             blue = (blue.coerceIn(0, 255) * mapped).toInt().coerceIn(0, 255),
-            white = (white.coerceIn(0, 255) * mapped).toInt().coerceIn(0, 255)
+            white = (white.coerceIn(0, 255) * mapped).toInt().coerceIn(0, 255),
         )
     }
 
@@ -470,16 +518,22 @@ object ZenggeBulbController : BulbControllerApi {
         val red: Int,
         val green: Int,
         val blue: Int,
-        val white: Int
+        val white: Int,
     )
 
     internal class SessionCallback : BluetoothGattCallback() {
         @Volatile private var connectionDeferred = CompletableDeferred<Unit>()
+
         @Volatile var connectionState: Int = BluetoothProfile.STATE_DISCONNECTED
+
         @Volatile var connectionStatus: Int = BluetoothGatt.GATT_FAILURE
+
         @Volatile private var servicesDeferred = CompletableDeferred<Unit>()
+
         @Volatile var servicesStatus: Int = BluetoothGatt.GATT_FAILURE
+
         @Volatile private var writeDeferred = CompletableDeferred<Unit>()
+
         @Volatile var lastWriteStatus: Int = BluetoothGatt.GATT_FAILURE
 
         fun resetConnectionAwaiter() {
@@ -508,7 +562,11 @@ object ZenggeBulbController : BulbControllerApi {
             writeDeferred.await()
         }
 
-        override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+        override fun onConnectionStateChange(
+            gatt: BluetoothGatt,
+            status: Int,
+            newState: Int,
+        ) {
             connectionStatus = status
             connectionState = newState
             if (newState == BluetoothProfile.STATE_CONNECTED || newState == BluetoothProfile.STATE_DISCONNECTED) {
@@ -516,13 +574,20 @@ object ZenggeBulbController : BulbControllerApi {
             }
         }
 
-        override fun onServicesDiscovered(gatt: BluetoothGatt, status: Int) {
+        override fun onServicesDiscovered(
+            gatt: BluetoothGatt,
+            status: Int,
+        ) {
             servicesStatus = status
             servicesDeferred.complete(Unit)
         }
 
         @Suppress("DEPRECATION")
-        override fun onCharacteristicWrite(gatt: BluetoothGatt, characteristic: BluetoothGattCharacteristic, status: Int) {
+        override fun onCharacteristicWrite(
+            gatt: BluetoothGatt,
+            characteristic: BluetoothGattCharacteristic,
+            status: Int,
+        ) {
             lastWriteStatus = status
             writeDeferred.complete(Unit)
         }

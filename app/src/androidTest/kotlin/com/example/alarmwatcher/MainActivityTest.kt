@@ -1,7 +1,6 @@
 package com.example.alarmwatcher
 
 import android.Manifest
-import android.os.Build
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
@@ -20,7 +19,6 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class MainActivityTest {
-
     // Tentative d'accorder les permissions critiques au démarrage du test.
     // Si l'environnement CI refuse, on continue silencieusement.
 
@@ -38,9 +36,18 @@ class MainActivityTest {
         try {
             val uiAutomation = InstrumentationRegistry.getInstrumentation().uiAutomation
             val pkg = InstrumentationRegistry.getInstrumentation().targetContext.packageName
-            try { uiAutomation.grantRuntimePermission(pkg, Manifest.permission.BLUETOOTH_CONNECT) } catch (_: Throwable) {}
-            try { uiAutomation.grantRuntimePermission(pkg, Manifest.permission.BLUETOOTH_SCAN) } catch (_: Throwable) {}
-            try { uiAutomation.grantRuntimePermission(pkg, Manifest.permission.POST_NOTIFICATIONS) } catch (_: Throwable) {}
+            try {
+                uiAutomation.grantRuntimePermission(pkg, Manifest.permission.BLUETOOTH_CONNECT)
+            } catch (_: Throwable) {
+            }
+            try {
+                uiAutomation.grantRuntimePermission(pkg, Manifest.permission.BLUETOOTH_SCAN)
+            } catch (_: Throwable) {
+            }
+            try {
+                uiAutomation.grantRuntimePermission(pkg, Manifest.permission.POST_NOTIFICATIONS)
+            } catch (_: Throwable) {
+            }
         } catch (_: Throwable) {
             // ignore: some test environments may not allow programmatic grants
         }

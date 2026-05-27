@@ -20,35 +20,40 @@ object NotificationHelper {
     fun showFallbackNotification(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(NotificationChannel(CHANNEL_FALLBACK, "Alarm Watcher Actions", NotificationManager.IMPORTANCE_HIGH))
+            nm.createNotificationChannel(
+                NotificationChannel(CHANNEL_FALLBACK, "Alarm Watcher Actions", NotificationManager.IMPORTANCE_HIGH),
+            )
         }
 
         val launch = context.packageManager.getLaunchIntentForPackage("com.zengge.blev2")
-        val pi = if (launch != null) {
-            PendingIntent.getActivity(
-                context,
-                0,
-                launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                PendingIntent.FLAG_IMMUTABLE
-            )
-        } else {
-            Log.w(TAG, "Impossible de créer l'action de notification: com.zengge.blev2 n'est pas installée")
-            null
-        }
+        val pi =
+            if (launch != null) {
+                PendingIntent.getActivity(
+                    context,
+                    0,
+                    launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    PendingIntent.FLAG_IMMUTABLE,
+                )
+            } else {
+                Log.w(TAG, "Impossible de créer l'action de notification: com.zengge.blev2 n'est pas installée")
+                null
+            }
 
-        val contentText = if (pi != null) {
-            "Taper pour ouvrir l'app cible"
-        } else {
-            "App cible non installée"
-        }
+        val contentText =
+            if (pi != null) {
+                "Taper pour ouvrir l'app cible"
+            } else {
+                "App cible non installée"
+            }
 
-        val n = notificationBuilderFactory(context, CHANNEL_FALLBACK)
-            .setContentTitle("Pré-alarme")
-            .setContentText(contentText)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentIntent(pi)
-            .setAutoCancel(true)
-            .build()
+        val n =
+            notificationBuilderFactory(context, CHANNEL_FALLBACK)
+                .setContentTitle("Pré-alarme")
+                .setContentText(contentText)
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .build()
         nm.notify(ID_FALLBACK, n)
     }
 }

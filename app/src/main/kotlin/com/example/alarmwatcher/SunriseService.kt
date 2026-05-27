@@ -14,10 +14,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 
@@ -33,15 +33,20 @@ class SunriseService : Service() {
         ensureChannel()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         if (intent?.action != ACTION_START_SUNRISE) {
             stopSelf(startId)
             return START_NOT_STICKY
         }
 
         val originalAlarmMs = intent.getLongExtra(EXTRA_ORIGINAL_ALARM_MS, -1L)
-        val zones = extractZones(intent)
-            .ifEmpty { SunriseZoneConfig.configuredZones() }
+        val zones =
+            extractZones(intent)
+                .ifEmpty { SunriseZoneConfig.configuredZones() }
 
         rampJob?.cancel()
         val durationMs = intent.getLongExtra(EXTRA_DURATION_MS, AlarmScheduler.PREWARN_MS).coerceAtLeast(1L)
@@ -60,44 +65,45 @@ class SunriseService : Service() {
             DiscordCrashReporter.reportNonFatal(
                 context = applicationContext,
                 throwable = e,
-                source = "SunriseService.startForeground"
+                source = "SunriseService.startForeground",
             )
             stopSelf(startId)
             return START_NOT_STICKY
         }
 
-        rampJob = serviceScope.launch {
-            try {
-                coroutineScope {
-                    zones.map { zone ->
-                        async {
-                            rampRunner.run(
-                                applicationContext,
-                                zone.macAddress,
-                                zone.sunriseR,
-                                zone.sunriseG,
-                                zone.sunriseB,
-                                durationMs
-                            ) { currentStep, total ->
-                                updateRampNotification(currentStep + 1, total, originalAlarmMs)
+        rampJob =
+            serviceScope.launch {
+                try {
+                    coroutineScope {
+                        zones.map { zone ->
+                            async {
+                                rampRunner.run(
+                                    applicationContext,
+                                    zone.macAddress,
+                                    zone.sunriseR,
+                                    zone.sunriseG,
+                                    zone.sunriseB,
+                                    durationMs,
+                                ) { currentStep, total ->
+                                    updateRampNotification(currentStep + 1, total, originalAlarmMs)
+                                }
                             }
-                        }
-                    }.forEach { it.await() }
+                        }.forEach { it.await() }
+                    }
+                } catch (e: CancellationException) {
+                    Log.i(TAG, "Rampe sunrise annulée")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Erreur durant la rampe de luminosité", e)
+                    DiscordCrashReporter.reportNonFatal(
+                        context = applicationContext,
+                        throwable = e,
+                        source = "SunriseService.rampJob",
+                    )
+                } finally {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
                 }
-            } catch (e: CancellationException) {
-                Log.i(TAG, "Rampe sunrise annulée")
-            } catch (e: Exception) {
-                Log.e(TAG, "Erreur durant la rampe de luminosité", e)
-                DiscordCrashReporter.reportNonFatal(
-                    context = applicationContext,
-                    throwable = e,
-                    source = "SunriseService.rampJob"
-                )
-            } finally {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
             }
-        }
 
         return START_NOT_STICKY
     }
@@ -111,29 +117,37 @@ class SunriseService : Service() {
     private fun ensureChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channel = NotificationChannel(
-            NOTIFICATION_CHANNEL_ID,
-            "Lever de soleil",
-            NotificationManager.IMPORTANCE_LOW
-        )
+        val channel =
+            NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                "Lever de soleil",
+                NotificationManager.IMPORTANCE_LOW,
+            )
         manager.createNotificationChannel(channel)
     }
 
-    private fun buildRampNotification(completedSteps: Int, totalSteps: Int, originalAlarmMs: Long) =
-        NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-            .setContentTitle("Alarm Watcher")
-            .setContentText("Lever de soleil — $completedSteps / $totalSteps")
-            .setSubText(formatAlarmTime(originalAlarmMs))
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .build()
+    private fun buildRampNotification(
+        completedSteps: Int,
+        totalSteps: Int,
+        originalAlarmMs: Long,
+    ) = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+        .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+        .setContentTitle("Alarm Watcher")
+        .setContentText("Lever de soleil — $completedSteps / $totalSteps")
+        .setSubText(formatAlarmTime(originalAlarmMs))
+        .setOngoing(true)
+        .setOnlyAlertOnce(true)
+        .setPriority(NotificationCompat.PRIORITY_LOW)
+        .build()
 
-    private fun updateRampNotification(completedSteps: Int, totalSteps: Int, originalAlarmMs: Long) {
+    private fun updateRampNotification(
+        completedSteps: Int,
+        totalSteps: Int,
+        originalAlarmMs: Long,
+    ) {
         getSystemService(NotificationManager::class.java)?.notify(
             NOTIFICATION_ID,
-            buildRampNotification(completedSteps, totalSteps, originalAlarmMs)
+            buildRampNotification(completedSteps, totalSteps, originalAlarmMs),
         )
     }
 
@@ -184,7 +198,7 @@ class SunriseService : Service() {
                     sunriseB = targetBs[index],
                     sunsetR = targetRs[index],
                     sunsetG = targetGs[index],
-                    sunsetB = targetBs[index]
+                    sunsetB = targetBs[index],
                 )
             }
     }

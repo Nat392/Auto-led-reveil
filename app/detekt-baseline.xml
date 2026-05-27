@@ -1,0 +1,72 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:SunriseService.kt$SunriseService$macAddresses.isEmpty() || targetRs == null || targetGs == null || targetBs == null</ID>
+    <ID>CyclomaticComplexMethod:ZenggeBulbController.kt$ZenggeBulbController$@Suppress("DEPRECATION") @SuppressLint("MissingPermission") private suspend fun writeCharacteristic( gatt: BluetoothGatt, callback: SessionCallback, characteristic: BluetoothGattCharacteristic, payload: ByteArray, forceWriteType: Int? = null, ): Boolean</ID>
+    <ID>LongMethod:AlarmTriggerReceiverTest.kt$AlarmTriggerReceiverTest$@Test fun `starts the sunrise service with the configured zones and extras`()</ID>
+    <ID>LongMethod:SunriseService.kt$SunriseService$override fun onStartCommand( intent: Intent?, flags: Int, startId: Int, ): Int</ID>
+    <ID>LongMethod:SunsetAutomationSchedulerTest.kt$SunsetAutomationSchedulerTest$@Test fun `refreshAndSchedule catches up expired bureau scenes and keeps future alarms`()</ID>
+    <ID>LongMethod:ZenggeBulbController.kt$ZenggeBulbController$@Suppress("DEPRECATION") @SuppressLint("MissingPermission") private suspend fun writeCharacteristic( gatt: BluetoothGatt, callback: SessionCallback, characteristic: BluetoothGattCharacteristic, payload: ByteArray, forceWriteType: Int? = null, ): Boolean</ID>
+    <ID>LongParameterList:AppContracts.kt$BulbControllerApi$( context: Context, macAddress: String, red: Int, green: Int, blue: Int, white: Int, )</ID>
+    <ID>LongParameterList:AppContracts.kt$BulbControllerApi$( context: Context, macAddress: String, red: Int, green: Int, blue: Int, white: Int, brightnessPercent: Int, )</ID>
+    <ID>LongParameterList:DiscordCrashReporter.kt$DiscordCrashReporter$( output: DataOutputStream, boundary: String, fieldName: String, fileName: String, contentType: String, bytes: ByteArray, )</ID>
+    <ID>LongParameterList:SunriseRampRunner.kt$SunriseRampRunner$( context: Context, macAddress: String, targetR: Int, targetG: Int, targetB: Int, durationMs: Long, onProgress: (currentStep: Int, totalSteps: Int) -&gt; Unit = { _, _ -&gt; }, )</ID>
+    <ID>LongParameterList:ZenggeBulbController.kt$ZenggeBulbController$( gatt: BluetoothGatt, callback: SessionCallback, characteristic: BluetoothGattCharacteristic, red: Int, green: Int, blue: Int, white: Int, )</ID>
+    <ID>LongParameterList:ZenggeBulbController.kt$ZenggeBulbController$( gatt: BluetoothGatt, callback: SessionCallback, red: Int, green: Int, blue: Int, white: Int, powerOn: Boolean = false, powerOff: Boolean = false, )</ID>
+    <ID>MagicNumber:AlarmMonitorRunner.kt$AlarmMonitorRunner$14</ID>
+    <ID>MagicNumber:DiscordCrashReporter.kt$DiscordCrashReporter$0x3498DB</ID>
+    <ID>MagicNumber:DiscordCrashReporter.kt$DiscordCrashReporter$0xE74C3C</ID>
+    <ID>MagicNumber:DiscordCrashReporter.kt$DiscordCrashReporter$0xF1C40F</ID>
+    <ID>MagicNumber:DiscordCrashReporter.kt$DiscordCrashReporter$20</ID>
+    <ID>MagicNumber:DiscordCrashReporter.kt$DiscordCrashReporter$200</ID>
+    <ID>MagicNumber:DiscordCrashReporter.kt$DiscordCrashReporter$25</ID>
+    <ID>MagicNumber:DiscordCrashReporter.kt$DiscordCrashReporter$299</ID>
+    <ID>MagicNumber:DiscordCrashReporter.kt$DiscordCrashReporter$900</ID>
+    <ID>MagicNumber:DiscordCrashReporter.kt$ScreenshotCapture$100</ID>
+    <ID>MagicNumber:SunriseRampSupport.kt$SunriseRampSupport$2.4</ID>
+    <ID>MagicNumber:SunriseRampSupport.kt$SunriseRampSupport$22.0</ID>
+    <ID>MagicNumber:SunriseRampSupport.kt$SunriseRampSupport$255</ID>
+    <ID>MagicNumber:SunriseRampSupport.kt$SunriseRampSupport$27.0</ID>
+    <ID>MagicNumber:SunriseRampSupport.kt$SunriseRampSupport$3.0</ID>
+    <ID>MagicNumber:SunriseRampSupport.kt$SunriseRampSupport$30.0</ID>
+    <ID>MagicNumber:SunriseRampSupport.kt$SunriseRampSupport$8.0</ID>
+    <ID>MagicNumber:SunsetAutomationScheduler.kt$SunsetAutomationScheduler$1000L</ID>
+    <ID>MagicNumber:SunsetAutomationScheduler.kt$SunsetAutomationScheduler$10_000</ID>
+    <ID>MagicNumber:SunsetAutomationScheduler.kt$SunsetAutomationScheduler$200</ID>
+    <ID>MagicNumber:SunsetAutomationScheduler.kt$SunsetAutomationScheduler$299</ID>
+    <ID>MagicNumber:SunsetAutomationScheduler.kt$SunsetAutomationScheduler$60</ID>
+    <ID>MagicNumber:ZenggeBulbController.kt$ZenggeBulbController$0xFF</ID>
+    <ID>MagicNumber:ZenggeBulbController.kt$ZenggeBulbController$12</ID>
+    <ID>MagicNumber:ZenggeBulbController.kt$ZenggeBulbController$255</ID>
+    <ID>MagicNumber:ZenggeBulbController.kt$ZenggeBulbController$700</ID>
+    <ID>ReturnCount:AlarmMonitorRunner.kt$AlarmMonitorRunner$fun scanNextAlarmAndSchedule(context: Context)</ID>
+    <ID>ReturnCount:DiscordCrashReporter.kt$ScreenshotCapture$private fun captureOnMainThread(activity: android.app.Activity): ByteArray?</ID>
+    <ID>ReturnCount:SunriseService.kt$SunriseService$override fun onStartCommand( intent: Intent?, flags: Int, startId: Int, ): Int</ID>
+    <ID>ReturnCount:SunsetSceneService.kt$SunsetSceneService$override fun onStartCommand( intent: Intent?, flags: Int, startId: Int, ): Int</ID>
+    <ID>ReturnCount:SunsetSceneService.kt$SunsetSceneService.Companion$internal suspend fun applySunsetScene( context: Context, zoneKey: String, ): Boolean</ID>
+    <ID>ReturnCount:ZenggeBulbController.kt$ZenggeBulbController$@Suppress("DEPRECATION") @SuppressLint("MissingPermission") private suspend fun writeCharacteristic( gatt: BluetoothGatt, callback: SessionCallback, characteristic: BluetoothGattCharacteristic, payload: ByteArray, forceWriteType: Int? = null, ): Boolean</ID>
+    <ID>ReturnCount:ZenggeBulbController.kt$ZenggeBulbController$@SuppressLint("MissingPermission") @WorkerThread override suspend fun diagnosticApplyScene( context: Context, macAddress: String, red: Int, green: Int, blue: Int, white: Int, ): String</ID>
+    <ID>ReturnCount:ZenggeBulbController.kt$ZenggeBulbController$@SuppressLint("MissingPermission") @WorkerThread override suspend fun openSession( context: Context, macAddress: String, ): BulbSession?</ID>
+    <ID>ReturnCount:ZenggeBulbController.kt$ZenggeBulbController$@SuppressLint("MissingPermission") @WorkerThread override suspend fun powerOff( context: Context, macAddress: String, ): Boolean</ID>
+    <ID>ReturnCount:ZenggeBulbController.kt$ZenggeBulbController$@SuppressLint("MissingPermission") private suspend fun connect( device: BluetoothDevice, context: Context, callback: SessionCallback, ): BluetoothGatt?</ID>
+    <ID>ReturnCount:ZenggeBulbController.kt$ZenggeBulbController$@SuppressLint("MissingPermission") private suspend fun discoverServices( gatt: BluetoothGatt, callback: SessionCallback, ): Boolean</ID>
+    <ID>SwallowedException:SunriseService.kt$SunriseService$e: CancellationException</ID>
+    <ID>TooGenericExceptionCaught:AlarmMonitorRunner.kt$AlarmMonitorRunner$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AlarmScheduler.kt$AlarmScheduler$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AlarmTriggerReceiver.kt$AlarmTriggerReceiver$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AlarmWatcherApp.kt$AlarmWatcherApp$reportingError: Throwable</ID>
+    <ID>TooGenericExceptionCaught:DiscordCrashReporter.kt$DiscordCrashReporter$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:MainActivity.kt$MainActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:SunriseRampRunner.kt$SunriseRampRunner$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:SunriseService.kt$SunriseService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:SunsetAutomationReceiver.kt$SunsetAutomationReceiver$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:SunsetAutomationScheduler.kt$SunsetAutomationScheduler$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:SunsetSceneService.kt$SunsetSceneService.Companion$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ZenggeBulbController.kt$ZenggeBulbController$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ZenggeBulbController.kt$ZenggeBulbController.Session$e: Exception</ID>
+    <ID>TooManyFunctions:DiscordCrashReporter.kt$DiscordCrashReporter : CrashReporterApi</ID>
+    <ID>TooManyFunctions:SunsetAutomationScheduler.kt$SunsetAutomationScheduler</ID>
+    <ID>TooManyFunctions:ZenggeBulbController.kt$ZenggeBulbController : BulbControllerApi</ID>
+  </CurrentIssues>
+</SmellBaseline>
