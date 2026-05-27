@@ -79,6 +79,6 @@ class AlarmTriggerReceiverTest {
         
         assertEquals(SunriseService::class.java.name, serviceIntent.component?.className)
         assertEquals(SunriseService.ACTION_START_SUNRISE, serviceIntent.action)
-        assertEquals(123456789L, serviceIntent.getLongExtra("original_alarm_ms", 0L))
+        assertEquals(123456789L, serviceIntent.getLongExtra(SunriseService.EXTRA_ORIGINAL_ALARM_MS, 0L))
     }
 }
