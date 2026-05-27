@@ -38,6 +38,7 @@ android {
         jniLibs {
             // Empêche le stripping de la librairie native utilisée par mockk
             pickFirsts += listOf("**/libmockkjvmtiagent.so")
+            useLegacyPackaging = true
         }
     }
 
