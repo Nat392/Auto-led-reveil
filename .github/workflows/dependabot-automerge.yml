@@ -1,0 +1,82 @@
+name: Dependabot Auto-merge
+
+on:
+  workflow_run:
+    workflows:
+      - Android CI - Alarm Watcher
+    types:
+      - completed
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable-auto-merge:
+    name: Enable squash auto-merge for Dependabot
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Enable auto-merge on matching Dependabot PRs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflowRun = context.payload.workflow_run;
+            const pullRequests = workflowRun.pull_requests ?? [];
+
+            if (pullRequests.length === 0) {
+              core.info('No pull request was associated with this CI run.');
+              return;
+            }
+
+            for (const associatedPullRequest of pullRequests) {
+              const { data: pullRequest } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: associatedPullRequest.number,
+              });
+
+              if (pullRequest.user?.login !== 'dependabot[bot]') {
+                core.info(`Skipping non-Dependabot PR #${pullRequest.number}.`);
+                continue;
+              }
+
+              if (pullRequest.state !== 'open') {
+                core.info(`Skipping closed PR #${pullRequest.number}.`);
+                continue;
+              }
+
+              if (pullRequest.auto_merge) {
+                core.info(`Auto-merge is already enabled for PR #${pullRequest.number}.`);
+                continue;
+              }
+
+              try {
+                await github.graphql(
+                  `
+                    mutation EnablePullRequestAutoMerge($pullRequestId: ID!) {
+                      enablePullRequestAutoMerge(input: {
+                        pullRequestId: $pullRequestId
+                        mergeMethod: SQUASH
+                      }) {
+                        pullRequest {
+                          number
+                          autoMergeRequest {
+                            enabledAt
+                            mergeMethod
+                          }
+                        }
+                      }
+                    }
+                  `,
+                  {
+                    pullRequestId: pullRequest.node_id,
+                  }
+                );
+
+                core.info(`Enabled squash auto-merge for PR #${pullRequest.number}.`);
+              } catch (error) {
+                core.warning(`Unable to enable auto-merge for PR #${pullRequest.number}: ${error.message}`);
+              }
+            }
