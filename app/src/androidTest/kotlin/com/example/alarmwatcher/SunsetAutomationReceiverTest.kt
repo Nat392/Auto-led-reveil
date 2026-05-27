@@ -17,7 +17,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 // Même chose ici, le wrapper natif est indispensable
-private class TestContextWrapper(base: Context) : ContextWrapper(base) {
+class SunsetTestContextWrapper(base: Context) : ContextWrapper(base) {
     val startedServices = mutableListOf<Intent>()
     override fun startForegroundService(service: Intent?): ComponentName? {
         if (service != null) {
@@ -48,7 +48,7 @@ class SunsetAutomationReceiverTest {
     @Test
     fun testSunsetAutomationReceiverStartsSunsetSceneService() {
         val baseContext = ApplicationProvider.getApplicationContext<Context>()
-        val testContext = TestContextWrapper(baseContext)
+        val testContext = SunsetTestContextWrapper(baseContext)
 
         val receiver = SunsetAutomationReceiver()
         
