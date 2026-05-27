@@ -40,7 +40,9 @@ class AlarmTriggerReceiverTest {
         every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
         
         mockkObject(SunriseZoneConfig)
-        val mockZone = mockk<SunriseBulbZone>(relaxed = true)
+        
+        // LA CORRECTION : on instancie un mock strict (sans relaxed = true)
+        val mockZone = mockk<SunriseBulbZone>() 
         every { mockZone.macAddress } returns "00:11:22:33:44:55"
         every { mockZone.sunriseR } returns 255
         every { mockZone.sunriseG } returns 200
