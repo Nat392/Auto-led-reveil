@@ -45,6 +45,9 @@ jobs:
     - name: Build Debug APK
       run: ./gradlew --build-cache assembleDebug lintDebug testDebugUnitTest jacocoDebugUnitTestReport
 
+    - name: Build Release APK
+      run: ./gradlew --build-cache assembleRelease
+
     - name: Comment coverage on PR
       if: github.event_name == 'pull_request'
       id: pr_jacoco
