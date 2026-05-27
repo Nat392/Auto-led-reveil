@@ -32,6 +32,7 @@ jobs:
             const workflowRun = context.payload.workflow_run;
             const androidWorkflowName = 'Android CI - Alarm Watcher';
             const androidWorkflowFileName = 'android.yml';
+            const androidWorkflowRef = 'main';
             const requestedPullRequestNumber = context.eventName === 'workflow_dispatch'
               ? Number.parseInt(context.payload.inputs.pull_request_number ?? '', 10)
               : undefined;
@@ -54,10 +55,14 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 workflow_id: androidWorkflowFileName,
-                ref: pullRequest.head.ref,
+                ref: androidWorkflowRef,
+                inputs: {
+                  checkout_ref: pullRequest.head.ref,
+                  checkout_sha: pullRequest.head.sha,
+                },
               });
 
-              core.info(`Triggered Android CI for PR #${pullRequest.number} on ref ${pullRequest.head.ref}.`);
+              core.info(`Triggered Android CI for PR #${pullRequest.number} from ${androidWorkflowRef} using ${pullRequest.head.ref} (${pullRequest.head.sha}).`);
             };
 
             const waitForAndroidCiRun = async (pullRequest) => {
