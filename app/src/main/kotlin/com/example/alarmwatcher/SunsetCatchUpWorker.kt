@@ -18,7 +18,7 @@ class SunsetCatchUpWorker(
         return if (applied) {
             Result.success()
         } else {
-            DiscordCrashReporter.reportNonFatal(
+            crashReporter.reportNonFatal(
                 context = applicationContext,
                 throwable = IllegalStateException(
                     "Echec de l'application de la scene de coucher de soleil pour la zone $zoneKey"
@@ -31,6 +31,7 @@ class SunsetCatchUpWorker(
 
     companion object {
         const val KEY_ZONE_KEY = "zone_key"
+        internal var crashReporter: CrashReporterApi = DiscordCrashReporter
 
         fun uniqueWorkName(zoneKey: String): String = "sunset_catch_up_$zoneKey"
     }

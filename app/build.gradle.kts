@@ -116,6 +116,7 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-intents:3.5.1")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
     androidTestImplementation("io.mockk:mockk-android:1.13.5")
+    androidTestImplementation("androidx.work:work-testing:2.11.2")
 }
 
 tasks.withType<Test>().configureEach {
