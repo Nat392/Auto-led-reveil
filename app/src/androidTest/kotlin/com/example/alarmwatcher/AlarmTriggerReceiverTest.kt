@@ -8,7 +8,6 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.mockk.coEvery
 import io.mockk.every
-import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.unmockkObject
 import org.junit.After
@@ -53,7 +52,10 @@ class AlarmTriggerReceiverTest {
             sunsetB = 50
         )
 
+        // SÉCURITÉ MAXIMALE : On force MockK à retourner notre vraie zone pour TOUTES les fonctions
+        every { SunriseZoneConfig.all() } returns listOf(realZone)
         every { SunriseZoneConfig.configuredZones() } returns listOf(realZone)
+        every { SunriseZoneConfig.primaryZone() } returns realZone
     }
 
     @After
@@ -66,7 +68,7 @@ class AlarmTriggerReceiverTest {
     @Test
     fun testAlarmTriggerReceiverStartsSunriseService() {
         val baseContext = ApplicationProvider.getApplicationContext<Context>()
-        val testContext = AlarmTestContextWrapper(baseContext) // Utilisation de notre wrapper natif
+        val testContext = AlarmTestContextWrapper(baseContext)
 
         val receiver = AlarmTriggerReceiver()
         
