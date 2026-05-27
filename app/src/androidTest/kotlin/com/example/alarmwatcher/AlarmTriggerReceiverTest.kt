@@ -41,14 +41,18 @@ class AlarmTriggerReceiverTest {
         
         mockkObject(SunriseZoneConfig)
         
-        // LA CORRECTION : on instancie un mock strict (sans relaxed = true)
-        val mockZone = mockk<SunriseBulbZone>() 
-        every { mockZone.macAddress } returns "00:11:22:33:44:55"
-        every { mockZone.sunriseR } returns 255
-        every { mockZone.sunriseG } returns 200
-        every { mockZone.sunriseB } returns 100
+        // --- LA CORRECTION DÉFINITIVE EST ICI ---
+        // On n'utilise PLUS mockk<SunriseBulbZone>(). 
+        // On crée une VRAIE instance (adapte les paramètres à ton constructeur si besoin).
+        val realZone = SunriseBulbZone(
+            macAddress = "00:11:22:33:44:55",
+            sunriseR = 255,
+            sunriseG = 200,
+            sunriseB = 100
+        )
 
-        every { SunriseZoneConfig.configuredZones() } returns listOf(mockZone)
+        // On passe notre vrai objet dans la liste
+        every { SunriseZoneConfig.configuredZones() } returns listOf(realZone)
     }
 
     @After
