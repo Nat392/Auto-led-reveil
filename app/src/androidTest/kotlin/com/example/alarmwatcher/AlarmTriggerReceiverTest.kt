@@ -18,7 +18,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 // 1. Notre faux contexte qui capture les lancements de service sans crasher
-class TestContextWrapper(base: Context) : ContextWrapper(base) {
+private class TestContextWrapper(base: Context) : ContextWrapper(base) {
     val startedServices = mutableListOf<Intent>()
     override fun startForegroundService(service: Intent?): ComponentName? {
         if (service != null) {

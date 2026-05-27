@@ -17,7 +17,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 // Même chose ici, le wrapper natif est indispensable
-class TestContextWrapper(base: Context) : ContextWrapper(base) {
+private class TestContextWrapper(base: Context) : ContextWrapper(base) {
     val startedServices = mutableListOf<Intent>()
     override fun startForegroundService(service: Intent?): ComponentName? {
         if (service != null) {
