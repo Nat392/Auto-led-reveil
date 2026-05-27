@@ -6,16 +6,23 @@ on:
       - Android CI - Alarm Watcher
     types:
       - completed
+  workflow_dispatch:
+    inputs:
+      pull_request_number:
+        description: "Numéro de PR Dependabot à activer"
+        required: false
+        type: string
 
 permissions:
   contents: write
+  actions: write
   pull-requests: write
 
 jobs:
   enable-auto-merge:
     name: Enable squash auto-merge for Dependabot
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
 
     steps:
       - name: Enable auto-merge on matching Dependabot PRs
@@ -23,18 +30,101 @@ jobs:
         with:
           script: |
             const workflowRun = context.payload.workflow_run;
-            const pullRequests = workflowRun.pull_requests ?? [];
+            const androidWorkflowName = 'Android CI - Alarm Watcher';
+            const androidWorkflowFileName = 'android.yml';
+            const requestedPullRequestNumber = context.eventName === 'workflow_dispatch'
+              ? Number.parseInt(context.payload.inputs.pull_request_number ?? '', 10)
+              : undefined;
 
-            if (pullRequests.length === 0) {
-              core.info('No pull request was associated with this CI run.');
-              return;
+            const pullRequestNumbers = [];
+
+            const hasSuccessfulAndroidCiRun = async (pullRequest) => {
+              const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: pullRequest.head.sha,
+                per_page: 100,
+              });
+
+              return workflowRuns.workflow_runs.some((run) => run.name === androidWorkflowName && run.conclusion === 'success');
+            };
+
+            const triggerAndroidCiRun = async (pullRequest) => {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: androidWorkflowFileName,
+                ref: pullRequest.head.ref,
+              });
+
+              core.info(`Triggered Android CI for PR #${pullRequest.number} on ref ${pullRequest.head.ref}.`);
+            };
+
+            const waitForAndroidCiRun = async (pullRequest) => {
+              const timeoutAt = Date.now() + 45 * 60 * 1000;
+
+              while (Date.now() < timeoutAt) {
+                const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  head_sha: pullRequest.head.sha,
+                  per_page: 100,
+                });
+
+                const androidRun = workflowRuns.workflow_runs.find((run) => run.name === androidWorkflowName);
+
+                if (!androidRun) {
+                  await new Promise((resolve) => setTimeout(resolve, 30000));
+                  continue;
+                }
+
+                if (androidRun.status !== 'completed') {
+                  await new Promise((resolve) => setTimeout(resolve, 30000));
+                  continue;
+                }
+
+                return androidRun.conclusion === 'success';
+              }
+
+              throw new Error(`Timed out waiting for Android CI on PR #${pullRequest.number}.`);
+            };
+
+            if (context.eventName === 'workflow_dispatch') {
+              if (Number.isNaN(requestedPullRequestNumber)) {
+                const { data: openPullRequests } = await github.rest.pulls.list({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  state: 'open',
+                  per_page: 100,
+                });
+
+                const dependabotPullRequests = openPullRequests.filter((pullRequest) => pullRequest.user?.login === 'dependabot[bot]');
+
+                if (dependabotPullRequests.length === 0) {
+                  core.info('No open Dependabot PRs found.');
+                  return;
+                }
+
+                pullRequestNumbers.push(...dependabotPullRequests.map((pullRequest) => pullRequest.number));
+              } else {
+                pullRequestNumbers.push(requestedPullRequestNumber);
+              }
+            } else {
+              const pullRequests = workflowRun?.pull_requests ?? [];
+
+              if (pullRequests.length === 0) {
+                core.info('No pull request was associated with this CI run.');
+                return;
+              }
+
+              pullRequestNumbers.push(...pullRequests.map((pullRequest) => pullRequest.number));
             }
 
-            for (const associatedPullRequest of pullRequests) {
+            for (const pullRequestNumber of pullRequestNumbers) {
               const { data: pullRequest } = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                pull_number: associatedPullRequest.number,
+                pull_number: pullRequestNumber,
               });
 
               if (pullRequest.user?.login !== 'dependabot[bot]') {
@@ -45,6 +135,22 @@ jobs:
               if (pullRequest.state !== 'open') {
                 core.info(`Skipping closed PR #${pullRequest.number}.`);
                 continue;
+              }
+
+              if (context.eventName === 'workflow_dispatch') {
+                const androidCiSucceeded = await hasSuccessfulAndroidCiRun(pullRequest);
+
+                if (!androidCiSucceeded) {
+                  core.info(`Android CI is not green for PR #${pullRequest.number}, triggering a fresh run before enabling auto-merge.`);
+                  await triggerAndroidCiRun(pullRequest);
+
+                  const androidCiFinishedGreen = await waitForAndroidCiRun(pullRequest);
+
+                  if (!androidCiFinishedGreen) {
+                    core.info(`Skipping PR #${pullRequest.number} because Android CI did not finish green.`);
+                    continue;
+                  }
+                }
               }
 
               if (pullRequest.auto_merge) {
