@@ -28,6 +28,8 @@ jobs:
     name: Build & Test
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      pr_coverage: ${{ steps.pr_jacoco.outputs.coverage-overall }}
 
     steps:
     - name: Checkout repository
@@ -40,16 +42,9 @@ jobs:
       with:
         java-version: '17' # Changé de 11 à 17
         distribution: 'temurin'
-        cache: gradle
 
-    - name: Cache Gradle build cache
-      uses: actions/cache@v5
-      with:
-        path: |
-          ~/.gradle/caches/build-cache-1
-        key: ${{ runner.os }}-gradle-build-cache-${{ hashFiles('**/*.gradle', '**/*.gradle.kts', 'gradle.properties', 'settings.gradle.kts', 'gradle/wrapper/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-build-cache-
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v6
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
@@ -71,60 +66,13 @@ jobs:
         update-comment: true
         comment-type: pr_comment
 
-    - name: Checkout main branch for baseline coverage
-      if: github.event_name == 'pull_request'
-      uses: actions/checkout@v6
+    - name: Upload Coverage Report
+      if: always()
+      uses: actions/upload-artifact@v7
       with:
-        ref: ${{ github.event.pull_request.base.ref }}
-        path: main-baseline
-
-    - name: Generate baseline coverage report
-      if: github.event_name == 'pull_request'
-      working-directory: main-baseline
-      run: |
-        chmod +x gradlew
-        ./gradlew --build-cache testDebugUnitTest jacocoDebugUnitTestReport
-
-    - name: Summarize baseline coverage
-      if: github.event_name == 'pull_request'
-      id: baseline_jacoco
-      uses: madrapps/jacoco-report@v1.7.2
-      with:
-        paths: ${{ github.workspace }}/main-baseline/app/build/reports/jacoco/jacocoDebugUnitTestReport/jacocoDebugUnitTestReport.xml
-        token: ${{ secrets.GITHUB_TOKEN }}
-        title: Baseline Coverage
-        update-comment: false
-        comment-type: summary
-
-    - name: Fail if coverage regresses versus main
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v9
-      env:
-        PR_COVERAGE: ${{ steps.pr_jacoco.outputs.coverage-overall }}
-        BASE_COVERAGE: ${{ steps.baseline_jacoco.outputs.coverage-overall }}
-      with:
-        script: |
-          const parseCoverage = (value) => Number.parseFloat(String(value).replace('%', '').trim());
-          const prCoverage = parseCoverage(process.env.PR_COVERAGE);
-          const baseCoverage = parseCoverage(process.env.BASE_COVERAGE);
-
-          if (Number.isNaN(prCoverage) || Number.isNaN(baseCoverage)) {
-            core.setFailed(`Unable to read coverage values. PR=${process.env.PR_COVERAGE}, main=${process.env.BASE_COVERAGE}`);
-            return;
-          }
-
-          if (prCoverage < baseCoverage) {
-            core.setFailed(`Coverage regressed: PR ${prCoverage.toFixed(2)}% < main ${baseCoverage.toFixed(2)}%`);
-          } else {
-            core.summary
-              .addHeading('Coverage comparison')
-              .addTable([
-                [{ data: 'Branch', header: true }, { data: 'Overall coverage', header: true }],
-                ['main', `${baseCoverage.toFixed(2)}%`],
-                ['PR', `${prCoverage.toFixed(2)}%`]
-              ])
-              .write();
-          }
+        name: alarm-watcher-jacoco-report
+        path: app/build/reports/jacoco/jacocoDebugUnitTestReport/
+        if-no-files-found: ignore
 
     - name: Enable KVM group perms
       run: |
@@ -156,10 +104,101 @@ jobs:
         name: alarm-watcher-debug-apk
         path: app/build/outputs/apk/debug/app-debug.apk
 
-    - name: Upload Coverage Report
-      if: always()
-      uses: actions/upload-artifact@v7
+  baseline_coverage:
+    name: Baseline Coverage
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout main branch for baseline coverage
+      uses: actions/checkout@v6
       with:
-        name: alarm-watcher-jacoco-report
-        path: app/build/reports/jacoco/jacocoDebugUnitTestReport/
-        if-no-files-found: ignore
+        ref: ${{ github.event.pull_request.base.ref }}
+        path: main-baseline
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v5
+      with:
+        java-version: '17' # Changé de 11 à 17
+        distribution: 'temurin'
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v6
+
+    - name: Generate baseline coverage report
+      working-directory: main-baseline
+      run: |
+        chmod +x gradlew
+        ./gradlew --build-cache testDebugUnitTest jacocoDebugUnitTestReport
+
+    - name: Extract baseline coverage
+      id: baseline_coverage
+      shell: bash
+      run: |
+        python - <<'PY'
+        import os
+        import xml.etree.ElementTree as ET
+
+        report_path = os.path.join(
+            os.environ["GITHUB_WORKSPACE"],
+            "main-baseline",
+            "app",
+            "build",
+            "reports",
+            "jacoco",
+            "jacocoDebugUnitTestReport",
+            "jacocoDebugUnitTestReport.xml",
+        )
+
+        root = ET.parse(report_path).getroot()
+        counter = next(node for node in root.findall("counter") if node.attrib["type"] == "INSTRUCTION")
+        covered = float(counter.attrib["covered"])
+        missed = float(counter.attrib["missed"])
+        total = covered + missed
+        coverage = 0.0 if total == 0 else (covered / total) * 100.0
+
+        print(f"coverage={coverage:.2f}")
+
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output_file:
+            output_file.write(f"baseline_coverage={coverage:.2f}\n")
+        PY
+
+    outputs:
+      baseline_coverage: ${{ steps.baseline_coverage.outputs.baseline_coverage }}
+
+  compare_coverage:
+    name: Compare Coverage
+    if: github.event_name == 'pull_request'
+    needs: [build, baseline_coverage]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Fail if coverage regresses versus main
+      uses: actions/github-script@v9
+      env:
+        PR_COVERAGE: ${{ needs.build.outputs.pr_coverage }}
+        BASE_COVERAGE: ${{ needs.baseline_coverage.outputs.baseline_coverage }}
+      with:
+        script: |
+          const parseCoverage = (value) => Number.parseFloat(String(value).replace('%', '').trim());
+          const prCoverage = parseCoverage(process.env.PR_COVERAGE);
+          const baseCoverage = parseCoverage(process.env.BASE_COVERAGE);
+
+          if (Number.isNaN(prCoverage) || Number.isNaN(baseCoverage)) {
+            core.setFailed(`Unable to read coverage values. PR=${process.env.PR_COVERAGE}, main=${process.env.BASE_COVERAGE}`);
+            return;
+          }
+
+          if (prCoverage < baseCoverage) {
+            core.setFailed(`Coverage regressed: PR ${prCoverage.toFixed(2)}% < main ${baseCoverage.toFixed(2)}%`);
+          } else {
+            core.summary
+              .addHeading('Coverage comparison')
+              .addTable([
+                [{ data: 'Branch', header: true }, { data: 'Overall coverage', header: true }],
+                ['main', `${baseCoverage.toFixed(2)}%`],
+                ['PR', `${prCoverage.toFixed(2)}%`]
+              ])
+              .write();
+          }
