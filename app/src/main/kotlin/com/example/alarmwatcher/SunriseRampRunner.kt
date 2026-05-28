@@ -21,98 +21,35 @@ internal class SunriseRampRunner(
         durationMs: Long,
         onProgress: (currentStep: Int, totalSteps: Int) -> Unit = { _, _ -> },
     ) {
-        val steps = SunriseRampSupport.computeStepCount(durationMs)
-        val session = bulbController.openSession(context, macAddress)
-        if (session == null) {
-            Log.w(TAG, "Impossible d'ouvrir une session BLE pour la rampe")
-            val errorMessage =
-                "Impossible d'ouvrir une session BLE pour la rampe" +
-                    " macAddress=$macAddress - durationMs=$durationMs - " +
-                    "steps=$steps - targetR=$targetR - " +
-                    "targetG=$targetG - targetB=$targetB"
-            crashReporter.reportNonFatal(
+        val request =
+            RampRequest(
                 context = context,
-                throwable = IllegalStateException(errorMessage),
-                source = TAG,
+                macAddress = macAddress,
+                durationMs = durationMs,
+                steps = SunriseRampSupport.computeStepCount(durationMs),
+                targetR = targetR,
+                targetG = targetG,
+                targetB = targetB,
+                onProgress = onProgress,
             )
-            return
-        }
+        val session = openSessionOrReportFailure(request) ?: return
 
-        val rampStartMs = nowMs()
-        val rampDeadlineMs = rampStartMs + max(0L, durationMs - FINAL_WRITE_RESERVE_MS)
-        val finalDeadlineMs = rampStartMs + durationMs
-        var lastAppliedStep = -1
-        var shouldSendFinalScene = true
+        val rampTiming = RampTiming.from(nowMs(), durationMs)
 
         try {
-            while (true) {
-                val currentMs = nowMs()
-                if (currentMs >= rampDeadlineMs) {
-                    break
-                }
-
-                val elapsedMs = (currentMs - rampStartMs).coerceAtLeast(0L)
-                val timeStep =
-                    ((elapsedMs.toDouble() / durationMs.coerceAtLeast(1L).toDouble()) * steps)
-                        .toInt()
-                        .coerceIn(0, steps - 1)
-
-                if (timeStep <= lastAppliedStep) {
-                    val nextStepTimeMs = rampStartMs + (((lastAppliedStep + 1L) * durationMs) / steps)
-                    val sleepMs = (min(nextStepTimeMs, rampDeadlineMs) - nowMs()).coerceAtLeast(0L)
-                    if (sleepMs > 0L) {
-                        delay(sleepMs)
-                    }
-                    continue
-                }
-
-                val palette = SunriseRampSupport.computeSceneAtStep(timeStep, steps, targetR, targetG, targetB)
-                if (
-                    !session.applyScene(
-                        red = palette.red,
-                        green = palette.green,
-                        blue = palette.blue,
-                        white = 0,
-                    )
-                ) {
-                    Log.w(TAG, "Echec d'ecriture BLE pendant la rampe, arret de la sequence")
-                    shouldSendFinalScene = false
-                    break
-                }
-                lastAppliedStep = timeStep
-                onProgress(timeStep, steps)
-
-                val nextStepTimeMs = rampStartMs + (((timeStep + 1L) * durationMs) / steps)
-                val sleepMs = (min(nextStepTimeMs, rampDeadlineMs) - nowMs()).coerceAtLeast(0L)
-                if (sleepMs > 0L) {
-                    delay(sleepMs)
-                }
-            }
+            val shouldSendFinalScene =
+                runTimedRamp(
+                    session = session,
+                    timing = rampTiming,
+                    request = request,
+                )
 
             if (shouldSendFinalScene) {
-                val finalDelayMs = (finalDeadlineMs - nowMs()).coerceAtLeast(0L)
-                if (finalDelayMs > 0L) {
-                    delay(finalDelayMs)
-                }
-
-                val finalPalette =
-                    SunriseRampSupport.Scene(
-                        targetR.coerceIn(0, 255),
-                        targetG.coerceIn(0, 255),
-                        targetB.coerceIn(0, 255),
-                    )
-                if (
-                    session.applyScene(
-                        red = finalPalette.red,
-                        green = finalPalette.green,
-                        blue = finalPalette.blue,
-                        white = 0,
-                    )
-                ) {
-                    onProgress(steps, steps)
-                } else {
-                    Log.w(TAG, "Echec d'ecriture BLE finale pour la rampe")
-                }
+                waitUntil(rampTiming.finalDeadlineMs)
+                sendFinalScene(
+                    session = session,
+                    request = request,
+                )
             }
         } catch (e: CancellationException) {
             throw e
@@ -124,8 +61,162 @@ internal class SunriseRampRunner(
         }
     }
 
+    private suspend fun openSessionOrReportFailure(request: RampRequest): BulbSession? {
+        val session = bulbController.openSession(request.context, request.macAddress)
+        if (session != null) {
+            return session
+        }
+
+        Log.w(TAG, "Impossible d'ouvrir une session BLE pour la rampe")
+        val errorMessage =
+            "Impossible d'ouvrir une session BLE pour la rampe" +
+                " macAddress=${request.macAddress} - durationMs=${request.durationMs} - " +
+                "steps=${request.steps} - targetR=${request.targetR} - " +
+                "targetG=${request.targetG} - targetB=${request.targetB}"
+        crashReporter.reportNonFatal(
+            context = request.context,
+            throwable = IllegalStateException(errorMessage),
+            source = TAG,
+        )
+        return null
+    }
+
+    private suspend fun runTimedRamp(
+        session: BulbSession,
+        timing: RampTiming,
+        request: RampRequest,
+    ): Boolean {
+        var lastAppliedStep = -1
+        while (nowMs() < timing.rampDeadlineMs) {
+            val timeStep = computeTimedStep(timing.rampStartMs, timing.durationMs, request.steps)
+            val shouldApplyStep = timeStep > lastAppliedStep
+
+            if (shouldApplyStep) {
+                val palette =
+                    SunriseRampSupport.computeSceneAtStep(
+                        timeStep,
+                        request.steps,
+                        request.targetR,
+                        request.targetG,
+                        request.targetB,
+                    )
+                if (!applyScene(session, palette.red, palette.green, palette.blue)) {
+                    Log.w(TAG, "Echec d'ecriture BLE pendant la rampe, arret de la sequence")
+                    return false
+                }
+                lastAppliedStep = timeStep
+                request.onProgress(timeStep, request.steps)
+            }
+
+            waitUntil(
+                min(
+                    nextStepTargetMs(
+                        rampStartMs = timing.rampStartMs,
+                        durationMs = timing.durationMs,
+                        steps = request.steps,
+                        lastAppliedStep = lastAppliedStep,
+                    ),
+                    timing.rampDeadlineMs,
+                ),
+            )
+        }
+
+        return true
+    }
+
+    private suspend fun sendFinalScene(
+        session: BulbSession,
+        request: RampRequest,
+    ) {
+        if (
+            applyScene(
+                session,
+                request.targetR.coerceIn(MIN_RGB_VALUE, MAX_RGB_VALUE),
+                request.targetG.coerceIn(MIN_RGB_VALUE, MAX_RGB_VALUE),
+                request.targetB.coerceIn(MIN_RGB_VALUE, MAX_RGB_VALUE),
+            )
+        ) {
+            request.onProgress(request.steps, request.steps)
+        } else {
+            Log.w(TAG, "Echec d'ecriture BLE finale pour la rampe")
+        }
+    }
+
+    private suspend fun applyScene(
+        session: BulbSession,
+        red: Int,
+        green: Int,
+        blue: Int,
+    ): Boolean =
+        session.applyScene(
+            red = red,
+            green = green,
+            blue = blue,
+            white = 0,
+        )
+
+    private suspend fun waitUntil(targetMs: Long) {
+        val sleepMs = (targetMs - nowMs()).coerceAtLeast(0L)
+        if (sleepMs > 0L) {
+            delay(sleepMs)
+        }
+    }
+
+    private fun computeTimedStep(
+        rampStartMs: Long,
+        durationMs: Long,
+        steps: Int,
+    ): Int {
+        val elapsedMs = (nowMs() - rampStartMs).coerceAtLeast(0L)
+        return ((elapsedMs.toDouble() / durationMs.coerceAtLeast(1L).toDouble()) * steps)
+            .toInt()
+            .coerceIn(0, steps - 1)
+    }
+
+    private fun nextStepTargetMs(
+        rampStartMs: Long,
+        durationMs: Long,
+        steps: Int,
+        lastAppliedStep: Int,
+    ): Long = rampStartMs + (((lastAppliedStep + 1L) * durationMs) / steps.coerceAtLeast(1))
+
+    private data class RampRequest(
+        val context: Context,
+        val macAddress: String,
+        val durationMs: Long,
+        val steps: Int,
+        val targetR: Int,
+        val targetG: Int,
+        val targetB: Int,
+        val onProgress: (currentStep: Int, totalSteps: Int) -> Unit,
+    )
+
     private companion object {
         const val TAG = "SunriseService"
         const val FINAL_WRITE_RESERVE_MS = 400L
+        const val MIN_RGB_VALUE = 0
+        const val MAX_RGB_VALUE = 255
+    }
+
+    private data class RampTiming(
+        val rampStartMs: Long,
+        val rampDeadlineMs: Long,
+        val finalDeadlineMs: Long,
+        val durationMs: Long,
+    ) {
+        companion object {
+            fun from(
+                rampStartMs: Long,
+                durationMs: Long,
+            ): RampTiming {
+                val rampDeadlineMs = rampStartMs + max(0L, durationMs - FINAL_WRITE_RESERVE_MS)
+                return RampTiming(
+                    rampStartMs = rampStartMs,
+                    rampDeadlineMs = rampDeadlineMs,
+                    finalDeadlineMs = rampStartMs + durationMs,
+                    durationMs = durationMs,
+                )
+            }
+        }
     }
 }

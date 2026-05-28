@@ -17,13 +17,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
-import kotlin.math.roundToInt
 import java.util.UUID
+import kotlin.math.roundToInt
 
 object ZenggeBulbController : BulbControllerApi {
     private const val TAG = "ZenggeBulbController"
     private const val CONNECT_TIMEOUT_MS = 12_000L
     private const val OP_TIMEOUT_MS = 5_000L
+    private const val MIN_BRIGHTNESS_PERCENT = 0
+    private const val MAX_BRIGHTNESS_PERCENT = 100
+    private const val MIN_RGB_VALUE = 0
+    private const val MAX_RGB_VALUE = 255
 
     private val UUID_RGBW_NEW: UUID = UUID.fromString("0000ff01-0000-1000-8000-00805f9b34fb")
     private val UUID_RGBW_LEGACY: UUID = UUID.fromString("0000ffe9-0000-1000-8000-00805f9b34fb")
@@ -506,13 +510,23 @@ object ZenggeBulbController : BulbControllerApi {
         white: Int,
         brightnessPercent: Int,
     ): Scene {
-        val brightnessScale = brightnessPercent.coerceIn(0, 100) / 100.0
+        val brightnessScale =
+            brightnessPercent.coerceIn(MIN_BRIGHTNESS_PERCENT, MAX_BRIGHTNESS_PERCENT).toDouble() /
+                MAX_BRIGHTNESS_PERCENT.toDouble()
         return Scene(
-            red = (red.coerceIn(0, 255) * brightnessScale).roundToInt().coerceIn(0, 255),
-            green = (green.coerceIn(0, 255) * brightnessScale).roundToInt().coerceIn(0, 255),
-            blue = (blue.coerceIn(0, 255) * brightnessScale).roundToInt().coerceIn(0, 255),
-            white = (white.coerceIn(0, 255) * brightnessScale).roundToInt().coerceIn(0, 255),
+            red = scaleChannel(red, brightnessScale),
+            green = scaleChannel(green, brightnessScale),
+            blue = scaleChannel(blue, brightnessScale),
+            white = scaleChannel(white, brightnessScale),
         )
+    }
+
+    private fun scaleChannel(
+        value: Int,
+        brightnessScale: Double,
+    ): Int {
+        val scaledValue = value.coerceIn(MIN_RGB_VALUE, MAX_RGB_VALUE) * brightnessScale
+        return scaledValue.roundToInt().coerceIn(MIN_RGB_VALUE, MAX_RGB_VALUE)
     }
 
     internal data class Scene(
