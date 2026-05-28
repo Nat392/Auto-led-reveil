@@ -24,4 +24,4 @@
   - `& .\gradlew.bat --build-cache connectedDebugAndroidTest`
 - Statut : assembleDebug, lintDebug, ktlintCheck, detekt, testDebugUnitTest, jacocoDebugUnitTestReport, assembleRelease et connectedDebugAndroidTest passés localement
 - Fichiers modifiés : `AGENT_MEMORY.md`, `gradlew` (bit exécutable dans Git)
-- PR : non créée pour l’instant
+- PR : https://github.com/Nat392/Auto-led-reveil/pull/17
