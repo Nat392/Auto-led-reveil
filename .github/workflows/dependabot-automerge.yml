@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - name: Enable auto-merge on matching Dependabot PRs
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const workflowRun = context.payload.workflow_run;
@@ -38,6 +38,10 @@ jobs:
               : undefined;
 
             const pullRequestNumbers = [];
+
+            const isDependabotPullRequest = (pullRequest) => pullRequest.user?.login === 'dependabot[bot]';
+
+            const isMergeablePullRequest = (pullRequest) => pullRequest.mergeable === true;
 
             const hasSuccessfulAndroidCiRun = async (pullRequest) => {
               const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
@@ -65,40 +69,15 @@ jobs:
               core.info(`Triggered Android CI for PR #${pullRequest.number} from ${androidWorkflowRef} using ${pullRequest.head.ref} (${pullRequest.head.sha}).`);
             };
 
-            const waitForAndroidCiRun = async (triggeredAfterIso) => {
-              const timeoutAt = Date.now() + 45 * 60 * 1000;
+            const getCandidatePullRequests = async () => {
+              if (context.eventName !== 'workflow_dispatch') {
+                const workflowRunHeadSha = workflowRun?.head_sha;
 
-              while (Date.now() < timeoutAt) {
-                const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  per_page: 100,
-                });
-
-                const androidRun = workflowRuns.workflow_runs.find((run) => {
-                  return run.name === androidWorkflowName
-                    && run.event === 'workflow_dispatch'
-                    && new Date(run.created_at).getTime() >= new Date(triggeredAfterIso).getTime();
-                });
-
-                if (!androidRun) {
-                  await new Promise((resolve) => setTimeout(resolve, 30000));
-                  continue;
+                if (!workflowRunHeadSha) {
+                  core.info('No head SHA was attached to the workflow run, so no candidate PR can be derived safely.');
+                  return [];
                 }
 
-                if (androidRun.status !== 'completed') {
-                  await new Promise((resolve) => setTimeout(resolve, 30000));
-                  continue;
-                }
-
-                return androidRun.conclusion === 'success';
-              }
-
-              throw new Error(`Timed out waiting for Android CI on PR #${pullRequest.number}.`);
-            };
-
-            if (context.eventName === 'workflow_dispatch') {
-              if (Number.isNaN(requestedPullRequestNumber)) {
                 const { data: openPullRequests } = await github.rest.pulls.list({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
@@ -106,26 +85,30 @@ jobs:
                   per_page: 100,
                 });
 
-                const dependabotPullRequests = openPullRequests.filter((pullRequest) => pullRequest.user?.login === 'dependabot[bot]');
-
-                if (dependabotPullRequests.length === 0) {
-                  core.info('No open Dependabot PRs found.');
-                  return;
-                }
-
-                pullRequestNumbers.push(...dependabotPullRequests.map((pullRequest) => pullRequest.number));
-              } else {
-                pullRequestNumbers.push(requestedPullRequestNumber);
-              }
-            } else {
-              const pullRequests = workflowRun?.pull_requests ?? [];
-
-              if (pullRequests.length === 0) {
-                core.info('No pull request was associated with this CI run.');
-                return;
+                return openPullRequests
+                  .filter((pullRequest) => isDependabotPullRequest(pullRequest) && pullRequest.head?.sha === workflowRunHeadSha)
+                  .map((pullRequest) => pullRequest.number);
               }
 
-              pullRequestNumbers.push(...pullRequests.map((pullRequest) => pullRequest.number));
+              if (!Number.isNaN(requestedPullRequestNumber)) {
+                return [requestedPullRequestNumber];
+              }
+
+              const { data: openPullRequests } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                per_page: 100,
+              });
+
+              return openPullRequests.filter(isDependabotPullRequest).map((pullRequest) => pullRequest.number);
+            };
+
+            pullRequestNumbers.push(...await getCandidatePullRequests());
+
+            if (pullRequestNumbers.length === 0) {
+              core.info('No candidate Dependabot PRs were found.');
+              return;
             }
 
             for (const pullRequestNumber of pullRequestNumbers) {
@@ -135,13 +118,20 @@ jobs:
                 pull_number: pullRequestNumber,
               });
 
-              if (pullRequest.user?.login !== 'dependabot[bot]') {
-                core.info(`Skipping non-Dependabot PR #${pullRequest.number}.`);
+              core.info(`Evaluating PR #${pullRequest.number}: ${pullRequest.title}`);
+
+              if (!isDependabotPullRequest(pullRequest)) {
+                core.info(`Skipping PR #${pullRequest.number} because it is not opened by Dependabot.`);
                 continue;
               }
 
               if (pullRequest.state !== 'open') {
-                core.info(`Skipping closed PR #${pullRequest.number}.`);
+                core.info(`Skipping PR #${pullRequest.number} because it is not open.`);
+                continue;
+              }
+
+              if (!isMergeablePullRequest(pullRequest)) {
+                core.info(`Skipping PR #${pullRequest.number} because GitHub reports it as not mergeable.`);
                 continue;
               }
 
@@ -150,13 +140,10 @@ jobs:
 
                 if (!androidCiSucceeded) {
                   core.info(`Android CI is not green for PR #${pullRequest.number}, triggering a fresh run before enabling auto-merge.`);
-                  const dispatchRequestedAt = new Date().toISOString();
-                  await triggerAndroidCiRun(pullRequest);
-
-                  const androidCiFinishedGreen = await waitForAndroidCiRun(dispatchRequestedAt);
-
-                  if (!androidCiFinishedGreen) {
-                    core.info(`Skipping PR #${pullRequest.number} because Android CI did not finish green.`);
+                  try {
+                    await triggerAndroidCiRun(pullRequest);
+                  } catch (error) {
+                    core.warning(`Unable to trigger Android CI for PR #${pullRequest.number}: ${error.message}`);
                     continue;
                   }
                 }
