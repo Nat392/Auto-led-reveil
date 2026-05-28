@@ -5,10 +5,12 @@ import android.util.Log
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlin.math.max
+import kotlin.math.min
 
 internal class SunriseRampRunner(
     private val bulbController: BulbControllerApi,
     private val crashReporter: CrashReporterApi = DiscordCrashReporter,
+    private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
     suspend fun run(
         context: Context,
@@ -20,7 +22,6 @@ internal class SunriseRampRunner(
         onProgress: (currentStep: Int, totalSteps: Int) -> Unit = { _, _ -> },
     ) {
         val steps = SunriseRampSupport.computeStepCount(durationMs)
-        val stepDelayMs = max(1L, durationMs / steps)
         val session = bulbController.openSession(context, macAddress)
         if (session == null) {
             Log.w(TAG, "Impossible d'ouvrir une session BLE pour la rampe")
@@ -37,9 +38,35 @@ internal class SunriseRampRunner(
             return
         }
 
+        val rampStartMs = nowMs()
+        val rampDeadlineMs = rampStartMs + max(0L, durationMs - FINAL_WRITE_RESERVE_MS)
+        val finalDeadlineMs = rampStartMs + durationMs
+        var lastAppliedStep = -1
+        var shouldSendFinalScene = true
+
         try {
-            for (step in 0..steps) {
-                val palette = SunriseRampSupport.computeSceneAtStep(step, steps, targetR, targetG, targetB)
+            while (true) {
+                val currentMs = nowMs()
+                if (currentMs >= rampDeadlineMs) {
+                    break
+                }
+
+                val elapsedMs = (currentMs - rampStartMs).coerceAtLeast(0L)
+                val timeStep =
+                    ((elapsedMs.toDouble() / durationMs.coerceAtLeast(1L).toDouble()) * steps)
+                        .toInt()
+                        .coerceIn(0, steps - 1)
+
+                if (timeStep <= lastAppliedStep) {
+                    val nextStepTimeMs = rampStartMs + (((lastAppliedStep + 1L) * durationMs) / steps)
+                    val sleepMs = (min(nextStepTimeMs, rampDeadlineMs) - nowMs()).coerceAtLeast(0L)
+                    if (sleepMs > 0L) {
+                        delay(sleepMs)
+                    }
+                    continue
+                }
+
+                val palette = SunriseRampSupport.computeSceneAtStep(timeStep, steps, targetR, targetG, targetB)
                 if (
                     !session.applyScene(
                         red = palette.red,
@@ -49,11 +76,42 @@ internal class SunriseRampRunner(
                     )
                 ) {
                     Log.w(TAG, "Echec d'ecriture BLE pendant la rampe, arret de la sequence")
+                    shouldSendFinalScene = false
                     break
                 }
-                onProgress(step, steps)
-                if (step < steps) {
-                    delay(stepDelayMs)
+                lastAppliedStep = timeStep
+                onProgress(timeStep, steps)
+
+                val nextStepTimeMs = rampStartMs + (((timeStep + 1L) * durationMs) / steps)
+                val sleepMs = (min(nextStepTimeMs, rampDeadlineMs) - nowMs()).coerceAtLeast(0L)
+                if (sleepMs > 0L) {
+                    delay(sleepMs)
+                }
+            }
+
+            if (shouldSendFinalScene) {
+                val finalDelayMs = (finalDeadlineMs - nowMs()).coerceAtLeast(0L)
+                if (finalDelayMs > 0L) {
+                    delay(finalDelayMs)
+                }
+
+                val finalPalette =
+                    SunriseRampSupport.Scene(
+                        targetR.coerceIn(0, 255),
+                        targetG.coerceIn(0, 255),
+                        targetB.coerceIn(0, 255),
+                    )
+                if (
+                    session.applyScene(
+                        red = finalPalette.red,
+                        green = finalPalette.green,
+                        blue = finalPalette.blue,
+                        white = 0,
+                    )
+                ) {
+                    onProgress(steps, steps)
+                } else {
+                    Log.w(TAG, "Echec d'ecriture BLE finale pour la rampe")
                 }
             }
         } catch (e: CancellationException) {
@@ -68,5 +126,6 @@ internal class SunriseRampRunner(
 
     private companion object {
         const val TAG = "SunriseService"
+        const val FINAL_WRITE_RESERVE_MS = 400L
     }
 }

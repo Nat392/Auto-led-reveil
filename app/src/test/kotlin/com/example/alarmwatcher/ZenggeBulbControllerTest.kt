@@ -84,20 +84,20 @@ class ZenggeBulbControllerTest {
     }
 
     @Test
-    fun `scaleScene clamps rgbw outputs and ignores brightnessPercent`() {
+    fun `scaleScene clamps rgbw outputs and applies brightnessPercent`() {
         val scene =
             ZenggeBulbController.scaleScene(
                 red = 300,
                 green = -20,
                 blue = 128,
                 white = 999,
-                brightnessPercent = 0,
+                brightnessPercent = 71,
             )
 
-        assertEquals(255, scene.red)
+        assertEquals(181, scene.red)
         assertEquals(0, scene.green)
-        assertEquals(128, scene.blue)
-        assertEquals(255, scene.white)
+        assertEquals(91, scene.blue)
+        assertEquals(181, scene.white)
     }
 
     @Test

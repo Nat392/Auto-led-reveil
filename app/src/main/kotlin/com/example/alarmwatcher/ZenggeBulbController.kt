@@ -17,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.math.roundToInt
 import java.util.UUID
 
 object ZenggeBulbController : BulbControllerApi {
@@ -505,12 +506,12 @@ object ZenggeBulbController : BulbControllerApi {
         white: Int,
         brightnessPercent: Int,
     ): Scene {
-        val mapped = 1.0
+        val brightnessScale = brightnessPercent.coerceIn(0, 100) / 100.0
         return Scene(
-            red = (red.coerceIn(0, 255) * mapped).toInt().coerceIn(0, 255),
-            green = (green.coerceIn(0, 255) * mapped).toInt().coerceIn(0, 255),
-            blue = (blue.coerceIn(0, 255) * mapped).toInt().coerceIn(0, 255),
-            white = (white.coerceIn(0, 255) * mapped).toInt().coerceIn(0, 255),
+            red = (red.coerceIn(0, 255) * brightnessScale).roundToInt().coerceIn(0, 255),
+            green = (green.coerceIn(0, 255) * brightnessScale).roundToInt().coerceIn(0, 255),
+            blue = (blue.coerceIn(0, 255) * brightnessScale).roundToInt().coerceIn(0, 255),
+            white = (white.coerceIn(0, 255) * brightnessScale).roundToInt().coerceIn(0, 255),
         )
     }
 
