@@ -111,6 +111,8 @@ Pour contribuer:
 1. Créez une branche dédiée.
 2. Faites des changements ciblés.
 3. Ouvrez une pull request avec une description courte et claire.
+4. Si vous activez l’automerge GitHub pour les PR Dependabot, assurez-vous que le dépôt autorise l’automerge et les squash merges, puis laissez la CI GitHub Actions terminer avant la fusion.
+5. Pour une PR déjà ouverte, lancez le workflow GitHub Actions `Dependabot Auto-merge` manuellement depuis l’onglet Actions, puis indiquez un numéro de PR si vous voulez en cibler une seule.
 
 ## Structure du dépôt
 
