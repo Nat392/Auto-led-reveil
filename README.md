@@ -55,11 +55,31 @@ Depuis la racine du projet:
 
 L’APK de debug est généré dans `app/build/outputs/apk/`.
 
+La CI exécute aussi JaCoCo sur les tests JVM du module `app`, publie un commentaire de couverture sur les PR, puis compare la couverture globale de la PR avec celle de `main`. Le job échoue uniquement si la PR fait baisser cette couverture. Le rapport HTML correspondant est généré dans `app/build/reports/jacoco/jacocoDebugUnitTestReport/html/`.
+
 Pour installer sur un appareil connecté:
 
 ```powershell
 ./gradlew.bat installDebug
 ```
+
+### Controles qualite (formatage et analyse statique)
+
+Le projet integre aussi `ktlint` et `detekt` pour faire respecter les standards Kotlin avant fusion.
+
+Commandes utiles en local:
+
+```powershell
+./gradlew.bat ktlintCheck detekt
+```
+
+Pour corriger automatiquement le formatage Kotlin:
+
+```powershell
+./gradlew.bat ktlintFormat
+```
+
+Ces verifications sont aussi lancees dans la CI sur les PR vers `main`.
 
 ### Premier lancement
 
@@ -91,6 +111,8 @@ Pour contribuer:
 1. Créez une branche dédiée.
 2. Faites des changements ciblés.
 3. Ouvrez une pull request avec une description courte et claire.
+4. Si vous activez l’automerge GitHub pour les PR Dependabot, assurez-vous que le dépôt autorise l’automerge et les squash merges, puis laissez la CI GitHub Actions terminer avant la fusion.
+5. Pour une PR déjà ouverte, lancez le workflow GitHub Actions `Dependabot Auto-merge` manuellement depuis l’onglet Actions, puis indiquez un numéro de PR si vous voulez en cibler une seule.
 
 ## Structure du dépôt
 

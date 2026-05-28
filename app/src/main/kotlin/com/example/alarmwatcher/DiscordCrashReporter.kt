@@ -40,20 +40,21 @@ object DiscordCrashReporter : CrashReporterApi {
     override fun reportNonFatal(
         context: Context,
         throwable: Throwable,
-        source: String?
-    ): Job = scope.launch {
-        sendReport(
-            context = context.applicationContext,
-            throwable = throwable,
-            source = source,
-            fatal = false
-        )
-    }
+        source: String?,
+    ): Job =
+        scope.launch {
+            sendReport(
+                context = context.applicationContext,
+                throwable = throwable,
+                source = source,
+                fatal = false,
+            )
+        }
 
     override fun reportFatalBlocking(
         context: Context,
         throwable: Throwable,
-        threadName: String?
+        threadName: String?,
     ) {
         runBlocking(Dispatchers.IO) {
             withTimeout(FATAL_WAIT_TIMEOUT_MS) {
@@ -61,7 +62,7 @@ object DiscordCrashReporter : CrashReporterApi {
                     context = context.applicationContext,
                     throwable = throwable,
                     source = threadName ?: Thread.currentThread().name,
-                    fatal = true
+                    fatal = true,
                 )
             }
         }
@@ -70,14 +71,14 @@ object DiscordCrashReporter : CrashReporterApi {
     override fun reportDebugBlocking(
         context: Context,
         source: String,
-        details: String
+        details: String,
     ) {
         runBlocking(Dispatchers.IO) {
             withTimeout(FATAL_WAIT_TIMEOUT_MS) {
                 sendDebugReport(
                     context = context.applicationContext,
                     source = source,
-                    details = details
+                    details = details,
                 )
             }
         }
@@ -87,7 +88,7 @@ object DiscordCrashReporter : CrashReporterApi {
         context: Context,
         throwable: Throwable,
         source: String?,
-        fatal: Boolean
+        fatal: Boolean,
     ) {
         val webhookUrl = BuildConfig.DISCORD_WEBHOOK_URL.trim()
         if (webhookUrl.isBlank()) {
@@ -97,49 +98,52 @@ object DiscordCrashReporter : CrashReporterApi {
 
         val screenshotBytes = captureScreenshotBestEffort()
         val stacktrace = throwable.stackTraceToString()
-        val payload = buildPayload(
-            context = context,
-            stacktrace = stacktrace,
-            source = source,
-            fatal = fatal,
-            hasScreenshot = screenshotBytes != null
-        )
+        val payload =
+            buildPayload(
+                context = context,
+                stacktrace = stacktrace,
+                source = source,
+                fatal = fatal,
+                hasScreenshot = screenshotBytes != null,
+            )
 
-        val attachments = buildList {
-            if (screenshotBytes != null) {
-                add(
-                    Attachment(
-                        fieldName = "files[0]",
-                        fileName = SCREENSHOT_FILENAME,
-                        contentType = "image/png",
-                        bytes = screenshotBytes
+        val attachments =
+            buildList {
+                if (screenshotBytes != null) {
+                    add(
+                        Attachment(
+                            fieldName = "files[0]",
+                            fileName = SCREENSHOT_FILENAME,
+                            contentType = "image/png",
+                            bytes = screenshotBytes,
+                        ),
                     )
-                )
-                add(
-                    Attachment(
-                        fieldName = "files[1]",
-                        fileName = STACKTRACE_FILENAME,
-                        contentType = "text/plain; charset=UTF-8",
-                        bytes = stacktrace.toByteArray(Charsets.UTF_8)
+                    add(
+                        Attachment(
+                            fieldName = "files[1]",
+                            fileName = STACKTRACE_FILENAME,
+                            contentType = "text/plain; charset=UTF-8",
+                            bytes = stacktrace.toByteArray(Charsets.UTF_8),
+                        ),
                     )
-                )
-            } else {
-                add(
-                    Attachment(
-                        fieldName = "files[0]",
-                        fileName = STACKTRACE_FILENAME,
-                        contentType = "text/plain; charset=UTF-8",
-                        bytes = stacktrace.toByteArray(Charsets.UTF_8)
+                } else {
+                    add(
+                        Attachment(
+                            fieldName = "files[0]",
+                            fileName = STACKTRACE_FILENAME,
+                            contentType = "text/plain; charset=UTF-8",
+                            bytes = stacktrace.toByteArray(Charsets.UTF_8),
+                        ),
                     )
-                )
+                }
             }
-        }
 
-        val success = postMultipart(
-            webhookUrl = webhookUrl,
-            payloadJson = payload,
-            attachments = attachments
-        )
+        val success =
+            postMultipart(
+                webhookUrl = webhookUrl,
+                payloadJson = payload,
+                attachments = attachments,
+            )
 
         if (!success) {
             Log.w(TAG, "Discord webhook returned a non-success response")
@@ -149,7 +153,7 @@ object DiscordCrashReporter : CrashReporterApi {
     private suspend fun sendDebugReport(
         context: Context,
         source: String,
-        details: String
+        details: String,
     ) {
         val webhookUrl = BuildConfig.DISCORD_WEBHOOK_URL.trim()
         if (webhookUrl.isBlank()) {
@@ -157,26 +161,29 @@ object DiscordCrashReporter : CrashReporterApi {
             return
         }
 
-        val payload = buildDebugPayload(
-            context = context,
-            source = source,
-            details = details
-        )
-
-        val attachments = listOf(
-            Attachment(
-                fieldName = "files[0]",
-                fileName = DEBUG_LOG_FILENAME,
-                contentType = "text/plain; charset=UTF-8",
-                bytes = details.toByteArray(Charsets.UTF_8)
+        val payload =
+            buildDebugPayload(
+                context = context,
+                source = source,
+                details = details,
             )
-        )
 
-        val success = postMultipart(
-            webhookUrl = webhookUrl,
-            payloadJson = payload,
-            attachments = attachments
-        )
+        val attachments =
+            listOf(
+                Attachment(
+                    fieldName = "files[0]",
+                    fileName = DEBUG_LOG_FILENAME,
+                    contentType = "text/plain; charset=UTF-8",
+                    bytes = details.toByteArray(Charsets.UTF_8),
+                ),
+            )
+
+        val success =
+            postMultipart(
+                webhookUrl = webhookUrl,
+                payloadJson = payload,
+                attachments = attachments,
+            )
 
         if (!success) {
             Log.w(TAG, "Discord webhook returned a non-success response for debug report")
@@ -197,25 +204,33 @@ object DiscordCrashReporter : CrashReporterApi {
         stacktrace: String,
         source: String?,
         fatal: Boolean,
-        hasScreenshot: Boolean
+        hasScreenshot: Boolean,
     ): JSONObject {
         val timestamp = isoTimestamp()
-        val packageInfo = runCatching {
-            @Suppress("DEPRECATION")
-            context.packageManager.getPackageInfo(context.packageName, 0)
-        }.getOrNull()
+        val packageInfo =
+            runCatching {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }.getOrNull()
         val appVersionName = packageInfo?.versionName ?: BuildConfig.VERSION_NAME
 
-        val embedFields = JSONArray().apply {
-            put(field("Date", timestamp, inline = true))
-            put(field("App", appVersionName, inline = true))
-            put(field("Android", "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})", inline = true))
-            put(field("Appareil", "${Build.MANUFACTURER} ${Build.MODEL}", inline = true))
-            if (!source.isNullOrBlank()) {
-                put(field("Source", source, inline = true))
+        val embedFields =
+            JSONArray().apply {
+                put(field("Date", timestamp, inline = true))
+                put(field("App", appVersionName, inline = true))
+                put(field("Android", "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})", inline = true))
+                put(field("Appareil", "${Build.MANUFACTURER} ${Build.MODEL}", inline = true))
+                if (!source.isNullOrBlank()) {
+                    put(field("Source", source, inline = true))
+                }
+                put(
+                    field(
+                        "Screenshot",
+                        if (hasScreenshot) "Pièce jointe envoyée" else "Aucune capture disponible",
+                        inline = true,
+                    ),
+                )
             }
-            put(field("Screenshot", if (hasScreenshot) "Pièce jointe envoyée" else "Aucune capture disponible", inline = true))
-        }
 
         val maxFields = 25
         stacktrace.chunked(900).forEachIndexed { index, chunk ->
@@ -224,57 +239,72 @@ object DiscordCrashReporter : CrashReporterApi {
             }
         }
 
-        val embed = JSONObject()
-            .put("title", if (fatal) "Crash fatal détecté" else "Erreur non-fatale détectée")
-            .put("color", if (fatal) 0xE74C3C else 0xF1C40F)
-            .put("timestamp", timestamp)
-            .put("fields", embedFields)
+        val embed =
+            JSONObject()
+                .put("title", if (fatal) "Crash fatal détecté" else "Erreur non-fatale détectée")
+                .put("color", if (fatal) 0xE74C3C else 0xF1C40F)
+                .put("timestamp", timestamp)
+                .put("fields", embedFields)
 
         if (hasScreenshot) {
             embed.put("image", JSONObject().put("url", "attachment://$SCREENSHOT_FILENAME"))
         }
 
         return JSONObject()
-            .put("content", if (fatal) "Une exception fatale a été capturée." else "Une erreur non-fatale a été capturée.")
+            .put(
+                "content",
+                if (fatal) {
+                    "Une exception fatale a été capturée."
+                } else {
+                    "Une erreur non-fatale a été capturée."
+                },
+            )
             .put("embeds", JSONArray().put(embed))
     }
 
     internal fun buildDebugPayload(
         context: Context,
         source: String,
-        details: String
+        details: String,
     ): JSONObject {
         val timestamp = isoTimestamp()
-        val packageInfo = runCatching {
-            @Suppress("DEPRECATION")
-            context.packageManager.getPackageInfo(context.packageName, 0)
-        }.getOrNull()
+        val packageInfo =
+            runCatching {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }.getOrNull()
         val appVersionName = packageInfo?.versionName ?: BuildConfig.VERSION_NAME
 
-        val embedFields = JSONArray().apply {
-            put(field("Date", timestamp, inline = true))
-            put(field("App", appVersionName, inline = true))
-            put(field("Android", "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})", inline = true))
-            put(field("Appareil", "${Build.MANUFACTURER} ${Build.MODEL}", inline = true))
-            put(field("Source", source, inline = true))
-        }
+        val embedFields =
+            JSONArray().apply {
+                put(field("Date", timestamp, inline = true))
+                put(field("App", appVersionName, inline = true))
+                put(field("Android", "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})", inline = true))
+                put(field("Appareil", "${Build.MANUFACTURER} ${Build.MODEL}", inline = true))
+                put(field("Source", source, inline = true))
+            }
 
         details.chunked(900).take(20).forEachIndexed { index, chunk ->
             embedFields.put(field("Debug ${index + 1}", chunk, inline = false))
         }
 
-        val embed = JSONObject()
-            .put("title", "Debug launch log")
-            .put("color", 0x3498DB)
-            .put("timestamp", timestamp)
-            .put("fields", embedFields)
+        val embed =
+            JSONObject()
+                .put("title", "Debug launch log")
+                .put("color", 0x3498DB)
+                .put("timestamp", timestamp)
+                .put("fields", embedFields)
 
         return JSONObject()
             .put("content", "Un log de debug au démarrage a été capturé.")
             .put("embeds", JSONArray().put(embed))
     }
 
-    private fun field(name: String, value: String, inline: Boolean): JSONObject =
+    private fun field(
+        name: String,
+        value: String,
+        inline: Boolean,
+    ): JSONObject =
         JSONObject()
             .put("name", name)
             .put("value", if (value.isBlank()) "(vide)" else value)
@@ -283,20 +313,21 @@ object DiscordCrashReporter : CrashReporterApi {
     private fun postMultipart(
         webhookUrl: String,
         payloadJson: JSONObject,
-        attachments: List<Attachment>
+        attachments: List<Attachment>,
     ): Boolean {
         val boundary = "----AlarmWatcherBoundary${System.currentTimeMillis()}"
         val url = URL(webhookUrl + if (webhookUrl.contains("?")) "&wait=true" else "?wait=true")
-        val connection = (url.openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = HTTP_TIMEOUT_MS
-            readTimeout = HTTP_TIMEOUT_MS
-            doInput = true
-            doOutput = true
-            useCaches = false
-            setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
-            setRequestProperty("Accept", "application/json")
-        }
+        val connection =
+            (url.openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"
+                connectTimeout = HTTP_TIMEOUT_MS
+                readTimeout = HTTP_TIMEOUT_MS
+                doInput = true
+                doOutput = true
+                useCaches = false
+                setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary")
+                setRequestProperty("Accept", "application/json")
+            }
 
         return try {
             DataOutputStream(connection.outputStream).use { output ->
@@ -305,7 +336,7 @@ object DiscordCrashReporter : CrashReporterApi {
                     boundary = boundary,
                     name = "payload_json",
                     value = payloadJson.toString(),
-                    contentType = "application/json; charset=UTF-8"
+                    contentType = "application/json; charset=UTF-8",
                 )
 
                 attachments.forEach { attachment ->
@@ -315,7 +346,7 @@ object DiscordCrashReporter : CrashReporterApi {
                         fieldName = attachment.fieldName,
                         fileName = attachment.fileName,
                         contentType = attachment.contentType,
-                        bytes = attachment.bytes
+                        bytes = attachment.bytes,
                     )
                 }
 
@@ -338,7 +369,7 @@ object DiscordCrashReporter : CrashReporterApi {
         boundary: String,
         name: String,
         value: String,
-        contentType: String
+        contentType: String,
     ) {
         output.writeBytes("--$boundary\r\n")
         output.writeBytes("Content-Disposition: form-data; name=\"$name\"\r\n")
@@ -353,7 +384,7 @@ object DiscordCrashReporter : CrashReporterApi {
         fieldName: String,
         fileName: String,
         contentType: String,
-        bytes: ByteArray
+        bytes: ByteArray,
     ) {
         output.writeBytes("--$boundary\r\n")
         output.writeBytes("Content-Disposition: form-data; name=\"$fieldName\"; filename=\"$fileName\"\r\n")
@@ -372,12 +403,15 @@ object DiscordCrashReporter : CrashReporterApi {
         val fieldName: String,
         val fileName: String,
         val contentType: String,
-        val bytes: ByteArray
+        val bytes: ByteArray,
     )
-    }
+}
 
 object ScreenshotCapture {
-    fun capture(activity: android.app.Activity, timeoutMs: Long): ByteArray? {
+    fun capture(
+        activity: android.app.Activity,
+        timeoutMs: Long,
+    ): ByteArray? {
         return if (Looper.myLooper() == Looper.getMainLooper()) {
             captureOnMainThread(activity)
         } else {
@@ -385,7 +419,10 @@ object ScreenshotCapture {
         }
     }
 
-    private fun captureViaMainThread(activity: android.app.Activity, timeoutMs: Long): ByteArray? {
+    private fun captureViaMainThread(
+        activity: android.app.Activity,
+        timeoutMs: Long,
+    ): ByteArray? {
         val latch = CountDownLatch(1)
         var bytes: ByteArray? = null
         Handler(Looper.getMainLooper()).post {

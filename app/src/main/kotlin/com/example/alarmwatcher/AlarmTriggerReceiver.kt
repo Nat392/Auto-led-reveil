@@ -14,11 +14,17 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
         private const val TAG = "AlarmTriggerReceiver"
     }
 
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         handleAlarm(context, intent)
     }
 
-    private fun handleAlarm(context: Context, intent: Intent) {
+    private fun handleAlarm(
+        context: Context,
+        intent: Intent,
+    ) {
         if (!BlePermissionSupport.hasBluetoothConnectPermission(context)) {
             Log.w(TAG, "Cannot start sunrise service: BLUETOOTH_CONNECT permission missing")
             NotificationHelper.showFallbackNotification(context)
@@ -43,15 +49,16 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
                     targetBValues[index] = zone.sunriseB
                 }
 
-                    val serviceIntent = intentFactory(context, SunriseService::class.java).apply {
-                    setAction(SunriseService.ACTION_START_SUNRISE)
-                    putStringArrayListExtra(SunriseService.EXTRA_BULB_MACS, macAddresses)
-                    putExtra(SunriseService.EXTRA_TARGET_RS, targetRValues)
-                    putExtra(SunriseService.EXTRA_TARGET_GS, targetGValues)
-                    putExtra(SunriseService.EXTRA_TARGET_BS, targetBValues)
-                    putExtra(SunriseService.EXTRA_ORIGINAL_ALARM_MS, originalAlarmMs)
-                    putExtra(SunriseService.EXTRA_DURATION_MS, durationMs)
-                }
+                val serviceIntent =
+                    intentFactory(context, SunriseService::class.java).apply {
+                        setAction(SunriseService.ACTION_START_SUNRISE)
+                        putStringArrayListExtra(SunriseService.EXTRA_BULB_MACS, macAddresses)
+                        putExtra(SunriseService.EXTRA_TARGET_RS, targetRValues)
+                        putExtra(SunriseService.EXTRA_TARGET_GS, targetGValues)
+                        putExtra(SunriseService.EXTRA_TARGET_BS, targetBValues)
+                        putExtra(SunriseService.EXTRA_ORIGINAL_ALARM_MS, originalAlarmMs)
+                        putExtra(SunriseService.EXTRA_DURATION_MS, durationMs)
+                    }
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                     context.startForegroundService(serviceIntent)
                 } else {

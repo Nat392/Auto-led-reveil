@@ -1,0 +1,184 @@
+name: Dependabot Auto-merge
+
+on:
+  workflow_run:
+    workflows:
+      - Android CI - Alarm Watcher
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      pull_request_number:
+        description: "Numéro de PR Dependabot à activer"
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  actions: write
+  pull-requests: write
+
+jobs:
+  enable-auto-merge:
+    name: Enable squash auto-merge for Dependabot
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+
+    steps:
+      - name: Enable auto-merge on matching Dependabot PRs
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const workflowRun = context.payload.workflow_run;
+            const androidWorkflowName = 'Android CI - Alarm Watcher';
+            const androidWorkflowFileName = 'android.yml';
+            const androidWorkflowRef = 'main';
+            const requestedPullRequestNumber = context.eventName === 'workflow_dispatch'
+              ? Number.parseInt(context.payload.inputs.pull_request_number ?? '', 10)
+              : undefined;
+
+            const pullRequestNumbers = [];
+
+            const isDependabotPullRequest = (pullRequest) => pullRequest.user?.login === 'dependabot[bot]';
+
+            const isMergeablePullRequest = (pullRequest) => pullRequest.mergeable === true;
+
+            const hasSuccessfulAndroidCiRun = async (pullRequest) => {
+              const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: pullRequest.head.sha,
+                per_page: 100,
+              });
+
+              return workflowRuns.workflow_runs.some((run) => run.name === androidWorkflowName && run.conclusion === 'success');
+            };
+
+            const triggerAndroidCiRun = async (pullRequest) => {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: androidWorkflowFileName,
+                ref: androidWorkflowRef,
+                inputs: {
+                  checkout_ref: pullRequest.head.ref,
+                  checkout_sha: pullRequest.head.sha,
+                },
+              });
+
+              core.info(`Triggered Android CI for PR #${pullRequest.number} from ${androidWorkflowRef} using ${pullRequest.head.ref} (${pullRequest.head.sha}).`);
+            };
+
+            const getCandidatePullRequests = async () => {
+              if (context.eventName !== 'workflow_dispatch') {
+                const workflowRunHeadSha = workflowRun?.head_sha;
+
+                if (!workflowRunHeadSha) {
+                  core.info('No head SHA was attached to the workflow run, so no candidate PR can be derived safely.');
+                  return [];
+                }
+
+                const { data: openPullRequests } = await github.rest.pulls.list({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  state: 'open',
+                  per_page: 100,
+                });
+
+                return openPullRequests
+                  .filter((pullRequest) => isDependabotPullRequest(pullRequest) && pullRequest.head?.sha === workflowRunHeadSha)
+                  .map((pullRequest) => pullRequest.number);
+              }
+
+              if (!Number.isNaN(requestedPullRequestNumber)) {
+                return [requestedPullRequestNumber];
+              }
+
+              const { data: openPullRequests } = await github.rest.pulls.list({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                per_page: 100,
+              });
+
+              return openPullRequests.filter(isDependabotPullRequest).map((pullRequest) => pullRequest.number);
+            };
+
+            pullRequestNumbers.push(...await getCandidatePullRequests());
+
+            if (pullRequestNumbers.length === 0) {
+              core.info('No candidate Dependabot PRs were found.');
+              return;
+            }
+
+            for (const pullRequestNumber of pullRequestNumbers) {
+              const { data: pullRequest } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pullRequestNumber,
+              });
+
+              core.info(`Evaluating PR #${pullRequest.number}: ${pullRequest.title}`);
+
+              if (!isDependabotPullRequest(pullRequest)) {
+                core.info(`Skipping PR #${pullRequest.number} because it is not opened by Dependabot.`);
+                continue;
+              }
+
+              if (pullRequest.state !== 'open') {
+                core.info(`Skipping PR #${pullRequest.number} because it is not open.`);
+                continue;
+              }
+
+              if (!isMergeablePullRequest(pullRequest)) {
+                core.info(`Skipping PR #${pullRequest.number} because GitHub reports it as not mergeable.`);
+                continue;
+              }
+
+              if (context.eventName === 'workflow_dispatch') {
+                const androidCiSucceeded = await hasSuccessfulAndroidCiRun(pullRequest);
+
+                if (!androidCiSucceeded) {
+                  core.info(`Android CI is not green for PR #${pullRequest.number}, triggering a fresh run before enabling auto-merge.`);
+                  try {
+                    await triggerAndroidCiRun(pullRequest);
+                  } catch (error) {
+                    core.warning(`Unable to trigger Android CI for PR #${pullRequest.number}: ${error.message}`);
+                    continue;
+                  }
+                }
+              }
+
+              if (pullRequest.auto_merge) {
+                core.info(`Auto-merge is already enabled for PR #${pullRequest.number}.`);
+                continue;
+              }
+
+              try {
+                await github.graphql(
+                  `
+                    mutation EnablePullRequestAutoMerge($pullRequestId: ID!) {
+                      enablePullRequestAutoMerge(input: {
+                        pullRequestId: $pullRequestId
+                        mergeMethod: SQUASH
+                      }) {
+                        pullRequest {
+                          number
+                          autoMergeRequest {
+                            enabledAt
+                            mergeMethod
+                          }
+                        }
+                      }
+                    }
+                  `,
+                  {
+                    pullRequestId: pullRequest.node_id,
+                  }
+                );
+
+                core.info(`Enabled squash auto-merge for PR #${pullRequest.number}.`);
+              } catch (error) {
+                core.warning(`Unable to enable auto-merge for PR #${pullRequest.number}: ${error.message}`);
+              }
+            }

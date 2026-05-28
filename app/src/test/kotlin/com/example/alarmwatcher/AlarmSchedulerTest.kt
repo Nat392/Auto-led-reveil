@@ -16,7 +16,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 class AlarmSchedulerTest {
-
     private val context = mockk<Context>()
     private val alarmManager = mockk<AlarmManager>(relaxed = true)
     private val pendingIntent = mockk<PendingIntent>(relaxed = true)
@@ -57,7 +56,7 @@ class AlarmSchedulerTest {
             context = context,
             whenMs = whenMs,
             originalAlarmMs = originalAlarmMs,
-            durationMs = durationMs
+            durationMs = durationMs,
         )
 
         verify(exactly = 1) {
@@ -65,7 +64,7 @@ class AlarmSchedulerTest {
                 any(),
                 5401,
                 any(),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         }
         verify(exactly = 1) {
@@ -81,7 +80,7 @@ class AlarmSchedulerTest {
             context = context,
             whenMs = 1_700_000_123_000L,
             originalAlarmMs = 1_700_000_900_000L,
-            durationMs = 87_000L
+            durationMs = 87_000L,
         )
 
         verify(exactly = 1) { PendingIntent.getBroadcast(any(), any(), any(), any()) }
@@ -100,7 +99,7 @@ class AlarmSchedulerTest {
             context = context,
             whenMs = 1_700_000_123_000L,
             originalAlarmMs = 1_700_000_900_000L,
-            durationMs = 87_000L
+            durationMs = 87_000L,
         )
 
         verify(exactly = 0) { PendingIntent.getBroadcast(any(), any(), any(), any()) }
@@ -116,7 +115,7 @@ class AlarmSchedulerTest {
                 any(),
                 5401,
                 any(),
-                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
             )
         }
         verify(exactly = 1) { alarmManager.cancel(pendingIntent) }

@@ -11,7 +11,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 class SunsetAutomationReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         when (intent.action) {
             SunsetAutomationScheduler.ACTION_REFRESH_SCHEDULE -> handleRefresh(context)
             SunsetAutomationScheduler.ACTION_APPLY_SCENE -> handleApplyScene(context, intent)
@@ -29,7 +32,7 @@ class SunsetAutomationReceiver : BroadcastReceiver() {
                 DiscordCrashReporter.reportNonFatal(
                     context = context.applicationContext,
                     throwable = e,
-                    source = "SunsetAutomationReceiver.handleRefresh"
+                    source = "SunsetAutomationReceiver.handleRefresh",
                 )
             } finally {
                 pendingResult.finish()
@@ -37,19 +40,23 @@ class SunsetAutomationReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun handleApplyScene(context: Context, intent: Intent) {
+    private fun handleApplyScene(
+        context: Context,
+        intent: Intent,
+    ) {
         if (!BlePermissionSupport.hasBluetoothConnectPermission(context)) {
             Log.w(TAG, "Skipping sunset scene: BLUETOOTH_CONNECT permission is not granted")
             return
         }
 
-        val serviceIntent = Intent(context, SunsetSceneService::class.java).apply {
-            action = SunsetAutomationScheduler.ACTION_APPLY_SCENE
-            putExtra(
-                SunsetAutomationScheduler.EXTRA_TARGET_ZONE,
-                intent.getStringExtra(SunsetAutomationScheduler.EXTRA_TARGET_ZONE)
-            )
-        }
+        val serviceIntent =
+            Intent(context, SunsetSceneService::class.java).apply {
+                action = SunsetAutomationScheduler.ACTION_APPLY_SCENE
+                putExtra(
+                    SunsetAutomationScheduler.EXTRA_TARGET_ZONE,
+                    intent.getStringExtra(SunsetAutomationScheduler.EXTRA_TARGET_ZONE),
+                )
+            }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.startForegroundService(serviceIntent)

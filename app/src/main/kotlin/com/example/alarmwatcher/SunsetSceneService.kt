@@ -28,7 +28,11 @@ class SunsetSceneService : Service() {
         ensureChannel()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         if (intent?.action != SunsetAutomationScheduler.ACTION_APPLY_SCENE) {
             stopSelf(startId)
             return START_NOT_STICKY
@@ -57,23 +61,24 @@ class SunsetSceneService : Service() {
             DiscordCrashReporter.reportNonFatal(
                 context = applicationContext,
                 throwable = e,
-                source = "SunsetSceneService.startForeground"
+                source = "SunsetSceneService.startForeground",
             )
             stopSelf(startId)
             return START_NOT_STICKY
         }
 
         sceneJob?.cancel()
-        sceneJob = serviceScope.launch {
-            try {
-                if (!applySunsetScene(applicationContext, zoneKey)) {
-                    Log.w(TAG, "Failed to apply sunset scene for ${zone.label}")
+        sceneJob =
+            serviceScope.launch {
+                try {
+                    if (!applySunsetScene(applicationContext, zoneKey)) {
+                        Log.w(TAG, "Failed to apply sunset scene for ${zone.label}")
+                    }
+                } finally {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf(startId)
                 }
-            } finally {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf(startId)
             }
-        }
 
         return START_NOT_STICKY
     }
@@ -87,11 +92,12 @@ class SunsetSceneService : Service() {
     private fun ensureChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channel = NotificationChannel(
-            NOTIFICATION_CHANNEL_ID,
-            "Mode soirée",
-            NotificationManager.IMPORTANCE_LOW
-        )
+        val channel =
+            NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                "Mode soirée",
+                NotificationManager.IMPORTANCE_LOW,
+            )
         manager.createNotificationChannel(channel)
     }
 
@@ -118,7 +124,10 @@ class SunsetSceneService : Service() {
             }
         }
 
-        internal suspend fun applySunsetScene(context: Context, zoneKey: String): Boolean {
+        internal suspend fun applySunsetScene(
+            context: Context,
+            zoneKey: String,
+        ): Boolean {
             val zone = resolveZone(zoneKey)
             if (zone == null || !zone.isConfigured) {
                 Log.w(TAG, "Missing configured zone for sunset scene: $zoneKey")
@@ -131,15 +140,16 @@ class SunsetSceneService : Service() {
             }
 
             return try {
-                val applied = ZenggeBulbController.applyScene(
-                    context = context,
-                    macAddress = zone.macAddress,
-                    red = zone.sunsetR,
-                    green = zone.sunsetG,
-                    blue = zone.sunsetB,
-                    white = zone.whiteChannel,
-                    brightnessPercent = zone.brightnessPercent
-                )
+                val applied =
+                    ZenggeBulbController.applyScene(
+                        context = context,
+                        macAddress = zone.macAddress,
+                        red = zone.sunsetR,
+                        green = zone.sunsetG,
+                        blue = zone.sunsetB,
+                        white = zone.whiteChannel,
+                        brightnessPercent = zone.brightnessPercent,
+                    )
 
                 if (!applied) {
                     Log.w(TAG, "Failed to apply sunset scene for ${zone.label}")
@@ -154,7 +164,7 @@ class SunsetSceneService : Service() {
                 DiscordCrashReporter.reportNonFatal(
                     context = context,
                     throwable = e,
-                    source = "SunsetSceneService.applySunsetScene"
+                    source = "SunsetSceneService.applySunsetScene",
                 )
                 false
             }

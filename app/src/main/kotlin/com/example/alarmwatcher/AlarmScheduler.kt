@@ -16,17 +16,34 @@ object AlarmScheduler : AlarmSchedulerApi {
         Intent(context, targetClass)
     }
 
-    override fun schedulePreWarn(context: Context, whenMs: Long, originalAlarmMs: Long, durationMs: Long) {
+    override fun schedulePreWarn(
+        context: Context,
+        whenMs: Long,
+        originalAlarmMs: Long,
+        durationMs: Long,
+    ) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
-        val intent = intentFactory(context, AlarmTriggerReceiver::class.java).apply {
-            action = ACTION_PREWARN
-            putExtra("original_alarm_ms", originalAlarmMs)
-            putExtra(SunriseService.EXTRA_DURATION_MS, durationMs)
-        }
-        val pi = PendingIntent.getBroadcast(context, REQ_CODE, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val intent =
+            intentFactory(context, AlarmTriggerReceiver::class.java).apply {
+                action = ACTION_PREWARN
+                putExtra("original_alarm_ms", originalAlarmMs)
+                putExtra(SunriseService.EXTRA_DURATION_MS, durationMs)
+            }
+        val pi =
+            PendingIntent.getBroadcast(
+                context,
+                REQ_CODE,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
 
         try {
-            val canScheduleExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) am.canScheduleExactAlarms() else true
+            val canScheduleExact =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    am.canScheduleExactAlarms()
+                } else {
+                    true
+                }
             if (!canScheduleExact) {
                 Log.w(TAG, "App cannot schedule exact alarms: request user permission")
                 return
@@ -39,8 +56,17 @@ object AlarmScheduler : AlarmSchedulerApi {
 
     override fun cancelPreWarn(context: Context) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
-        val intent = intentFactory(context, AlarmTriggerReceiver::class.java).apply { action = ACTION_PREWARN }
-        val pi = PendingIntent.getBroadcast(context, REQ_CODE, intent, PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE)
+        val intent =
+            intentFactory(context, AlarmTriggerReceiver::class.java).apply {
+                action = ACTION_PREWARN
+            }
+        val pi =
+            PendingIntent.getBroadcast(
+                context,
+                REQ_CODE,
+                intent,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+            )
         if (pi != null) {
             am.cancel(pi)
             pi.cancel()

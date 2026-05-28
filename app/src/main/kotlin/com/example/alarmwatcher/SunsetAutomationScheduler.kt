@@ -63,7 +63,7 @@ internal object SunsetAutomationScheduler {
                 DiscordCrashReporter.reportNonFatal(
                     context = context.applicationContext,
                     throwable = e,
-                    source = "SunsetAutomationScheduler.requestRefreshAndSchedule"
+                    source = "SunsetAutomationScheduler.requestRefreshAndSchedule",
                 )
             }
         }
@@ -71,10 +71,11 @@ internal object SunsetAutomationScheduler {
 
     suspend fun refreshAndSchedule(context: Context) {
         val now = System.currentTimeMillis()
-        val sunsetInstant = fetchSunsetInstant() ?: run {
-            scheduleRefreshRetry(context, now + REFRESH_RETRY_MS)
-            return
-        }
+        val sunsetInstant =
+            fetchSunsetInstant() ?: run {
+                scheduleRefreshRetry(context, now + REFRESH_RETRY_MS)
+                return
+            }
 
         val sunsetMs = sunsetInstant.toEpochMilli()
         val bureauMs = sunsetMs - SUNSET_OFFSET_BUREAU_MS
@@ -93,13 +94,16 @@ internal object SunsetAutomationScheduler {
 
     internal suspend fun fetchSunsetInstant(): Instant? {
         return try {
-            val connection = sunsetConnectionFactory(SUNSET_API_URL).apply {
-                connectTimeout = 10_000
-                readTimeout = 10_000
-                requestMethod = "GET"
-                instanceFollowRedirects = true
-                setRequestProperty("Accept", "application/json")
-            }
+            val todayDate = LocalDate.now(ZoneId.systemDefault()).toString()
+            val url = "$SUNSET_API_URL&date=$todayDate"
+            val connection =
+                sunsetConnectionFactory(url).apply {
+                    connectTimeout = 10_000
+                    readTimeout = 10_000
+                    requestMethod = "GET"
+                    instanceFollowRedirects = true
+                    setRequestProperty("Accept", "application/json")
+                }
 
             try {
                 val responseCode = connection.responseCode
@@ -108,12 +112,14 @@ internal object SunsetAutomationScheduler {
                     return null
                 }
 
-                val body = BufferedReader(InputStreamReader(connection.inputStream)).use { reader ->
-                    reader.readText()
-                }
-                val sunsetIso = JSONObject(body)
-                    .getJSONObject("results")
-                    .getString("sunset")
+                val body =
+                    BufferedReader(InputStreamReader(connection.inputStream)).use { reader ->
+                        reader.readText()
+                    }
+                val sunsetIso =
+                    JSONObject(body)
+                        .getJSONObject("results")
+                        .getString("sunset")
                 Instant.parse(sunsetIso)
             } finally {
                 connection.disconnect()
@@ -124,25 +130,45 @@ internal object SunsetAutomationScheduler {
         }
     }
 
-    private suspend fun scheduleSceneAlarmIfNeeded(context: Context, zoneKey: String, whenMs: Long) {
-        if (whenMs <= System.currentTimeMillis()) {
-            Log.w(TAG, "Sunset scene for $zoneKey is already past at $whenMs; running catch-up now")
-            triggerSceneCatchUp(context, zoneKey)
+    private suspend fun scheduleSceneAlarmIfNeeded(
+        context: Context,
+        zoneKey: String,
+        whenMs: Long,
+    ) {
+        val now = System.currentTimeMillis()
+        if (whenMs <= now) {
+            val missedByMs = now - whenMs
+            val maxCatchUpDelay = 1 * 60 * 60 * 1000L
+            if (missedByMs <= maxCatchUpDelay) {
+                Log.w(TAG, "Sunset scene for $zoneKey is already past at $whenMs; running catch-up now")
+                triggerSceneCatchUp(context, zoneKey)
+            } else {
+                Log.w(TAG, "Sunset scene for $zoneKey passed $missedByMs ms ago, skipping catch-up as it is too late.")
+            }
             return
         }
         scheduleExactAlarm(context, zoneKeyAlarmRequestCode(zoneKey), buildSceneIntent(context, zoneKey), whenMs)
     }
 
-    private fun scheduleRefreshAlarm(context: Context, whenMs: Long) {
+    private fun scheduleRefreshAlarm(
+        context: Context,
+        whenMs: Long,
+    ) {
         scheduleExactAlarm(context, REQ_REFRESH, buildRefreshIntent(context), whenMs)
     }
 
-    private fun scheduleRefreshRetry(context: Context, whenMs: Long) {
+    private fun scheduleRefreshRetry(
+        context: Context,
+        whenMs: Long,
+    ) {
         Log.w(TAG, "Scheduling sunset refresh retry at $whenMs")
         scheduleExactAlarm(context, REQ_REFRESH, buildRefreshIntent(context), whenMs)
     }
 
-    private fun cancelSceneAlarm(context: Context, zoneKey: String) {
+    private fun cancelSceneAlarm(
+        context: Context,
+        zoneKey: String,
+    ) {
         cancelExactAlarm(context, zoneKeyAlarmRequestCode(zoneKey), buildSceneIntent(context, zoneKey))
     }
 
@@ -150,14 +176,20 @@ internal object SunsetAutomationScheduler {
         cancelExactAlarm(context, REQ_REFRESH, buildRefreshIntent(context))
     }
 
-    private fun buildSceneIntent(context: Context, zoneKey: String): Intent {
+    private fun buildSceneIntent(
+        context: Context,
+        zoneKey: String,
+    ): Intent {
         return intentFactory(context, SunsetAutomationReceiver::class.java).apply {
             action = ACTION_APPLY_SCENE
             putExtra(EXTRA_TARGET_ZONE, zoneKey)
         }
     }
 
-    private suspend fun triggerSceneCatchUp(context: Context, zoneKey: String) {
+    private suspend fun triggerSceneCatchUp(
+        context: Context,
+        zoneKey: String,
+    ) {
         val zone = SunsetSceneService.resolveZone(zoneKey)
         if (zone == null || !zone.isConfigured) {
             Log.w(TAG, "Cannot run sunset catch-up for $zoneKey: zone is missing or not configured")
@@ -175,17 +207,21 @@ internal object SunsetAutomationScheduler {
         }
     }
 
-    private fun scheduleCatchUpRetry(context: Context, zoneKey: String) {
-        val workRequest = OneTimeWorkRequestBuilder<SunsetCatchUpWorker>()
-            .setInitialDelay(CATCH_UP_RETRY_MS, TimeUnit.MILLISECONDS)
-            .setInputData(workDataOf(SunsetCatchUpWorker.KEY_ZONE_KEY to zoneKey))
-            .build()
+    private fun scheduleCatchUpRetry(
+        context: Context,
+        zoneKey: String,
+    ) {
+        val workRequest =
+            OneTimeWorkRequestBuilder<SunsetCatchUpWorker>()
+                .setInitialDelay(CATCH_UP_RETRY_MS, TimeUnit.MILLISECONDS)
+                .setInputData(workDataOf(SunsetCatchUpWorker.KEY_ZONE_KEY to zoneKey))
+                .build()
 
         Log.w(TAG, "Sunset catch-up for $zoneKey did not apply; retrying in $CATCH_UP_RETRY_MS ms")
         WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
             SunsetCatchUpWorker.uniqueWorkName(zoneKey),
             ExistingWorkPolicy.REPLACE,
-            workRequest
+            workRequest,
         )
     }
 
@@ -195,41 +231,58 @@ internal object SunsetAutomationScheduler {
         }
     }
 
-    private fun scheduleExactAlarm(context: Context, requestCode: Int, intent: Intent, whenMs: Long) {
+    private fun scheduleExactAlarm(
+        context: Context,
+        requestCode: Int,
+        intent: Intent,
+        whenMs: Long,
+    ) {
         val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
 
         try {
-            val canScheduleExact = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                alarmManager.canScheduleExactAlarms()
-            } else {
-                true
-            }
+            val canScheduleExact =
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    alarmManager.canScheduleExactAlarms()
+                } else {
+                    true
+                }
 
             if (!canScheduleExact) {
                 Log.w(TAG, "Exact alarm permission is missing; not scheduling requestCode=$requestCode")
                 return
             }
 
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                requestCode,
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val pendingIntent =
+                PendingIntent.getBroadcast(
+                    context,
+                    requestCode,
+                    intent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
             alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMs, pendingIntent)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule exact sunset alarm", e)
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = e,
+                source = "SunsetAutomationScheduler.scheduleExactAlarm(requestCode=$requestCode, whenMs=$whenMs)",
+            )
         }
     }
 
-    private fun cancelExactAlarm(context: Context, requestCode: Int, intent: Intent) {
+    private fun cancelExactAlarm(
+        context: Context,
+        requestCode: Int,
+        intent: Intent,
+    ) {
         val alarmManager = context.getSystemService(AlarmManager::class.java) ?: return
-        val pendingIntent = PendingIntent.getBroadcast(
-            context,
-            requestCode,
-            intent,
-            PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
-        ) ?: return
+        val pendingIntent =
+            PendingIntent.getBroadcast(
+                context,
+                requestCode,
+                intent,
+                PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE,
+            ) ?: return
 
         alarmManager.cancel(pendingIntent)
         pendingIntent.cancel()
@@ -237,20 +290,22 @@ internal object SunsetAutomationScheduler {
 
     internal fun computeNextRefreshAtMillis(
         nowMillis: Long = System.currentTimeMillis(),
-        zoneId: ZoneId = ZoneId.systemDefault()
+        zoneId: ZoneId = ZoneId.systemDefault(),
     ): Long {
         val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
         val today = now.toLocalDate()
-        val todayRefresh = today
-            .atTime(LocalTime.of(REFRESH_LOCAL_HOUR, REFRESH_LOCAL_MINUTE))
-            .atZone(zoneId)
-        val nextRefresh = if (todayRefresh.isAfter(now)) {
-            todayRefresh
-        } else {
-            today.plusDays(1)
+        val todayRefresh =
+            today
                 .atTime(LocalTime.of(REFRESH_LOCAL_HOUR, REFRESH_LOCAL_MINUTE))
                 .atZone(zoneId)
-        }
+        val nextRefresh =
+            if (todayRefresh.isAfter(now)) {
+                todayRefresh
+            } else {
+                today.plusDays(1)
+                    .atTime(LocalTime.of(REFRESH_LOCAL_HOUR, REFRESH_LOCAL_MINUTE))
+                    .atZone(zoneId)
+            }
         return nextRefresh.toInstant().toEpochMilli()
     }
 

@@ -7,25 +7,54 @@ import kotlinx.coroutines.Job
 const val DEFAULT_PREWARN_MS = 30 * 60 * 1000L
 
 interface AlarmSchedulerApi {
-    fun schedulePreWarn(context: Context, whenMs: Long, originalAlarmMs: Long, durationMs: Long = DEFAULT_PREWARN_MS)
+    fun schedulePreWarn(
+        context: Context,
+        whenMs: Long,
+        originalAlarmMs: Long,
+        durationMs: Long = DEFAULT_PREWARN_MS,
+    )
+
     fun cancelPreWarn(context: Context)
+
     fun stopSunriseService(context: Context)
 }
 
 interface CrashReporterApi {
-    fun reportNonFatal(context: Context, throwable: Throwable, source: String? = null): Job
-    fun reportFatalBlocking(context: Context, throwable: Throwable, threadName: String? = null)
-    fun reportDebugBlocking(context: Context, source: String, details: String)
+    fun reportNonFatal(
+        context: Context,
+        throwable: Throwable,
+        source: String? = null,
+    ): Job
+
+    fun reportFatalBlocking(
+        context: Context,
+        throwable: Throwable,
+        threadName: String? = null,
+    )
+
+    fun reportDebugBlocking(
+        context: Context,
+        source: String,
+        details: String,
+    )
 }
 
 interface BulbSession : AutoCloseable {
     @WorkerThread
-    suspend fun applyScene(red: Int, green: Int, blue: Int, white: Int): Boolean
+    suspend fun applyScene(
+        red: Int,
+        green: Int,
+        blue: Int,
+        white: Int,
+    ): Boolean
 }
 
 interface BulbControllerApi {
     @WorkerThread
-    suspend fun openSession(context: Context, macAddress: String): BulbSession?
+    suspend fun openSession(
+        context: Context,
+        macAddress: String,
+    ): BulbSession?
 
     @WorkerThread
     suspend fun applyScene(
@@ -35,11 +64,14 @@ interface BulbControllerApi {
         green: Int,
         blue: Int,
         white: Int,
-        brightnessPercent: Int
+        brightnessPercent: Int,
     ): Boolean
 
     @WorkerThread
-    suspend fun powerOff(context: Context, macAddress: String): Boolean
+    suspend fun powerOff(
+        context: Context,
+        macAddress: String,
+    ): Boolean
 
     @WorkerThread
     suspend fun diagnosticApplyScene(
@@ -48,6 +80,6 @@ interface BulbControllerApi {
         red: Int,
         green: Int,
         blue: Int,
-        white: Int
+        white: Int,
     ): String
 }
