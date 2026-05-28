@@ -20,7 +20,15 @@ class SunriseRampRunnerTest {
     private val bulbController = mockk<BulbControllerApi>()
     private val session = mockk<BulbSession>(relaxUnitFun = true)
     private val crashReporter = mockk<CrashReporterApi>(relaxed = true)
-    private val runner = SunriseRampRunner(bulbController, crashReporter)
+
+    private class MutableClock(var nowMs: Long)
+
+    private fun createRunner(clock: MutableClock = MutableClock(0L)) =
+        SunriseRampRunner(
+            bulbController = bulbController,
+            crashReporter = crashReporter,
+            nowMs = { clock.nowMs },
+        )
 
     @BeforeEach
     fun setUp() {
@@ -31,12 +39,17 @@ class SunriseRampRunnerTest {
     }
 
     @Test
-    fun `runs the full ramp and reports every step`() =
+    fun `runs the ramp and sends the final target at the deadline`() =
         runTest {
+            val clock = MutableClock(0L)
+            val runner = createRunner(clock)
             val progress = mutableListOf<Pair<Int, Int>>()
 
             coEvery { bulbController.openSession(context, "AA:BB:CC:DD:EE:FF") } returns session
-            coEvery { session.applyScene(any(), any(), any(), any()) } returns true
+            coEvery { session.applyScene(any(), any(), any(), any()) } answers {
+                clock.nowMs = if (clock.nowMs == 0L) 750L else 1_000L
+                true
+            }
 
             runner.run(
                 context = context,
@@ -44,11 +57,11 @@ class SunriseRampRunnerTest {
                 targetR = 255,
                 targetG = 128,
                 targetB = 64,
-                durationMs = SunriseRampSupport.MIN_STEP_DELAY_MS,
+                durationMs = 1_000L,
                 onProgress = { currentStep, totalSteps -> progress += currentStep to totalSteps },
             )
 
-            assertEquals(listOf(0 to 1, 1 to 1), progress)
+            assertEquals(listOf(0 to 4, 4 to 4), progress)
             verify(exactly = 1) { session.close() }
             coVerify(exactly = 1) { session.applyScene(0, 0, 0, 0) }
             coVerify(exactly = 1) { session.applyScene(255, 128, 64, 0) }
@@ -57,6 +70,7 @@ class SunriseRampRunnerTest {
     @Test
     fun `returns immediately when no BLE session can be opened`() =
         runTest {
+            val runner = createRunner()
             coEvery { bulbController.openSession(context, any()) } returns null
 
             runner.run(
@@ -75,6 +89,7 @@ class SunriseRampRunnerTest {
     @Test
     fun `stops the ramp and closes the session when a BLE write fails softly`() =
         runTest {
+            val runner = createRunner()
             coEvery { bulbController.openSession(context, any()) } returns session
             coEvery { session.applyScene(any(), any(), any(), any()) } returns false
 
@@ -93,6 +108,7 @@ class SunriseRampRunnerTest {
 
     @Test
     fun `propagates cancellation and still closes the session`() {
+        val runner = createRunner()
         coEvery { bulbController.openSession(context, any()) } returns session
         coEvery { session.applyScene(any(), any(), any(), any()) } throws CancellationException("cancelled")
 
@@ -114,6 +130,7 @@ class SunriseRampRunnerTest {
 
     @Test
     fun `propagates unexpected failures and still closes the session`() {
+        val runner = createRunner()
         coEvery { bulbController.openSession(context, any()) } returns session
         coEvery { session.applyScene(any(), any(), any(), any()) } throws IllegalStateException("boom")
 
