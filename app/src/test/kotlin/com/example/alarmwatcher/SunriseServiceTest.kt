@@ -32,22 +32,17 @@ class SunriseServiceTest {
         every { Log.i(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>(), any<Throwable>()) } returns 0
-        
         every { service.applicationContext } returns applicationContext
-        
-        // Nouveaux mocks vitaux pour survivre au `rampJob?.cancel()`
         every { service.stopSelf() } returns Unit
         every { service.stopSelf(any<Int>()) } returns Unit
         every { service.startForeground(any<Int>(), any()) } returns Unit
         every { service.stopForeground(any<Int>()) } returns Unit
         every { service.stopForeground(any<Boolean>()) } returns Unit
-
         every { service["ensureChannel"]() } returns Unit
         every {
             service["buildRampNotification"](any<Int>(), any<Int>(), any<Long>())
         } returns mockk<Notification>(relaxed = true)
         every { service["updateRampNotification"](any<Int>(), any<Int>(), any<Long>()) } returns Unit
-
         coEvery { ZenggeBulbController.openSession(any(), any()) } answers {
             Thread.sleep(500L)
             null
