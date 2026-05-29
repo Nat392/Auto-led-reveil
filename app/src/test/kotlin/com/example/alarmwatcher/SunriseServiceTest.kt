@@ -13,7 +13,6 @@ import io.mockk.mockkStatic
 import io.mockk.spyk
 import io.mockk.unmockkAll
 import io.mockk.verify
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -43,7 +42,7 @@ class SunriseServiceTest {
         every { service["updateRampNotification"](any<Int>(), any<Int>(), any<Long>()) } returns Unit
 
         coEvery { ZenggeBulbController.openSession(any(), any()) } answers {
-            delay(5000L)
+            Thread.sleep(2000L)
             null
         }
     }
