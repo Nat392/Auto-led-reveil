@@ -42,13 +42,19 @@ class SunriseServiceTest {
         every { service["updateRampNotification"](any<Int>(), any<Int>(), any<Long>()) } returns Unit
 
         coEvery { ZenggeBulbController.openSession(any(), any()) } answers {
-            Thread.sleep(2000L)
+            Thread.sleep(500L)
             null
         }
     }
 
     @AfterEach
     fun tearDown() {
+        try {
+            service.onDestroy()
+        } catch (e: Exception) {
+            // Ignore les exceptions de type "Stub!" que le framework Android (super.onDestroy) 
+            // pourrait lancer dans un environnement de test JVM pur.
+        }
         unmockkAll()
     }
 
