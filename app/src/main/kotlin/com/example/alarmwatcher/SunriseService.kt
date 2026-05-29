@@ -25,6 +25,7 @@ class SunriseService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var rampJob: Job? = null
     private val rampRunner = SunriseRampRunner(ZenggeBulbController)
+    private var currentTargetAlarmMs: Long = -1L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -44,6 +45,11 @@ class SunriseService : Service() {
         }
 
         val originalAlarmMs = intent.getLongExtra(EXTRA_ORIGINAL_ALARM_MS, -1L)
+        if (rampJob?.isActive == true && currentTargetAlarmMs == originalAlarmMs) {
+            Log.i(TAG, "Rampe déjà en cours pour cette alarme, on ignore le redémarrage.")
+            return START_NOT_STICKY
+        }
+        currentTargetAlarmMs = originalAlarmMs
         val zones =
             extractZones(intent)
                 .ifEmpty { SunriseZoneConfig.configuredZones() }
