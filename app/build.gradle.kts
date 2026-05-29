@@ -132,18 +132,18 @@ dependencies {
     implementation("com.google.android.material:material:1.14.0")
 
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
-    testImplementation("io.mockk:mockk:1.13.5")
+    testImplementation("io.mockk:mockk:1.14.9")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("org.json:json:20240303")
 
     androidTestImplementation("androidx.test:core:1.5.0")
     androidTestImplementation("androidx.test:runner:1.5.2")
     androidTestImplementation("androidx.test:rules:1.5.0")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
-    androidTestImplementation("androidx.test.espresso:espresso-intents:3.5.1")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+    androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
+    androidTestImplementation("androidx.test.espresso:espresso-intents:3.7.0")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
-    androidTestImplementation("io.mockk:mockk-android:1.13.5")
+    androidTestImplementation("io.mockk:mockk-android:1.14.9")
     androidTestImplementation("androidx.work:work-testing:2.11.2")
 
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
