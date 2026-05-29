@@ -32,9 +32,16 @@ class SunriseServiceTest {
         every { Log.i(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>(), any<Throwable>()) } returns 0
+        
         every { service.applicationContext } returns applicationContext
-        every { service.stopSelf(any()) } returns Unit
-        every { service.startForeground(any(), any()) } returns Unit
+        
+        // Nouveaux mocks vitaux pour survivre au `rampJob?.cancel()`
+        every { service.stopSelf() } returns Unit
+        every { service.stopSelf(any<Int>()) } returns Unit
+        every { service.startForeground(any<Int>(), any()) } returns Unit
+        every { service.stopForeground(any<Int>()) } returns Unit
+        every { service.stopForeground(any<Boolean>()) } returns Unit
+
         every { service["ensureChannel"]() } returns Unit
         every {
             service["buildRampNotification"](any<Int>(), any<Int>(), any<Long>())
@@ -50,7 +57,7 @@ class SunriseServiceTest {
     @AfterEach
     fun tearDown() {
         try {
-            // CRITIQUE : Annule explicitement le rampJob et le serviceScope
+            // Annule explicitement le rampJob et le serviceScope
             // pour éviter que la coroutine ne survive et ne pollue les tests suivants.
             service.onDestroy()
         } catch (ignored: Exception) {
@@ -73,7 +80,7 @@ class SunriseServiceTest {
 
             assertEquals(Service.START_NOT_STICKY, result)
             verify(exactly = 1) { service.stopSelf(41) }
-            verify(exactly = 0) { service.startForeground(any(), any()) }
+            verify(exactly = 0) { service.startForeground(any<Int>(), any()) }
         }
 
     @Test
@@ -93,7 +100,7 @@ class SunriseServiceTest {
 
             assertEquals(Service.START_NOT_STICKY, result)
             verify(exactly = 1) { service.stopSelf(42) }
-            verify(exactly = 0) { service.startForeground(any(), any()) }
+            verify(exactly = 0) { service.startForeground(any<Int>(), any()) }
         }
 
     @Test
@@ -114,13 +121,13 @@ class SunriseServiceTest {
 
             val result1 = service.onStartCommand(intent, 0, 1)
             assertEquals(Service.START_NOT_STICKY, result1)
-            verify(exactly = 1) { service.startForeground(any(), any()) }
+            verify(exactly = 1) { service.startForeground(any<Int>(), any()) }
 
             val result2 = service.onStartCommand(intent, 0, 2)
             assertEquals(Service.START_NOT_STICKY, result2)
 
             verify { Log.i(any(), "Rampe déjà en cours pour cette alarme, on ignore le redémarrage.") }
-            verify(exactly = 1) { service.startForeground(any(), any()) }
+            verify(exactly = 1) { service.startForeground(any<Int>(), any()) }
         }
 
     @Test
@@ -155,6 +162,6 @@ class SunriseServiceTest {
             service.onStartCommand(intent2, 0, 2)
 
             verify(exactly = 0) { Log.i(any(), "Rampe déjà en cours pour cette alarme, on ignore le redémarrage.") }
-            verify(exactly = 2) { service.startForeground(any(), any()) }
+            verify(exactly = 2) { service.startForeground(any<Int>(), any()) }
         }
 }
