@@ -50,9 +50,11 @@ class SunriseServiceTest {
     @AfterEach
     fun tearDown() {
         try {
+            // CRITIQUE : Annule explicitement le rampJob et le serviceScope
+            // pour éviter que la coroutine ne survive et ne pollue les tests suivants.
             service.onDestroy()
-        } catch (e: Exception) {
-            // Ignore les exceptions de type "Stub!" que le framework Android (super.onDestroy) 
+        } catch (ignored: Exception) {
+            // Ignore les exceptions de type "Stub!" que le framework Android (super.onDestroy)
             // pourrait lancer dans un environnement de test JVM pur.
         }
         unmockkAll()
