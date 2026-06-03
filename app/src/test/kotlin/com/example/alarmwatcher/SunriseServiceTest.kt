@@ -184,4 +184,5 @@ class SunriseServiceTest {
             verify(exactly = 0) { Log.i(any(), "Rampe déjà en cours pour cette alarme, on ignore le redémarrage.") }
             verify(exactly = 2) { service.startForeground(any<Int>(), any()) }
         }
+
 }

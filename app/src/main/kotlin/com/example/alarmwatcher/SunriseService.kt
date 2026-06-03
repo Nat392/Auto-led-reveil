@@ -16,7 +16,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.text.DateFormat
@@ -120,12 +119,7 @@ class SunriseService : Service() {
 
     override fun onDestroy() {
         rampJob?.cancel()
-        try {
-            kotlinx.coroutines.runBlocking {
-                rampJob?.cancelAndJoin()
-            }
-        } catch (_: Exception) {
-        }
+        rampJob = null
         serviceScope.cancel()
         super.onDestroy()
     }
