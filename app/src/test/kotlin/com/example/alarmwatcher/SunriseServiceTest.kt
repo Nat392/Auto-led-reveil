@@ -14,11 +14,11 @@ import io.mockk.spyk
 import io.mockk.unmockkAll
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
-import java.util.concurrent.CountDownLatch
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.util.concurrent.CountDownLatch
 
 class SunriseServiceTest {
     private val applicationContext = mockk<Context>(relaxed = true)
@@ -190,5 +190,4 @@ class SunriseServiceTest {
             verify(exactly = 0) { Log.i(any(), "Rampe déjà en cours pour cette alarme, on ignore le redémarrage.") }
             verify(exactly = 2) { service.startForeground(any<Int>(), any()) }
         }
-
 }
