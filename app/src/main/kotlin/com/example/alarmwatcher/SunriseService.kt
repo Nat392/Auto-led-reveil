@@ -25,6 +25,7 @@ class SunriseService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var rampJob: Job? = null
     private val rampRunner = SunriseRampRunner(ZenggeBulbController)
+    private var currentTargetAlarmMs: Long = -1L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -44,6 +45,12 @@ class SunriseService : Service() {
         }
 
         val originalAlarmMs = intent.getLongExtra(EXTRA_ORIGINAL_ALARM_MS, -1L)
+        val shouldDeduplicate = originalAlarmMs > 0L && currentTargetAlarmMs == originalAlarmMs
+        if (rampJob?.isActive == true && shouldDeduplicate) {
+            Log.i(TAG, "Rampe déjà en cours pour cette alarme, on ignore le redémarrage.")
+            return START_NOT_STICKY
+        }
+        currentTargetAlarmMs = if (originalAlarmMs > 0L) originalAlarmMs else -1L
         val zones =
             extractZones(intent)
                 .ifEmpty { SunriseZoneConfig.configuredZones() }
@@ -92,6 +99,8 @@ class SunriseService : Service() {
                     }
                 } catch (e: CancellationException) {
                     Log.i(TAG, "Rampe sunrise annulée")
+                } catch (e: InterruptedException) {
+                    Log.i(TAG, "Rampe sunrise interrompue")
                 } catch (e: Exception) {
                     Log.e(TAG, "Erreur durant la rampe de luminosité", e)
                     DiscordCrashReporter.reportNonFatal(
@@ -110,6 +119,7 @@ class SunriseService : Service() {
 
     override fun onDestroy() {
         rampJob?.cancel()
+        rampJob = null
         serviceScope.cancel()
         super.onDestroy()
     }
