@@ -16,6 +16,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import java.text.DateFormat
@@ -98,6 +99,8 @@ class SunriseService : Service() {
                     }
                 } catch (e: CancellationException) {
                     Log.i(TAG, "Rampe sunrise annulée")
+                } catch (e: InterruptedException) {
+                    Log.i(TAG, "Rampe sunrise interrompue")
                 } catch (e: Exception) {
                     Log.e(TAG, "Erreur durant la rampe de luminosité", e)
                     DiscordCrashReporter.reportNonFatal(
@@ -116,6 +119,12 @@ class SunriseService : Service() {
 
     override fun onDestroy() {
         rampJob?.cancel()
+        try {
+            kotlinx.coroutines.runBlocking {
+                rampJob?.cancelAndJoin()
+            }
+        } catch (_: Exception) {
+        }
         serviceScope.cancel()
         super.onDestroy()
     }
