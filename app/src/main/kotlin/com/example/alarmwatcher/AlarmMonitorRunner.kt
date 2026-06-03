@@ -10,6 +10,11 @@ internal class AlarmMonitorRunner(
 ) {
     fun scanNextAlarmAndSchedule(context: Context) {
         try {
+            if (SunriseService.isRunning) {
+                Log.i(TAG, "Sunrise already running; skipping alarm rescan")
+                return
+            }
+
             val alarmManager = context.getSystemService(AlarmManager::class.java)
             if (alarmManager == null) {
                 Log.w(TAG, "AlarmManager unavailable")

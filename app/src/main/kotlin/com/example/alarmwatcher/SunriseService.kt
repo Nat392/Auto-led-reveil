@@ -78,6 +78,7 @@ class SunriseService : Service() {
             return START_NOT_STICKY
         }
 
+        isRunning = true
         rampJob =
             serviceScope.launch {
                 try {
@@ -118,6 +119,7 @@ class SunriseService : Service() {
     }
 
     override fun onDestroy() {
+        isRunning = false
         rampJob?.cancel()
         rampJob = null
         serviceScope.cancel()
@@ -173,6 +175,9 @@ class SunriseService : Service() {
         private const val TAG = "SunriseService"
         private const val NOTIFICATION_ID = 401
         private const val NOTIFICATION_CHANNEL_ID = "sunrise_service"
+
+        @Volatile
+        internal var isRunning: Boolean = false
 
         const val ACTION_START_SUNRISE = "com.example.alarmwatcher.ACTION_START_SUNRISE"
         const val EXTRA_BULB_MACS = "extra_bulb_macs"

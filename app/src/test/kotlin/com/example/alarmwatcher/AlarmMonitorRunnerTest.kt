@@ -32,6 +32,16 @@ class AlarmMonitorRunnerTest {
     @AfterEach
     fun tearDown() {
         unmockkAll()
+        SunriseService.isRunning = false
+    }
+
+    @Test
+    fun `skips rescan while sunrise service is already running`() {
+        SunriseService.isRunning = true
+
+        runner.scanNextAlarmAndSchedule(context)
+
+        confirmVerified(alarmScheduler, crashReporter)
     }
 
     @Test
