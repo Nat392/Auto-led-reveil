@@ -126,6 +126,31 @@ class SunriseServiceTest {
         }
 
     @Test
+    fun `does not deduplicate when original alarm timestamp is missing`() =
+        runTest {
+            every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+
+            val intent = mockk<Intent>(relaxed = true)
+            every { intent.action } returns SunriseService.ACTION_START_SUNRISE
+            every { intent.getStringArrayListExtra(SunriseService.EXTRA_BULB_MACS) } returns
+                arrayListOf("AA:BB:CC:DD:EE:FF")
+            every { intent.getIntArrayExtra(SunriseService.EXTRA_TARGET_RS) } returns intArrayOf(255)
+            every { intent.getIntArrayExtra(SunriseService.EXTRA_TARGET_GS) } returns intArrayOf(240)
+            every { intent.getIntArrayExtra(SunriseService.EXTRA_TARGET_BS) } returns intArrayOf(210)
+            every { intent.getLongExtra(SunriseService.EXTRA_ORIGINAL_ALARM_MS, -1L) } returns -1L
+
+            val result1 = service.onStartCommand(intent, 0, 1)
+            assertEquals(Service.START_NOT_STICKY, result1)
+            verify(exactly = 1) { service.startForeground(any<Int>(), any()) }
+
+            val result2 = service.onStartCommand(intent, 0, 2)
+            assertEquals(Service.START_NOT_STICKY, result2)
+
+            verify(exactly = 0) { Log.i(any(), "Rampe déjà en cours pour cette alarme, on ignore le redémarrage.") }
+            verify(exactly = 2) { service.startForeground(any<Int>(), any()) }
+        }
+
+    @Test
     fun `restarts ramp when receiving intent for a different alarm`() =
         runTest {
             every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true

@@ -46,11 +46,12 @@ class SunriseService : Service() {
         }
 
         val originalAlarmMs = intent.getLongExtra(EXTRA_ORIGINAL_ALARM_MS, -1L)
-        if (rampJob?.isActive == true && currentTargetAlarmMs == originalAlarmMs) {
+        val shouldDeduplicate = originalAlarmMs > 0L && currentTargetAlarmMs == originalAlarmMs
+        if (rampJob?.isActive == true && shouldDeduplicate) {
             Log.i(TAG, "Rampe déjà en cours pour cette alarme, on ignore le redémarrage.")
             return START_NOT_STICKY
         }
-        currentTargetAlarmMs = originalAlarmMs
+        currentTargetAlarmMs = if (originalAlarmMs > 0L) originalAlarmMs else -1L
         val zones =
             extractZones(intent)
                 .ifEmpty { SunriseZoneConfig.configuredZones() }
