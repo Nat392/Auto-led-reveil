@@ -14,6 +14,7 @@ import io.mockk.spyk
 import io.mockk.unmockkAll
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
+import java.util.concurrent.CountDownLatch
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
@@ -43,10 +44,7 @@ class SunriseServiceTest {
             service["buildRampNotification"](any<Int>(), any<Int>(), any<Long>())
         } returns mockk<Notification>(relaxed = true)
         every { service["updateRampNotification"](any<Int>(), any<Int>(), any<Long>()) } returns Unit
-        coEvery { ZenggeBulbController.openSession(any(), any()) } answers {
-            Thread.sleep(500L)
-            null
-        }
+        coEvery { ZenggeBulbController.openSession(any(), any()) } returns null
     }
 
     @AfterEach
@@ -102,6 +100,12 @@ class SunriseServiceTest {
     fun `ignores intent when ramp is already running for the same alarm`() =
         runTest {
             every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+            val releaseOpenSession = CountDownLatch(1)
+
+            coEvery { ZenggeBulbController.openSession(any(), any()) } answers {
+                releaseOpenSession.await()
+                null
+            }
 
             val intent = mockk<Intent>(relaxed = true)
             every { intent.action } returns SunriseService.ACTION_START_SUNRISE
@@ -123,6 +127,8 @@ class SunriseServiceTest {
 
             verify { Log.i(any(), "Rampe déjà en cours pour cette alarme, on ignore le redémarrage.") }
             verify(exactly = 1) { service.startForeground(any<Int>(), any()) }
+
+            releaseOpenSession.countDown()
         }
 
     @Test
