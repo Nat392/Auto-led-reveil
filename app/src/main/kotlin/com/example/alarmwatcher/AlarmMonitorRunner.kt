@@ -22,39 +22,53 @@ internal class AlarmMonitorRunner(
                 if (creatorPackage != null && creatorPackage !in ALLOWED_CLOCK_PACKAGES) {
                     Log.i(TAG, "Skipping alarm from unauthorized package: $creatorPackage")
                     alarmScheduler.cancelPreWarn(context)
+                    cancelAllNightFades(context)
                     return
                 }
 
                 val trigger = next.triggerTime
                 val now = System.currentTimeMillis()
 
-                if (trigger <= now) {
-                    Log.i(TAG, "Skipping expired nextAlarmClock at $trigger (now=$now)")
-                    alarmScheduler.cancelPreWarn(context)
-                    return
+                // 1. Gérer la rampe nocturne (Night Fade) de manière indépendante, par zone
+                for (zoneKey in NIGHT_FADE_ZONE_KEYS) {
+                    val zone = SunsetSceneService.resolveZone(zoneKey)
+                    if (zone == null || !zone.isConfigured) {
+                        alarmScheduler.cancelNightFade(context, zoneKey)
+                        continue
+                    }
+
+                    val zoneEveningStartMs = SunsetTimesStore.getEveningStartMs(context, zoneKey)
+                    val nightFadeSchedule = NightFadeTimingSupport.computeScheduleOrNull(trigger, zoneEveningStartMs)
+                    if (nightFadeSchedule != null) {
+                        alarmScheduler.scheduleNightFade(
+                            context,
+                            zoneKey,
+                            nightFadeSchedule.alarmTriggerAtMs,
+                            nightFadeSchedule.originalStartTimeMs,
+                            nightFadeSchedule.targetEndTimeMs,
+                        )
+                    } else {
+                        alarmScheduler.cancelNightFade(context, zoneKey)
+                    }
                 }
 
-                // Check if the alarm is in the morning/noon
-                val hour =
-                    java.time.Instant.ofEpochMilli(trigger)
-                        .atZone(java.time.ZoneId.systemDefault())
-                        .hour
-                if (hour < 2 || hour >= 14) {
-                    Log.i(TAG, "Skipping non-morning alarm at $trigger (hour=$hour)")
+                // 2. Gérer le lever de soleil (Sunrise Prewarn)
+                val hour = java.time.Instant.ofEpochMilli(trigger).atZone(java.time.ZoneId.systemDefault()).hour
+                if (hour in 2..13) {
+                    val window = AlarmTimingSupport.computePreWarnWindow(trigger, now)
+                    if (window != null) {
+                        alarmScheduler.schedulePreWarn(context, window.scheduleAt, trigger, window.durationMs)
+                    } else {
+                        alarmScheduler.cancelPreWarn(context)
+                    }
+                } else {
+                    Log.i(TAG, "Skipping non-morning alarm for sunrise at $trigger (hour=$hour)")
                     alarmScheduler.cancelPreWarn(context)
-                    return
                 }
-
-                val window =
-                    AlarmTimingSupport.computePreWarnWindow(trigger, now)
-                        ?: run {
-                            alarmScheduler.cancelPreWarn(context)
-                            return
-                        }
-
-                alarmScheduler.schedulePreWarn(context, window.scheduleAt, trigger, window.durationMs)
+                
             } else {
                 alarmScheduler.cancelPreWarn(context)
+                cancelAllNightFades(context)
             }
         } catch (e: SecurityException) {
             Log.w(TAG, "Permission manquante pour lire les alarmes : ${e.message}")
@@ -73,30 +87,29 @@ internal class AlarmMonitorRunner(
         }
     }
 
+    private fun cancelAllNightFades(context: Context) {
+        for (zoneKey in NIGHT_FADE_ZONE_KEYS) {
+            alarmScheduler.cancelNightFade(context, zoneKey)
+        }
+    }
+
     private companion object {
         const val TAG = "AlarmMonitor"
 
+        val NIGHT_FADE_ZONE_KEYS =
+            listOf(SunsetAutomationScheduler.ZONE_BUREAU, SunsetAutomationScheduler.ZONE_CHAMBRE)
+
         val ALLOWED_CLOCK_PACKAGES =
             setOf(
-                // Horloge Google (Pixel, etc.)
                 "com.google.android.deskclock",
-                // Horloge Samsung
                 "com.sec.android.app.clockpackage",
-                // Horloge AOSP (utilisée par Xiaomi, Motorola, Nothing, etc.)
                 "com.android.deskclock",
-                // Horloge OnePlus
                 "com.oneplus.deskclock",
-                // Horloge Oppo / Realme (ColorOS)
                 "com.coloros.alarmclock",
-                // Horloge Xiaomi (sur certaines versions de MIUI)
                 "com.miui.deskclock",
-                // Anciennes versions Android
                 "com.android.alarmclock",
-                // Horloge LG
                 "com.lge.clock",
-                // Horloge Asus
                 "com.asus.deskclock",
-                // Horloge Sony
                 "com.sonyericsson.organizer",
             )
     }
