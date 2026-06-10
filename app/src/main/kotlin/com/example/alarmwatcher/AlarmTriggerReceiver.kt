@@ -12,7 +12,7 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
         }
 
         private const val TAG = "AlarmTriggerReceiver"
-        private const val ACTION_PREWARN = "com.example.alarmwatcher.ACTION_PREWARN"
+        const val ACTION_PREWARN = "com.example.alarmwatcher.ACTION_PREWARN"
     }
 
     override fun onReceive(
