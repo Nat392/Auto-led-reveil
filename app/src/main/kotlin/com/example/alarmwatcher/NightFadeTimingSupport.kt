@@ -7,6 +7,9 @@ import kotlin.math.max
 internal object NightFadeTimingSupport {
 
     private const val LEAD_TIME_MS = (8 * 60 + 35) * 60 * 1000L
+    private const val MINUTES_PER_HOUR = 60
+    private const val MORNING_WINDOW_START_MINUTES = 7 * MINUTES_PER_HOUR
+    private const val MORNING_WINDOW_END_MINUTES = 9 * MINUTES_PER_HOUR + 30
 
     data class Schedule(
         val alarmTriggerAtMs: Long,
@@ -24,28 +27,30 @@ internal object NightFadeTimingSupport {
         zoneEveningStartMs: Long?,
         now: Long = System.currentTimeMillis(),
     ): Schedule? {
-        if (alarmTimeMs <= now) return null
         if (zoneEveningStartMs == null) return null
 
         val alarmZdt = Instant.ofEpochMilli(alarmTimeMs).atZone(ZoneId.systemDefault())
-        val minutes = alarmZdt.hour * 60 + alarmZdt.minute
-
-        // L'alarme doit être entre 07:00 (420) et 09:30 (570)
-        if (minutes !in 420..570) return null
-
+        val minutesOfDay = alarmZdt.hour * MINUTES_PER_HOUR + alarmZdt.minute
         val targetEndMs = alarmTimeMs - LEAD_TIME_MS
-        if (targetEndMs <= now) return null // Déjà trop tard pour finir la rampe
 
-        // Le mode soirée doit avoir lieu avant la fin visée du mode nuit, sinon la rampe n'a pas de sens
-        if (zoneEveningStartMs >= targetEndMs) return null
+        // L'alarme doit être future, dans la fenêtre 07:00-09:30, avec une rampe encore réalisable
+        // et un mode soirée déclenché avant la fin visée du mode nuit.
+        val isSchedulable =
+            alarmTimeMs > now &&
+                minutesOfDay in MORNING_WINDOW_START_MINUTES..MORNING_WINDOW_END_MINUTES &&
+                targetEndMs > now &&
+                zoneEveningStartMs < targetEndMs
 
-        // L'heure à laquelle le service doit réellement se réveiller (maintenant, ou au déclenchement du mode soirée)
-        val actualStartMs = max(zoneEveningStartMs, now)
-
-        return Schedule(
-            alarmTriggerAtMs = actualStartMs,
-            originalStartTimeMs = zoneEveningStartMs,
-            targetEndTimeMs = targetEndMs,
-        )
+        return if (isSchedulable) {
+            Schedule(
+                // L'heure à laquelle le service doit réellement se réveiller
+                // (maintenant, ou au déclenchement du mode soirée)
+                alarmTriggerAtMs = max(zoneEveningStartMs, now),
+                originalStartTimeMs = zoneEveningStartMs,
+                targetEndTimeMs = targetEndMs,
+            )
+        } else {
+            null
+        }
     }
 }

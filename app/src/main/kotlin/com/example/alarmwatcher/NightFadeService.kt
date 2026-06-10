@@ -31,31 +31,53 @@ class NightFadeService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val request = validateRequest(intent)
+        if (request != null) {
+            startFadeJob(request)
+        } else {
+            stopSelf(startId)
+        }
+        return START_NOT_STICKY
+    }
+
+    private fun validateRequest(intent: Intent?): NightFadeRequest? {
+        val request = parseRequest(intent)
+        val hasPermission = BlePermissionSupport.hasBluetoothConnectPermission(applicationContext)
+
+        return when {
+            request == null -> {
+                Log.w(TAG, "Paramètres invalides ou zone non configurée, fondu nocturne annulé")
+                null
+            }
+            !hasPermission -> {
+                Log.w(TAG, "Arrêt du fondu nocturne : permission BLUETOOTH_CONNECT manquante")
+                null
+            }
+            !startForegroundSafely() -> null
+            else -> request
+        }
+    }
+
+    private fun parseRequest(intent: Intent?): NightFadeRequest? {
         val zoneKey = intent?.getStringExtra(AlarmScheduler.EXTRA_ZONE_KEY)
         val startTimeMs = intent?.getLongExtra(AlarmScheduler.EXTRA_START_TIME_MS, 0L) ?: 0L
         val endTimeMs = intent?.getLongExtra(AlarmScheduler.EXTRA_END_TIME_MS, 0L) ?: 0L
+        val zone = zoneKey?.let { SunsetSceneService.resolveZone(it) }
 
-        if (zoneKey == null || startTimeMs <= 0L || endTimeMs <= startTimeMs) {
-            Log.w(TAG, "Paramètres invalides, fondu nocturne annulé")
-            stopSelf(startId)
-            return START_NOT_STICKY
+        val isValid =
+            zoneKey != null && startTimeMs > 0L && endTimeMs > startTimeMs && zone != null && zone.isConfigured
+
+        return if (isValid) {
+            NightFadeRequest(zone, startTimeMs, endTimeMs)
+        } else {
+            null
         }
+    }
 
-        val zone = SunsetSceneService.resolveZone(zoneKey)
-        if (zone == null || !zone.isConfigured) {
-            Log.w(TAG, "Zone inconnue ou non configurée ($zoneKey), fondu nocturne annulé")
-            stopSelf(startId)
-            return START_NOT_STICKY
-        }
-
-        if (!BlePermissionSupport.hasBluetoothConnectPermission(applicationContext)) {
-            Log.w(TAG, "Arrêt du fondu nocturne : permission BLUETOOTH_CONNECT manquante")
-            stopSelf(startId)
-            return START_NOT_STICKY
-        }
-
+    private fun startForegroundSafely(): Boolean =
         try {
             startForeground(NOTIFICATION_ID, buildNotification())
+            true
         } catch (e: SecurityException) {
             Log.e(TAG, "Impossible de démarrer le service en avant-plan pour le fondu nocturne", e)
             crashReporter.reportNonFatal(
@@ -63,25 +85,23 @@ class NightFadeService : Service() {
                 throwable = e,
                 source = "NightFadeService.startForeground",
             )
-            stopSelf(startId)
-            return START_NOT_STICKY
+            false
         }
 
+    private fun startFadeJob(request: NightFadeRequest) {
         fadeJob?.cancel()
         fadeJob = serviceScope.launch {
             try {
                 val runner = NightFadeRunner(ZenggeBulbController, crashReporter)
                 runner.run(
                     context = applicationContext,
-                    macAddress = zone.macAddress,
-                    startR = zone.sunsetR,
-                    startG = zone.sunsetG,
-                    startB = zone.sunsetB,
-                    startTimeMs = startTimeMs,
-                    endTimeMs = endTimeMs,
+                    zone = request.zone,
+                    startTimeMs = request.startTimeMs,
+                    endTimeMs = request.endTimeMs,
                 )
             } catch (e: CancellationException) {
                 Log.i(TAG, "Fondu nocturne annulé")
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Erreur durant le fondu nocturne", e)
                 crashReporter.reportNonFatal(
@@ -94,9 +114,13 @@ class NightFadeService : Service() {
                 stopSelf()
             }
         }
-
-        return START_NOT_STICKY
     }
+
+    private data class NightFadeRequest(
+        val zone: SunriseBulbZone,
+        val startTimeMs: Long,
+        val endTimeMs: Long,
+    )
 
     override fun onDestroy() {
         fadeJob?.cancel()

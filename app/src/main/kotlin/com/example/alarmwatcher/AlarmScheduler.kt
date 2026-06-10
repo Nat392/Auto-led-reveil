@@ -9,11 +9,11 @@ import android.util.Log
 
 object AlarmScheduler : AlarmSchedulerApi {
     private const val TAG = "AlarmScheduler"
-    
+
     // --- Identifiants pour le Sunrise ---
     private const val REQ_CODE = 5401
     private const val ACTION_PREWARN = "com.example.alarmwatcher.ACTION_PREWARN"
-    
+
     // --- Identifiants pour le Night Fade (un par zone) ---
     private const val REQ_CODE_NIGHT_FADE_BUREAU = 5402
     private const val REQ_CODE_NIGHT_FADE_CHAMBRE = 5403
@@ -23,7 +23,7 @@ object AlarmScheduler : AlarmSchedulerApi {
     const val EXTRA_ZONE_KEY = "extra_zone_key"
 
     const val PREWARN_MS = DEFAULT_PREWARN_MS
-    
+
     internal var intentFactory: (Context, Class<*>) -> Intent = { context, targetClass ->
         Intent(context, targetClass)
     }
@@ -32,7 +32,13 @@ object AlarmScheduler : AlarmSchedulerApi {
     // NOUVELLES FONCTIONS NIGHT FADE
     // ==========================================
 
-    override fun scheduleNightFade(context: Context, zoneKey: String, triggerAtMs: Long, startTimeMs: Long, endTimeMs: Long) {
+    override fun scheduleNightFade(
+        context: Context,
+        zoneKey: String,
+        triggerAtMs: Long,
+        startTimeMs: Long,
+        endTimeMs: Long,
+    ) {
         val am = context.getSystemService(AlarmManager::class.java) ?: return
         val intent = intentFactory(context, AlarmTriggerReceiver::class.java).apply {
             action = ACTION_START_NIGHT_FADE
@@ -58,7 +64,10 @@ object AlarmScheduler : AlarmSchedulerApi {
                 return
             }
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMs, pi)
-            Log.i(TAG, "Night Fade ($zoneKey) programmé pour déclenchement à $triggerAtMs (Début absolu: $startTimeMs)")
+            Log.i(
+                TAG,
+                "Night Fade ($zoneKey) programmé pour déclenchement à $triggerAtMs (Début absolu: $startTimeMs)",
+            )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule exact alarm for Night Fade ($zoneKey): ${e.message}")
         }
