@@ -10,7 +10,6 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
 class SunsetTimesStoreTest {
-
     private val context = mockk<Context>()
     private val prefs = mockk<SharedPreferences>()
     private val editor = mockk<SharedPreferences.Editor>(relaxed = true)

@@ -18,7 +18,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class NightFadeService : Service() {
-
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var fadeJob: Job? = null
     private val crashReporter: CrashReporterApi = DiscordCrashReporter
@@ -30,7 +29,11 @@ class NightFadeService : Service() {
         ensureChannel()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+    override fun onStartCommand(
+        intent: Intent?,
+        flags: Int,
+        startId: Int,
+    ): Int {
         val request = validateRequest(intent)
         if (request != null) {
             startFadeJob(request)
@@ -90,30 +93,31 @@ class NightFadeService : Service() {
 
     private fun startFadeJob(request: NightFadeRequest) {
         fadeJob?.cancel()
-        fadeJob = serviceScope.launch {
-            try {
-                val runner = NightFadeRunner(ZenggeBulbController, crashReporter)
-                runner.run(
-                    context = applicationContext,
-                    zone = request.zone,
-                    startTimeMs = request.startTimeMs,
-                    endTimeMs = request.endTimeMs,
-                )
-            } catch (e: CancellationException) {
-                Log.i(TAG, "Fondu nocturne annulé")
-                throw e
-            } catch (e: Exception) {
-                Log.e(TAG, "Erreur durant le fondu nocturne", e)
-                crashReporter.reportNonFatal(
-                    context = applicationContext,
-                    throwable = e,
-                    source = "NightFadeService.fadeJob",
-                )
-            } finally {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                stopSelf()
+        fadeJob =
+            serviceScope.launch {
+                try {
+                    val runner = NightFadeRunner(ZenggeBulbController, crashReporter)
+                    runner.run(
+                        context = applicationContext,
+                        zone = request.zone,
+                        startTimeMs = request.startTimeMs,
+                        endTimeMs = request.endTimeMs,
+                    )
+                } catch (e: CancellationException) {
+                    Log.i(TAG, "Fondu nocturne annulé")
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "Erreur durant le fondu nocturne", e)
+                    crashReporter.reportNonFatal(
+                        context = applicationContext,
+                        throwable = e,
+                        source = "NightFadeService.fadeJob",
+                    )
+                } finally {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    stopSelf()
+                }
             }
-        }
     }
 
     private data class NightFadeRequest(
@@ -132,11 +136,12 @@ class NightFadeService : Service() {
     private fun ensureChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channel = NotificationChannel(
-            NOTIFICATION_CHANNEL_ID,
-            "Fondu nocturne",
-            NotificationManager.IMPORTANCE_LOW,
-        )
+        val channel =
+            NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                "Fondu nocturne",
+                NotificationManager.IMPORTANCE_LOW,
+            )
         manager.createNotificationChannel(channel)
     }
 

@@ -5,7 +5,6 @@ import java.time.ZoneId
 import kotlin.math.max
 
 internal object NightFadeTimingSupport {
-
     private const val LEAD_TIME_MS = (8 * 60 + 35) * 60 * 1000L
     private const val MINUTES_PER_HOUR = 60
     private const val MORNING_WINDOW_START_MINUTES = 7 * MINUTES_PER_HOUR

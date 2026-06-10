@@ -7,15 +7,17 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 class NightFadeTimingSupportTest {
-
     private val zoneId = ZoneId.systemDefault()
     private val today = LocalDate.of(2026, 6, 10)
     private val tomorrow = today.plusDays(1)
 
     private val leadTimeMs = (8 * 60 + 35) * 60 * 1000L
 
-    private fun atTime(date: LocalDate, hour: Int, minute: Int): Long =
-        date.atTime(hour, minute).atZone(zoneId).toInstant().toEpochMilli()
+    private fun atTime(
+        date: LocalDate,
+        hour: Int,
+        minute: Int,
+    ): Long = date.atTime(hour, minute).atZone(zoneId).toInstant().toEpochMilli()
 
     @Test
     fun `returns null when alarm time is in the past`() {

@@ -55,7 +55,10 @@ internal class AlarmMonitorRunner(
         }
     }
 
-    private fun scheduleNightFades(context: Context, trigger: Long) {
+    private fun scheduleNightFades(
+        context: Context,
+        trigger: Long,
+    ) {
         for (zoneKey in NIGHT_FADE_ZONE_KEYS) {
             val zone = SunsetSceneService.resolveZone(zoneKey)
             if (zone == null || !zone.isConfigured) {
@@ -79,7 +82,11 @@ internal class AlarmMonitorRunner(
         }
     }
 
-    private fun scheduleSunrisePreWarn(context: Context, trigger: Long, now: Long) {
+    private fun scheduleSunrisePreWarn(
+        context: Context,
+        trigger: Long,
+        now: Long,
+    ) {
         val hour = Instant.ofEpochMilli(trigger).atZone(ZoneId.systemDefault()).hour
         if (hour !in MORNING_WINDOW_START_HOUR..MORNING_WINDOW_END_HOUR) {
             Log.i(TAG, "Skipping non-morning alarm for sunrise at $trigger (hour=$hour)")

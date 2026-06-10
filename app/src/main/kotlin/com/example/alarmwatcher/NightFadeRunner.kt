@@ -55,21 +55,26 @@ internal class NightFadeRunner(
         }
     }
 
-    private suspend fun applyFadeStep(context: Context, zone: SunriseBulbZone, progress: Float) {
+    private suspend fun applyFadeStep(
+        context: Context,
+        zone: SunriseBulbZone,
+        progress: Float,
+    ) {
         // Interpolation absolue
         val red = lerp(zone.sunsetR, TARGET_R, progress)
         val green = lerp(zone.sunsetG, 0, progress)
         val blue = lerp(zone.sunsetB, 0, progress)
 
-        val success = bulbController.applyScene(
-            context = context,
-            macAddress = zone.macAddress,
-            red = red,
-            green = green,
-            blue = blue,
-            white = 0,
-            brightnessPercent = 100,
-        )
+        val success =
+            bulbController.applyScene(
+                context = context,
+                macAddress = zone.macAddress,
+                red = red,
+                green = green,
+                blue = blue,
+                white = 0,
+                brightnessPercent = 100,
+            )
 
         if (!success) {
             Log.w(
@@ -85,7 +90,10 @@ internal class NightFadeRunner(
         }
     }
 
-    private suspend fun applyFinalScene(context: Context, zone: SunriseBulbZone) {
+    private suspend fun applyFinalScene(
+        context: Context,
+        zone: SunriseBulbZone,
+    ) {
         bulbController.applyScene(
             context = context,
             macAddress = zone.macAddress,
@@ -98,8 +106,11 @@ internal class NightFadeRunner(
         Log.i(TAG, "Fondu nocturne terminé pour ${zone.macAddress}")
     }
 
-    private fun lerp(from: Int, to: Int, progress: Float): Int =
-        (from + (to - from) * progress).toInt().coerceIn(0, MAX_COLOR_VALUE)
+    private fun lerp(
+        from: Int,
+        to: Int,
+        progress: Float,
+    ): Int = (from + (to - from) * progress).toInt().coerceIn(0, MAX_COLOR_VALUE)
 
     private companion object {
         const val TAG = "NightFadeRunner"
