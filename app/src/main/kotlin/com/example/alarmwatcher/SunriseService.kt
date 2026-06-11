@@ -45,20 +45,8 @@ class SunriseService : Service() {
         }
 
         val originalAlarmMs = intent.getLongExtra(EXTRA_ORIGINAL_ALARM_MS, -1L)
-        val snoozeToleranceMs = 30 * 60 * 1000L
-        val isSnooze =
-            currentTargetAlarmMs > 0L && originalAlarmMs > 0L &&
-                kotlin.math.abs(originalAlarmMs - currentTargetAlarmMs) <= snoozeToleranceMs
-
-        val shouldDeduplicate = originalAlarmMs > 0L && (currentTargetAlarmMs == originalAlarmMs || isSnooze)
-
-        if (rampJob?.isActive == true && shouldDeduplicate) {
-            Log.i(TAG, "Rampe déjà en cours (ou alarme snooze détectée), on ignore le redémarrage.")
+        if (shouldSkipRestart(originalAlarmMs)) {
             return START_NOT_STICKY
-        }
-
-        if (!isSnooze) {
-            currentTargetAlarmMs = if (originalAlarmMs > 0L) originalAlarmMs else -1L
         }
         val zones =
             extractZones(intent)
@@ -138,6 +126,28 @@ class SunriseService : Service() {
         super.onDestroy()
     }
 
+    /**
+     * Détermine si le redémarrage de la rampe doit être ignoré car une rampe est déjà en cours
+     * pour la même alarme, ou pour une alarme reportée (snooze) proche de la cible en cours.
+     * Met à jour [currentTargetAlarmMs] lorsque le redémarrage n'est pas ignoré.
+     */
+    private fun shouldSkipRestart(originalAlarmMs: Long): Boolean {
+        val isSnooze =
+            currentTargetAlarmMs > 0L && originalAlarmMs > 0L &&
+                kotlin.math.abs(originalAlarmMs - currentTargetAlarmMs) <= SNOOZE_TOLERANCE_MS
+        val shouldDeduplicate = originalAlarmMs > 0L && (currentTargetAlarmMs == originalAlarmMs || isSnooze)
+
+        if (rampJob?.isActive == true && shouldDeduplicate) {
+            Log.i(TAG, "Rampe déjà en cours (ou alarme snooze détectée), on ignore le redémarrage.")
+            return true
+        }
+
+        if (!isSnooze) {
+            currentTargetAlarmMs = if (originalAlarmMs > 0L) originalAlarmMs else -1L
+        }
+        return false
+    }
+
     private fun ensureChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -187,6 +197,7 @@ class SunriseService : Service() {
         private const val TAG = "SunriseService"
         private const val NOTIFICATION_ID = 401
         private const val NOTIFICATION_CHANNEL_ID = "sunrise_service"
+        private const val SNOOZE_TOLERANCE_MS = 30 * 60 * 1000L
 
         const val ACTION_START_SUNRISE = "com.example.alarmwatcher.ACTION_START_SUNRISE"
         const val EXTRA_BULB_MACS = "extra_bulb_macs"
