@@ -56,6 +56,11 @@
             android:foregroundServiceType="connectedDevice" />
 
         <service
+            android:name=".NightFadeService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
+        <service
             android:name=".SunsetSceneService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />

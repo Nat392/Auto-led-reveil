@@ -153,6 +153,12 @@ class SunsetSceneService : Service() {
 
                 if (!applied) {
                     Log.w(TAG, "Failed to apply sunset scene for ${zone.label}")
+                    val errorMessage = "Failed to apply sunset scene for ${zone.label} (macAddress=${zone.macAddress})"
+                    DiscordCrashReporter.reportNonFatal(
+                        context = context,
+                        throwable = IllegalStateException(errorMessage),
+                        source = "SunsetSceneService.applySunsetScene",
+                    )
                 }
 
                 applied

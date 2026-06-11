@@ -102,6 +102,14 @@ internal class SunriseRampRunner(
                     )
                 if (!applyScene(session, palette.red, palette.green, palette.blue)) {
                     Log.w(TAG, "Echec d'ecriture BLE pendant la rampe, arret de la sequence")
+                    val errorMessage =
+                        "Echec d'ecriture BLE pendant la rampe, arret de la sequence" +
+                            " macAddress=${request.macAddress} - step=$timeStep/${request.steps}"
+                    crashReporter.reportNonFatal(
+                        context = request.context,
+                        throwable = IllegalStateException(errorMessage),
+                        source = "$TAG.runTimedRamp",
+                    )
                     return false
                 }
                 lastAppliedStep = timeStep
@@ -139,6 +147,12 @@ internal class SunriseRampRunner(
             request.onProgress(request.steps, request.steps)
         } else {
             Log.w(TAG, "Echec d'ecriture BLE finale pour la rampe")
+            val errorMessage = "Echec d'ecriture BLE finale pour la rampe macAddress=${request.macAddress}"
+            crashReporter.reportNonFatal(
+                context = request.context,
+                throwable = IllegalStateException(errorMessage),
+                source = "$TAG.sendFinalScene",
+            )
         }
     }
 

@@ -15,6 +15,8 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
+private const val ACTION_PREWARN = "com.example.alarmwatcher.ACTION_PREWARN"
+
 class AlarmTriggerReceiverTest {
     private val context = mockk<Context>()
     private val incomingIntent = mockk<Intent>()
@@ -44,6 +46,7 @@ class AlarmTriggerReceiverTest {
         every { serviceIntent.putExtra(any<String>(), any<Long>()) } returns serviceIntent
         AlarmTriggerReceiver.intentFactory = { _, _ -> serviceIntent }
 
+        every { incomingIntent.action } returns ACTION_PREWARN
         every { incomingIntent.getLongExtra("original_alarm_ms", -1L) } returns 1_700_000_900_000L
         every {
             incomingIntent.getLongExtra(
