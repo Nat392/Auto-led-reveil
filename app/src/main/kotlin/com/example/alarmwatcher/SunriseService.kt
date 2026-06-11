@@ -45,12 +45,21 @@ class SunriseService : Service() {
         }
 
         val originalAlarmMs = intent.getLongExtra(EXTRA_ORIGINAL_ALARM_MS, -1L)
-        val shouldDeduplicate = originalAlarmMs > 0L && currentTargetAlarmMs == originalAlarmMs
+        val snoozeToleranceMs = 30 * 60 * 1000L
+        val isSnooze =
+            currentTargetAlarmMs > 0L && originalAlarmMs > 0L &&
+                kotlin.math.abs(originalAlarmMs - currentTargetAlarmMs) <= snoozeToleranceMs
+
+        val shouldDeduplicate = originalAlarmMs > 0L && (currentTargetAlarmMs == originalAlarmMs || isSnooze)
+
         if (rampJob?.isActive == true && shouldDeduplicate) {
-            Log.i(TAG, "Rampe déjà en cours pour cette alarme, on ignore le redémarrage.")
+            Log.i(TAG, "Rampe déjà en cours (ou alarme snooze détectée), on ignore le redémarrage.")
             return START_NOT_STICKY
         }
-        currentTargetAlarmMs = if (originalAlarmMs > 0L) originalAlarmMs else -1L
+
+        if (!isSnooze) {
+            currentTargetAlarmMs = if (originalAlarmMs > 0L) originalAlarmMs else -1L
+        }
         val zones =
             extractZones(intent)
                 .ifEmpty { SunriseZoneConfig.configuredZones() }
@@ -61,6 +70,11 @@ class SunriseService : Service() {
 
         if (!BlePermissionSupport.hasBluetoothConnectPermission(applicationContext)) {
             Log.w(TAG, "Stopping sunrise service: BLUETOOTH_CONNECT permission is not granted")
+            DiscordCrashReporter.reportNonFatal(
+                context = applicationContext,
+                throwable = SecurityException("BLUETOOTH_CONNECT permission missing, sunrise not started"),
+                source = "SunriseService.onStartCommand",
+            )
             stopSelf(startId)
             return START_NOT_STICKY
         }

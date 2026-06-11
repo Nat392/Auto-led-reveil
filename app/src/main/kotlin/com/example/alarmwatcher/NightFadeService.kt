@@ -49,11 +49,27 @@ class NightFadeService : Service() {
 
         return when {
             request == null -> {
+                val zoneKey = intent?.getStringExtra(AlarmScheduler.EXTRA_ZONE_KEY)
+                val startTimeMs = intent?.getLongExtra(AlarmScheduler.EXTRA_START_TIME_MS, 0L) ?: 0L
+                val endTimeMs = intent?.getLongExtra(AlarmScheduler.EXTRA_END_TIME_MS, 0L) ?: 0L
                 Log.w(TAG, "Paramètres invalides ou zone non configurée, fondu nocturne annulé")
+                val errorMessage =
+                    "Fondu nocturne annulé: paramètres invalides ou zone non configurée " +
+                        "(zoneKey=$zoneKey, startTimeMs=$startTimeMs, endTimeMs=$endTimeMs)"
+                crashReporter.reportNonFatal(
+                    context = applicationContext,
+                    throwable = IllegalStateException(errorMessage),
+                    source = "NightFadeService.validateRequest.invalidRequest",
+                )
                 null
             }
             !hasPermission -> {
                 Log.w(TAG, "Arrêt du fondu nocturne : permission BLUETOOTH_CONNECT manquante")
+                crashReporter.reportNonFatal(
+                    context = applicationContext,
+                    throwable = SecurityException("BLUETOOTH_CONNECT permission missing, night fade not started"),
+                    source = "NightFadeService.validateRequest.permission",
+                )
                 null
             }
             !startForegroundSafely() -> null

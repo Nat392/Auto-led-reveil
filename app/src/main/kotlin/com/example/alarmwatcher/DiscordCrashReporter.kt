@@ -355,7 +355,12 @@ object DiscordCrashReporter : CrashReporterApi {
             }
 
             val code = connection.responseCode
-            code in 200..299
+            val success = code in 200..299
+            if (!success) {
+                val errorBody = connection.errorStream?.use { it.readBytes().toString(Charsets.UTF_8) }
+                Log.w(TAG, "Discord webhook responded with HTTP $code: ${errorBody.orEmpty()}")
+            }
+            success
         } catch (e: Exception) {
             Log.e(TAG, "Failed to send Discord crash report", e)
             false

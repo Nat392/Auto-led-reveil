@@ -46,6 +46,16 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
             } else {
                 context.startService(serviceIntent)
             }
+        } else {
+            val errorMessage =
+                "Fondu nocturne ignoré: paramètres invalides (zoneKey=$zoneKey, " +
+                    "startTimeMs=$startTimeMs, endTimeMs=$endTimeMs)"
+            Log.w(TAG, errorMessage)
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = IllegalStateException(errorMessage),
+                source = "AlarmTriggerReceiver.handleNightFade",
+            )
         }
     }
 
