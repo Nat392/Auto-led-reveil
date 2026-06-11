@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 internal class NightFadeRunner(
     private val bulbController: BulbControllerApi,
     private val crashReporter: CrashReporterApi,
+    private val nowMs: () -> Long = System::currentTimeMillis,
 ) {
     suspend fun run(
         context: Context,
@@ -25,7 +26,7 @@ internal class NightFadeRunner(
 
         try {
             while (true) {
-                val now = System.currentTimeMillis()
+                val now = nowMs()
                 if (now >= endTimeMs) {
                     break
                 }
@@ -35,7 +36,7 @@ internal class NightFadeRunner(
                 val progress = (elapsedSinceOfficialStartMs / totalDurationMs).coerceIn(0f, 1f)
                 applyFadeStep(context, zone, progress)
 
-                val timeToSleep = (endTimeMs - System.currentTimeMillis()).coerceAtMost(UPDATE_INTERVAL_MS)
+                val timeToSleep = (endTimeMs - nowMs()).coerceAtMost(UPDATE_INTERVAL_MS)
                 if (timeToSleep > 0L) {
                     delay(timeToSleep)
                 }

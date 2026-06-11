@@ -24,17 +24,8 @@ class NightFadeTimingSupportTest {
         val now = atTime(today, 12, 0)
         val alarmTimeMs = now - 1L
 
-        val result = NightFadeTimingSupport.computeScheduleOrNull(alarmTimeMs, zoneEveningStartMs = now - 1L, now = now)
-
-        assertNull(result)
-    }
-
-    @Test
-    fun `returns null when no evening start time is known`() {
-        val now = atTime(today, 12, 0)
-        val alarmTimeMs = atTime(tomorrow, 8, 0)
-
-        val result = NightFadeTimingSupport.computeScheduleOrNull(alarmTimeMs, zoneEveningStartMs = null, now = now)
+        val result =
+            NightFadeTimingSupport.computeScheduleOrNull(alarmTimeMs, originalStartTimeMs = now - 1L, now = now)
 
         assertNull(result)
     }

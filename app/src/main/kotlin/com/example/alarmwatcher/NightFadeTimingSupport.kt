@@ -17,35 +17,34 @@ internal object NightFadeTimingSupport {
     )
 
     /**
-     * @param zoneEveningStartMs L'heure absolue de déclenchement du mode soirée pour cette zone
-     * (coucher du soleil - offset de zone, fourni par [SunsetTimesStore]). `null` si cette
-     * donnée n'a pas encore été calculée (pas de mode nuit programmé tant qu'elle est inconnue).
+     * @param originalStartTimeMs L'heure absolue "logique" de début du fondu nocturne pour cette
+     * zone, déjà résolue par [AlarmMonitorRunner] (ancrée sur le début du mode soirée, ou sur
+     * l'instant présent si le mode soirée est déjà passé sans fondu déjà programmé pour cette
+     * zone).
      */
     fun computeScheduleOrNull(
         alarmTimeMs: Long,
-        zoneEveningStartMs: Long?,
+        originalStartTimeMs: Long,
         now: Long = System.currentTimeMillis(),
     ): Schedule? {
-        if (zoneEveningStartMs == null) return null
-
         val alarmZdt = Instant.ofEpochMilli(alarmTimeMs).atZone(ZoneId.systemDefault())
         val minutesOfDay = alarmZdt.hour * MINUTES_PER_HOUR + alarmZdt.minute
         val targetEndMs = alarmTimeMs - LEAD_TIME_MS
 
         // L'alarme doit être future, dans la fenêtre 07:00-09:30, avec une rampe encore réalisable
-        // et un mode soirée déclenché avant la fin visée du mode nuit.
+        // et un début de fondu avant la fin visée du mode nuit.
         val isSchedulable =
             alarmTimeMs > now &&
                 minutesOfDay in MORNING_WINDOW_START_MINUTES..MORNING_WINDOW_END_MINUTES &&
                 targetEndMs > now &&
-                zoneEveningStartMs < targetEndMs
+                originalStartTimeMs < targetEndMs
 
         return if (isSchedulable) {
             Schedule(
                 // L'heure à laquelle le service doit réellement se réveiller
-                // (maintenant, ou au déclenchement du mode soirée)
-                alarmTriggerAtMs = max(zoneEveningStartMs, now),
-                originalStartTimeMs = zoneEveningStartMs,
+                // (maintenant, ou au déclenchement du fondu)
+                alarmTriggerAtMs = max(originalStartTimeMs, now),
+                originalStartTimeMs = originalStartTimeMs,
                 targetEndTimeMs = targetEndMs,
             )
         } else {

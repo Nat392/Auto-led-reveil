@@ -36,7 +36,7 @@ internal class AlarmMonitorRunner(
             val trigger = next.triggerTime
             val now = System.currentTimeMillis()
 
-            scheduleNightFades(context, trigger)
+            scheduleNightFades(context, trigger, now)
             scheduleSunrisePreWarn(context, trigger, now)
         } catch (e: SecurityException) {
             Log.w(TAG, "Permission manquante pour lire les alarmes : ${e.message}")
@@ -58,28 +58,83 @@ internal class AlarmMonitorRunner(
     private fun scheduleNightFades(
         context: Context,
         trigger: Long,
+        now: Long,
     ) {
         for (zoneKey in NIGHT_FADE_ZONE_KEYS) {
-            val zone = SunsetSceneService.resolveZone(zoneKey)
-            if (zone == null || !zone.isConfigured) {
-                alarmScheduler.cancelNightFade(context, zoneKey)
-                continue
-            }
-
-            val zoneEveningStartMs = SunsetTimesStore.getEveningStartMs(context, zoneKey)
-            val nightFadeSchedule = NightFadeTimingSupport.computeScheduleOrNull(trigger, zoneEveningStartMs)
-            if (nightFadeSchedule != null) {
-                alarmScheduler.scheduleNightFade(
-                    context,
-                    zoneKey,
-                    nightFadeSchedule.alarmTriggerAtMs,
-                    nightFadeSchedule.originalStartTimeMs,
-                    nightFadeSchedule.targetEndTimeMs,
-                )
-            } else {
-                alarmScheduler.cancelNightFade(context, zoneKey)
-            }
+            scheduleNightFadeForZone(context, zoneKey, trigger, now)
         }
+    }
+
+    private fun scheduleNightFadeForZone(
+        context: Context,
+        zoneKey: String,
+        trigger: Long,
+        now: Long,
+    ) {
+        val zone = SunsetSceneService.resolveZone(zoneKey)
+        val zoneEveningStartMs = zoneEveningStartMsOrNull(context, zone, zoneKey)
+        if (zoneEveningStartMs == null) {
+            alarmScheduler.cancelNightFade(context, zoneKey)
+            NightFadeScheduleStore.clearAnchor(context, zoneKey)
+            return
+        }
+
+        val anchor = NightFadeScheduleStore.getAnchor(context, zoneKey)
+        val anchorForThisEvening = anchor?.takeIf { it.eveningStartMs == zoneEveningStartMs }
+
+        // Si une alarme était déjà connue avant le mode soirée, la rampe démarre à l'heure du
+        // mode soirée (durée complète). Sinon (mode soirée déjà passé sans rampe encore
+        // programmée), elle démarre maintenant avec un fondu plus rapide jusqu'à la cible. Cette
+        // heure de départ "logique" reste figée pour tout le mode soirée, même une fois le
+        // fondu déclenché.
+        val originalStartTimeMs =
+            anchorForThisEvening?.originalStartTimeMs
+                ?: if (zoneEveningStartMs >= now) zoneEveningStartMs else now
+
+        val nightFadeSchedule = NightFadeTimingSupport.computeScheduleOrNull(trigger, originalStartTimeMs, now)
+        // Si le fondu a déjà été déclenché mais que l'heure de l'alarme a changé entretemps,
+        // la cible (targetEndTimeMs) est recalculée et le fondu en cours est réajusté
+        // dynamiquement en relançant immédiatement le service avec la nouvelle cible.
+        val alreadyFiredWithSameTarget =
+            anchorForThisEvening?.fired == true &&
+                nightFadeSchedule != null &&
+                anchorForThisEvening.targetEndTimeMs == nightFadeSchedule.targetEndTimeMs
+
+        if (nightFadeSchedule != null && !alreadyFiredWithSameTarget) {
+            alarmScheduler.scheduleNightFade(
+                context,
+                zoneKey,
+                nightFadeSchedule.alarmTriggerAtMs,
+                nightFadeSchedule.originalStartTimeMs,
+                nightFadeSchedule.targetEndTimeMs,
+            )
+            NightFadeScheduleStore.saveAnchor(
+                context,
+                zoneKey,
+                NightFadeScheduleStore.Anchor(
+                    eveningStartMs = zoneEveningStartMs,
+                    originalStartTimeMs = nightFadeSchedule.originalStartTimeMs,
+                    targetEndTimeMs = nightFadeSchedule.targetEndTimeMs,
+                    fired = nightFadeSchedule.alarmTriggerAtMs <= now,
+                ),
+            )
+        } else if (nightFadeSchedule == null) {
+            alarmScheduler.cancelNightFade(context, zoneKey)
+            NightFadeScheduleStore.clearAnchor(context, zoneKey)
+        }
+    }
+
+    /**
+     * Retourne l'heure de début du mode soirée pour [zoneKey], ou `null` si la zone n'est pas
+     * configurée ou si cette heure n'a pas encore été calculée.
+     */
+    private fun zoneEveningStartMsOrNull(
+        context: Context,
+        zone: SunriseBulbZone?,
+        zoneKey: String,
+    ): Long? {
+        if (zone == null || !zone.isConfigured) return null
+        return SunsetTimesStore.getEveningStartMs(context, zoneKey)
     }
 
     private fun scheduleSunrisePreWarn(
