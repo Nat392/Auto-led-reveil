@@ -81,6 +81,8 @@ internal object SunsetAutomationScheduler {
         val bureauMs = sunsetMs - SUNSET_OFFSET_BUREAU_MS
         val chambreMs = sunsetMs - SUNSET_OFFSET_CHAMBRE_MS
 
+        SunsetTimesStore.save(context, bureauMs, chambreMs)
+
         cancelSceneAlarm(context, ZONE_BUREAU)
         cancelSceneAlarm(context, ZONE_CHAMBRE)
         cancelRefreshAlarm(context)
@@ -88,6 +90,9 @@ internal object SunsetAutomationScheduler {
         scheduleSceneAlarmIfNeeded(context, ZONE_BUREAU, bureauMs)
         scheduleSceneAlarmIfNeeded(context, ZONE_CHAMBRE, chambreMs)
         scheduleRefreshAlarm(context, computeNextRefreshAtMillis())
+
+        // Les horaires "mode soirée" viennent de changer : recalcule la planification du mode nuit par zone
+        AlarmMonitor.scanNextAlarmAndSchedule(context)
 
         Log.i(TAG, "Scheduled sunset scenes: bureau=$bureauMs chambre=$chambreMs sunset=$sunsetMs")
     }

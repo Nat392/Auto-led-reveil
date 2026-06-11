@@ -41,6 +41,8 @@ class SunsetAutomationSchedulerTest {
         mockkObject(BlePermissionSupport)
         mockkObject(SunriseZoneConfig)
         mockkObject(ZenggeBulbController)
+        mockkObject(SunsetTimesStore)
+        mockkObject(AlarmMonitor)
         every { Log.w(any(), any<String>()) } returns 0
         every { Log.i(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>()) } returns 0
@@ -52,6 +54,8 @@ class SunsetAutomationSchedulerTest {
         every { pendingIntent.cancel() } returns Unit
         every { alarmManager.cancel(any<PendingIntent>()) } returns Unit
         every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+        every { SunsetTimesStore.save(any(), any(), any()) } returns Unit
+        every { AlarmMonitor.scanNextAlarmAndSchedule(any()) } returns Unit
         SunsetAutomationScheduler.sunsetConnectionFactory = defaultConnectionFactory
         SunsetAutomationScheduler.intentFactory = defaultIntentFactory
     }
