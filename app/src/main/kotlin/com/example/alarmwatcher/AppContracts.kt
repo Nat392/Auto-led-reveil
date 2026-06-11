@@ -17,6 +17,20 @@ interface AlarmSchedulerApi {
     fun cancelPreWarn(context: Context)
 
     fun stopSunriseService(context: Context)
+
+    // Planification par zone, basée sur des timestamps absolus
+    fun scheduleNightFade(
+        context: Context,
+        zoneKey: String,
+        triggerAtMs: Long,
+        startTimeMs: Long,
+        endTimeMs: Long,
+    )
+
+    fun cancelNightFade(
+        context: Context,
+        zoneKey: String,
+    )
 }
 
 interface CrashReporterApi {

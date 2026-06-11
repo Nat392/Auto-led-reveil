@@ -29,6 +29,8 @@ class SunriseServiceTest {
         mockkStatic(Log::class)
         mockkObject(BlePermissionSupport)
         mockkObject(ZenggeBulbController)
+        mockkObject(DiscordCrashReporter)
+        every { DiscordCrashReporter.reportNonFatal(any(), any(), any()) } returns mockk(relaxed = true)
         every { Log.w(any(), any<String>()) } returns 0
         every { Log.i(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>()) } returns 0
@@ -125,7 +127,7 @@ class SunriseServiceTest {
             val result2 = service.onStartCommand(intent, 0, 2)
             assertEquals(Service.START_NOT_STICKY, result2)
 
-            verify { Log.i(any(), "Rampe déjà en cours pour cette alarme, on ignore le redémarrage.") }
+            verify { Log.i(any(), "Rampe déjà en cours (ou alarme snooze détectée), on ignore le redémarrage.") }
             verify(exactly = 1) { service.startForeground(any<Int>(), any()) }
 
             releaseOpenSession.countDown()
@@ -152,7 +154,9 @@ class SunriseServiceTest {
             val result2 = service.onStartCommand(intent, 0, 2)
             assertEquals(Service.START_NOT_STICKY, result2)
 
-            verify(exactly = 0) { Log.i(any(), "Rampe déjà en cours pour cette alarme, on ignore le redémarrage.") }
+            verify(exactly = 0) {
+                Log.i(any(), "Rampe déjà en cours (ou alarme snooze détectée), on ignore le redémarrage.")
+            }
             verify(exactly = 2) { service.startForeground(any<Int>(), any()) }
         }
 
@@ -180,14 +184,17 @@ class SunriseServiceTest {
             every { intent2.getIntArrayExtra(SunriseService.EXTRA_TARGET_GS) } returns intArrayOf(240)
             every { intent2.getIntArrayExtra(SunriseService.EXTRA_TARGET_BS) } returns intArrayOf(210)
 
-            val futureAlarm2 = System.currentTimeMillis() + 200000L
+            // Au-delà de la tolérance de snooze (30 min), il s'agit d'une alarme distincte.
+            val futureAlarm2 = futureAlarm1 + 40 * 60 * 1000L
             every { intent2.getLongExtra(SunriseService.EXTRA_ORIGINAL_ALARM_MS, -1L) } returns futureAlarm2
 
             service.onStartCommand(intent1, 0, 1)
 
             service.onStartCommand(intent2, 0, 2)
 
-            verify(exactly = 0) { Log.i(any(), "Rampe déjà en cours pour cette alarme, on ignore le redémarrage.") }
+            verify(exactly = 0) {
+                Log.i(any(), "Rampe déjà en cours (ou alarme snooze détectée), on ignore le redémarrage.")
+            }
             verify(exactly = 2) { service.startForeground(any<Int>(), any()) }
         }
 }
