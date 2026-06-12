@@ -25,7 +25,7 @@ jobs:
     if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
 
     steps:
-      - name: Enable auto-merge for Dependabot PRs matching this CI run
+      - name: Enable auto-merge for Dependabot PRs with green CI
         uses: actions/github-script@v9
         with:
           script: |
@@ -34,6 +34,17 @@ jobs:
             const isDependabotPullRequest = (pullRequest) => pullRequest.user?.login === 'dependabot[bot]';
 
             const isMergeablePullRequest = (pullRequest) => pullRequest.mergeable === true;
+
+            const hasSuccessfulAndroidCiRun = async (pullRequest) => {
+              const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: pullRequest.head.sha,
+                per_page: 100,
+              });
+
+              return workflowRuns.workflow_runs.some((run) => run.name === androidWorkflowName && run.conclusion === 'success');
+            };
 
             const enableAutoMergeForPullRequest = async (pullRequest) => {
               if (pullRequest.auto_merge) {
@@ -70,13 +81,6 @@ jobs:
               }
             };
 
-            const workflowRunHeadSha = context.payload.workflow_run?.head_sha;
-
-            if (!workflowRunHeadSha) {
-              core.info('No head SHA was attached to the workflow run, nothing to do.');
-              return;
-            }
-
             const { data: openPullRequests } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -84,12 +88,10 @@ jobs:
               per_page: 100,
             });
 
-            const candidates = openPullRequests.filter(
-              (pullRequest) => isDependabotPullRequest(pullRequest) && pullRequest.head?.sha === workflowRunHeadSha
-            );
+            const candidates = openPullRequests.filter(isDependabotPullRequest);
 
             if (candidates.length === 0) {
-              core.info('No open Dependabot PRs match this CI run.');
+              core.info('No open Dependabot PRs were found.');
               return;
             }
 
@@ -104,6 +106,11 @@ jobs:
 
               if (!isMergeablePullRequest(pullRequest)) {
                 core.info(`Skipping PR #${pullRequest.number} because GitHub reports it as not mergeable.`);
+                continue;
+              }
+
+              if (!(await hasSuccessfulAndroidCiRun(pullRequest))) {
+                core.info(`Skipping PR #${pullRequest.number} because Android CI has not succeeded for ${pullRequest.head.sha}.`);
                 continue;
               }
 
