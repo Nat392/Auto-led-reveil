@@ -58,6 +58,8 @@
     <ID>TooGenericExceptionCaught:AlarmWatcherApp.kt$AlarmWatcherApp$reportingError: Throwable</ID>
     <ID>TooGenericExceptionCaught:DiscordCrashReporter.kt$DiscordCrashReporter$e: Exception</ID>
     <ID>TooGenericExceptionCaught:MainActivity.kt$MainActivity$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:NightFadeRunner.kt$NightFadeRunner$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:NightFadeService.kt$NightFadeService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:SunriseRampRunner.kt$SunriseRampRunner$e: Exception</ID>
     <ID>TooGenericExceptionCaught:SunriseService.kt$SunriseService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:SunsetAutomationReceiver.kt$SunsetAutomationReceiver$e: Exception</ID>
