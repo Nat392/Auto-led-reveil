@@ -149,7 +149,6 @@ jobs:
           script: |
             const androidWorkflowName = 'Android CI - Alarm Watcher';
             const androidWorkflowFileName = 'android.yml';
-            const androidWorkflowRef = 'main';
 
             const isDependabotPullRequest = (pullRequest) => pullRequest.user?.login === 'dependabot[bot]';
 
@@ -195,14 +194,10 @@ jobs:
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 workflow_id: androidWorkflowFileName,
-                ref: androidWorkflowRef,
-                inputs: {
-                  checkout_ref: pullRequest.head.ref,
-                  checkout_sha: pullRequest.head.sha,
-                },
+                ref: pullRequest.head.ref,
               });
 
-              core.info(`Triggered Android CI for PR #${pullRequest.number} from ${androidWorkflowRef} using ${pullRequest.head.ref} (${pullRequest.head.sha}).`);
+              core.info(`Triggered Android CI for PR #${pullRequest.number} on branch ${pullRequest.head.ref} (${pullRequest.head.sha}), so the resulting check attaches to this commit.`);
             };
 
             const getAndroidCiRun = async (headSha) => {
