@@ -35,6 +35,29 @@ jobs:
 
             const isMergeablePullRequest = (pullRequest) => pullRequest.mergeable === true;
 
+            const wait = (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+
+            const waitForMergeableDecision = async (pullNumber, { timeoutSeconds = 60, pollIntervalSeconds = 3 } = {}) => {
+              const deadline = Date.now() + timeoutSeconds * 1000;
+              let pullRequest;
+
+              do {
+                ({ data: pullRequest } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullNumber,
+                }));
+
+                if (pullRequest.mergeable !== null) {
+                  return pullRequest;
+                }
+
+                await wait(pollIntervalSeconds);
+              } while (Date.now() < deadline);
+
+              return pullRequest;
+            };
+
             const hasSuccessfulAndroidCiRun = async (pullRequest) => {
               const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
                 owner: context.repo.owner,
@@ -96,11 +119,7 @@ jobs:
             }
 
             for (const candidate of candidates) {
-              const { data: pullRequest } = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: candidate.number,
-              });
+              const pullRequest = await waitForMergeableDecision(candidate.number);
 
               core.info(`Evaluating PR #${pullRequest.number}: ${pullRequest.title}`);
 
@@ -215,6 +234,27 @@ jobs:
               return null;
             };
 
+            const waitForMergeableDecision = async (pullNumber, { timeoutSeconds = 60, pollIntervalSeconds = 3 } = {}) => {
+              const deadline = Date.now() + timeoutSeconds * 1000;
+              let pullRequest;
+
+              do {
+                ({ data: pullRequest } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullNumber,
+                }));
+
+                if (pullRequest.mergeable !== null) {
+                  return pullRequest;
+                }
+
+                await wait(pollIntervalSeconds);
+              } while (Date.now() < deadline);
+
+              return pullRequest;
+            };
+
             const waitForBranchUpdate = async (pullNumber, previousHeadSha, { timeoutMinutes = 5, pollIntervalSeconds = 10 } = {}) => {
               const deadline = Date.now() + timeoutMinutes * 60 * 1000;
 
@@ -326,11 +366,7 @@ jobs:
                   continue;
                 }
 
-                const { data: refreshedPullRequest } = await github.rest.pulls.get({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: pullRequest.number,
-                });
+                const refreshedPullRequest = await waitForMergeableDecision(pullRequest.number);
 
                 if (!isMergeablePullRequest(refreshedPullRequest)) {
                   core.info(`Skipping PR #${refreshedPullRequest.number} because GitHub reports it as not mergeable.`);
