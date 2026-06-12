@@ -88,6 +88,33 @@ class SunriseRampRunnerTest {
         }
 
     @Test
+    fun `reports a non-fatal error when the final scene write fails`() =
+        runTest {
+            val runner = createRunner()
+            coEvery { bulbController.openSession(context, any()) } returns session
+            coEvery { bulbController.applyScene(context, "AA:BB:CC:DD:EE:FF", 255, 128, 64, 0, 100) } returns false
+
+            runner.run(
+                context = context,
+                macAddress = "AA:BB:CC:DD:EE:FF",
+                targetR = 255,
+                targetG = 128,
+                targetB = 64,
+                durationMs = SunriseRampSupport.MIN_STEP_DELAY_MS,
+            )
+
+            coVerify(exactly = 1) { bulbController.applyScene(context, "AA:BB:CC:DD:EE:FF", 255, 128, 64, 0, 100) }
+            coVerify(exactly = 1) {
+                crashReporter.reportNonFatal(
+                    context = context,
+                    throwable = any(),
+                    source = "SunriseService.sendFinalScene",
+                )
+            }
+            verify(exactly = 1) { session.close() }
+        }
+
+    @Test
     fun `stops the ramp and closes the session when a BLE write fails softly`() =
         runTest {
             val runner = createRunner()
