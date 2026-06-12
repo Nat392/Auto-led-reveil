@@ -78,6 +78,7 @@ class AlarmTriggerReceiverTest {
 
         val alarmIntent =
             Intent(testContext, AlarmTriggerReceiver::class.java).apply {
+                action = AlarmTriggerReceiver.ACTION_PREWARN
                 putExtra("original_alarm_ms", 123456789L)
             }
 
