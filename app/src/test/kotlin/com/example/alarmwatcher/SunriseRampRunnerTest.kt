@@ -50,6 +50,7 @@ class SunriseRampRunnerTest {
                 clock.nowMs = if (clock.nowMs == 0L) 750L else 1_000L
                 true
             }
+            coEvery { bulbController.applyScene(context, "AA:BB:CC:DD:EE:FF", 255, 128, 64, 0, 100) } returns true
 
             runner.run(
                 context = context,
@@ -64,7 +65,7 @@ class SunriseRampRunnerTest {
             assertEquals(listOf(0 to 4, 4 to 4), progress)
             verify(exactly = 1) { session.close() }
             coVerify(exactly = 1) { session.applyScene(0, 0, 0, 0) }
-            coVerify(exactly = 1) { session.applyScene(255, 128, 64, 0) }
+            coVerify(exactly = 1) { bulbController.applyScene(context, "AA:BB:CC:DD:EE:FF", 255, 128, 64, 0, 100) }
         }
 
     @Test
@@ -92,6 +93,7 @@ class SunriseRampRunnerTest {
             val runner = createRunner()
             coEvery { bulbController.openSession(context, any()) } returns session
             coEvery { session.applyScene(any(), any(), any(), any()) } returns false
+            coEvery { bulbController.applyScene(context, "AA:BB:CC:DD:EE:FF", 255, 128, 64, 0, 100) } returns true
 
             runner.run(
                 context = context,
@@ -99,10 +101,11 @@ class SunriseRampRunnerTest {
                 targetR = 255,
                 targetG = 128,
                 targetB = 64,
-                durationMs = SunriseRampSupport.MIN_STEP_DELAY_MS,
+                durationMs = 1_000L,
             )
 
             coVerify(exactly = 1) { session.applyScene(any(), any(), any(), any()) }
+            coVerify(exactly = 1) { bulbController.applyScene(context, "AA:BB:CC:DD:EE:FF", 255, 128, 64, 0, 100) }
             verify(exactly = 1) { session.close() }
         }
 
@@ -110,7 +113,8 @@ class SunriseRampRunnerTest {
     fun `propagates cancellation and still closes the session`() {
         val runner = createRunner()
         coEvery { bulbController.openSession(context, any()) } returns session
-        coEvery { session.applyScene(any(), any(), any(), any()) } throws CancellationException("cancelled")
+        coEvery { bulbController.applyScene(context, "AA:BB:CC:DD:EE:FF", any(), any(), any(), 0, 100) } throws
+            CancellationException("cancelled")
 
         assertThrows(CancellationException::class.java) {
             runTest {
@@ -132,7 +136,8 @@ class SunriseRampRunnerTest {
     fun `propagates unexpected failures and still closes the session`() {
         val runner = createRunner()
         coEvery { bulbController.openSession(context, any()) } returns session
-        coEvery { session.applyScene(any(), any(), any(), any()) } throws IllegalStateException("boom")
+        coEvery { bulbController.applyScene(context, "AA:BB:CC:DD:EE:FF", any(), any(), any(), 0, 100) } throws
+            IllegalStateException("boom")
 
         assertThrows(IllegalStateException::class.java) {
             runTest {

@@ -63,8 +63,12 @@ internal class NightFadeRunner(
     ) {
         // Interpolation absolue
         val red = lerp(zone.sunsetR, TARGET_R, progress)
-        val green = lerp(zone.sunsetG, 0, progress)
-        val blue = lerp(zone.sunsetB, 0, progress)
+        // Le vert/bleu doivent atteindre 0 avant le rouge : au-delà de cette fraction de la
+        // progression, seul le rouge continue de baisser. Cela évite qu'un résidu de vert/bleu
+        // ne domine perceptivement le rouge très faible en fin de fondu (effet Purkinje).
+        val colorTaperProgress = (progress / GREEN_BLUE_FADE_FRACTION).coerceIn(0f, 1f)
+        val green = lerp(zone.sunsetG, 0, colorTaperProgress)
+        val blue = lerp(zone.sunsetB, 0, colorTaperProgress)
 
         val success =
             bulbController.applyScene(
@@ -123,5 +127,8 @@ internal class NightFadeRunner(
         const val UPDATE_INTERVAL_MS = 60_000L
 
         const val MAX_COLOR_VALUE = 255
+
+        // Le vert/bleu doivent atteindre 0 avant le rouge (effet Purkinje en fin de fondu)
+        const val GREEN_BLUE_FADE_FRACTION = 0.7f
     }
 }
