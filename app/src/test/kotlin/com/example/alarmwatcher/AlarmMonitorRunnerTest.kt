@@ -31,6 +31,7 @@ class AlarmMonitorRunnerTest {
         mockkObject(SunriseZoneConfig)
         mockkObject(SunsetTimesStore)
         mockkObject(NightFadeScheduleStore)
+        mockkObject(NightFadeRunningStore)
         every { Log.w(any(), any<String>()) } returns 0
         every { Log.i(any(), any()) } returns 0
         every { Log.e(any(), any()) } returns 0
@@ -42,6 +43,8 @@ class AlarmMonitorRunnerTest {
         every { NightFadeScheduleStore.getAnchor(any(), any()) } returns null
         every { NightFadeScheduleStore.saveAnchor(any(), any(), any()) } just runs
         every { NightFadeScheduleStore.clearAnchor(any(), any()) } just runs
+        // Par défaut, on considère qu'un fondu déjà "fired" tourne toujours (cas nominal).
+        every { NightFadeRunningStore.isRunning(any(), any()) } returns true
     }
 
     @AfterEach
@@ -554,6 +557,74 @@ class AlarmMonitorRunnerTest {
             NightFadeScheduleStore.saveAnchor(any(), eq(SunsetAutomationScheduler.ZONE_CHAMBRE), any())
         }
         verify(exactly = 0) { alarmScheduler.cancelNightFade(any(), eq(SunsetAutomationScheduler.ZONE_CHAMBRE)) }
+        verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_BUREAU) }
+        verify(exactly = 1) { alarmScheduler.cancelPreWarn(context) }
+        confirmVerified(alarmScheduler, crashReporter)
+    }
+
+    @Test
+    fun `resumes an already fired night fade when the service is no longer running`() {
+        val alarmManager = mockk<AlarmManager>()
+        val alarmClock = mockk<AlarmManager.AlarmClockInfo>()
+        every { alarmClock.showIntent } returns null
+        every { context.getSystemService(AlarmManager::class.java) } returns alarmManager
+        every { alarmManager.nextAlarmClock } returns alarmClock
+
+        val triggerTime =
+            java.time.LocalDate.now().plusDays(2)
+                .atTime(8, 0).atZone(java.time.ZoneId.systemDefault())
+                .toInstant().toEpochMilli()
+        every { alarmClock.triggerTime } returns triggerTime
+        val targetEndMs = triggerTime - (8 * 60 + 35) * 60 * 1000L
+
+        // Le fondu avait déjà été déclenché vers cette même cible...
+        val eveningStartMs = System.currentTimeMillis() - 60_000L
+        every { SunriseZoneConfig.chambre } returns configuredZone("Chambre", "08:65:F0:E9:1D:0B")
+        every {
+            SunsetTimesStore.getEveningStartMs(context, SunsetAutomationScheduler.ZONE_CHAMBRE)
+        } returns eveningStartMs
+        every {
+            NightFadeScheduleStore.getAnchor(context, SunsetAutomationScheduler.ZONE_CHAMBRE)
+        } returns
+            NightFadeScheduleStore.Anchor(
+                eveningStartMs = eveningStartMs,
+                originalStartTimeMs = eveningStartMs,
+                targetEndTimeMs = targetEndMs,
+                fired = true,
+            )
+        // ...mais NightFadeService ne tourne plus pour cette zone (processus relancé, service tué).
+        every {
+            NightFadeRunningStore.isRunning(context, SunsetAutomationScheduler.ZONE_CHAMBRE)
+        } returns false
+
+        mockkObject(AlarmTimingSupport)
+        every { AlarmTimingSupport.computePreWarnWindow(any(), any()) } returns null
+
+        val alarmTriggerAtMs = slot<Long>()
+        every {
+            alarmScheduler.scheduleNightFade(
+                context,
+                SunsetAutomationScheduler.ZONE_CHAMBRE,
+                capture(alarmTriggerAtMs),
+                eveningStartMs,
+                targetEndMs,
+            )
+        } returns Unit
+
+        runner.scanNextAlarmAndSchedule(context)
+
+        // Le fondu reprend immédiatement vers la même cible.
+        assertTrue(alarmTriggerAtMs.captured >= eveningStartMs)
+        verify(exactly = 1) {
+            alarmScheduler.scheduleNightFade(
+                context,
+                SunsetAutomationScheduler.ZONE_CHAMBRE,
+                alarmTriggerAtMs.captured,
+                eveningStartMs,
+                targetEndMs,
+            )
+        }
+        verifyChambreNightFadeAnchorSaved(eveningStartMs, eveningStartMs, targetEndMs, fired = true)
         verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_BUREAU) }
         verify(exactly = 1) { alarmScheduler.cancelPreWarn(context) }
         confirmVerified(alarmScheduler, crashReporter)
