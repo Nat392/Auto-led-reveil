@@ -634,6 +634,7 @@ class AlarmMonitorRunnerTest {
         }
         verifyChambreNightFadeAnchorSaved(eveningStartMs, eveningStartMs, targetEndMs, fired = true)
         verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_BUREAU) }
+        verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_CUISINE) }
         verify(exactly = 1) { alarmScheduler.cancelPreWarn(context) }
         confirmVerified(alarmScheduler, crashReporter)
     }
