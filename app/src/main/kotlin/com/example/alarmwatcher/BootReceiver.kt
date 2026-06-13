@@ -12,6 +12,7 @@ class BootReceiver : BroadcastReceiver() {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
             AlarmMonitor.scanNextAlarmAndSchedule(context)
             SunsetAutomationScheduler.requestRefreshAndSchedule(context)
+            DaylightHarvestingScheduler.schedule(context)
         }
     }
 }

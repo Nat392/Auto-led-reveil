@@ -36,9 +36,10 @@ class AlarmMonitorRunnerTest {
         every { Log.i(any(), any()) } returns 0
         every { Log.e(any(), any()) } returns 0
         every { Log.e(any(), any(), any<Throwable>()) } returns 0
-        // Par défaut, aucune zone n'est configurée : le mode nuit est annulé pour les deux zones.
+        // Par défaut, aucune zone n'est configurée : le mode nuit est annulé pour les trois zones.
         every { SunriseZoneConfig.bureau } returns unconfiguredZone("Bureau")
         every { SunriseZoneConfig.chambre } returns unconfiguredZone("Chambre")
+        every { SunriseZoneConfig.cuisine } returns unconfiguredZone("Cuisine")
         every { SunsetTimesStore.getEveningStartMs(any(), any()) } returns null
         every { NightFadeScheduleStore.getAnchor(any(), any()) } returns null
         every { NightFadeScheduleStore.saveAnchor(any(), any(), any()) } just runs
@@ -91,6 +92,7 @@ class AlarmMonitorRunnerTest {
     private fun verifyNightFadeCancelledForUnconfiguredZones() {
         verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_BUREAU) }
         verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_CHAMBRE) }
+        verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_CUISINE) }
     }
 
     private fun verifyChambreNightFadeAnchorSaved(
@@ -300,6 +302,7 @@ class AlarmMonitorRunnerTest {
             )
         }
         verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_BUREAU) }
+        verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_CUISINE) }
         verify(exactly = 1) { alarmScheduler.cancelPreWarn(context) }
         confirmVerified(alarmScheduler, crashReporter)
     }
@@ -330,6 +333,7 @@ class AlarmMonitorRunnerTest {
 
         verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_BUREAU) }
         verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_CHAMBRE) }
+        verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_CUISINE) }
         verify(exactly = 1) { alarmScheduler.cancelPreWarn(context) }
         confirmVerified(alarmScheduler, crashReporter)
     }
@@ -394,6 +398,7 @@ class AlarmMonitorRunnerTest {
             fired = true,
         )
         verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_BUREAU) }
+        verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_CUISINE) }
         verify(exactly = 1) { alarmScheduler.cancelPreWarn(context) }
         confirmVerified(alarmScheduler, crashReporter)
     }
@@ -453,6 +458,7 @@ class AlarmMonitorRunnerTest {
         }
         verifyChambreNightFadeAnchorSaved(eveningStartMs, eveningStartMs, targetEndMs, fired = true)
         verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_BUREAU) }
+        verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_CUISINE) }
         verify(exactly = 1) { alarmScheduler.cancelPreWarn(context) }
         confirmVerified(alarmScheduler, crashReporter)
     }
@@ -510,6 +516,7 @@ class AlarmMonitorRunnerTest {
         }
         verifyChambreNightFadeAnchorSaved(eveningStartMs, eveningStartMs, newTargetEndMs, fired = true)
         verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_BUREAU) }
+        verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_CUISINE) }
         verify(exactly = 1) { alarmScheduler.cancelPreWarn(context) }
         confirmVerified(alarmScheduler, crashReporter)
     }
@@ -558,6 +565,7 @@ class AlarmMonitorRunnerTest {
         }
         verify(exactly = 0) { alarmScheduler.cancelNightFade(any(), eq(SunsetAutomationScheduler.ZONE_CHAMBRE)) }
         verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_BUREAU) }
+        verify(exactly = 1) { alarmScheduler.cancelNightFade(context, SunsetAutomationScheduler.ZONE_CUISINE) }
         verify(exactly = 1) { alarmScheduler.cancelPreWarn(context) }
         confirmVerified(alarmScheduler, crashReporter)
     }

@@ -10,11 +10,17 @@
     <ID>LongMethod:ZenggeBulbController.kt$ZenggeBulbController$@Suppress("DEPRECATION") @SuppressLint("MissingPermission") private suspend fun writeCharacteristic( gatt: BluetoothGatt, callback: SessionCallback, characteristic: BluetoothGattCharacteristic, payload: ByteArray, forceWriteType: Int? = null, ): Boolean</ID>
     <ID>LongParameterList:AppContracts.kt$BulbControllerApi$( context: Context, macAddress: String, red: Int, green: Int, blue: Int, white: Int, )</ID>
     <ID>LongParameterList:AppContracts.kt$BulbControllerApi$( context: Context, macAddress: String, red: Int, green: Int, blue: Int, white: Int, brightnessPercent: Int, )</ID>
+    <ID>LongParameterList:DaylightFadeRunner.kt$DaylightFadeRunner$( context: Context, zone: SunriseBulbZone, from: Triple&lt;Int, Int, Int&gt;, to: Triple&lt;Int, Int, Int&gt;, durationMs: Long = DEFAULT_DURATION_MS, steps: Int = DEFAULT_STEPS, )</ID>
     <ID>LongParameterList:DiscordCrashReporter.kt$DiscordCrashReporter$( output: DataOutputStream, boundary: String, fieldName: String, fileName: String, contentType: String, bytes: ByteArray, )</ID>
     <ID>LongParameterList:SunriseRampRunner.kt$SunriseRampRunner$( context: Context, macAddress: String, targetR: Int, targetG: Int, targetB: Int, durationMs: Long, onProgress: (currentStep: Int, totalSteps: Int) -&gt; Unit = { _, _ -&gt; }, )</ID>
     <ID>LongParameterList:ZenggeBulbController.kt$ZenggeBulbController$( gatt: BluetoothGatt, callback: SessionCallback, characteristic: BluetoothGattCharacteristic, red: Int, green: Int, blue: Int, white: Int, )</ID>
     <ID>LongParameterList:ZenggeBulbController.kt$ZenggeBulbController$( gatt: BluetoothGatt, callback: SessionCallback, red: Int, green: Int, blue: Int, white: Int, powerOn: Boolean = false, powerOff: Boolean = false, )</ID>
-    <ID>MagicNumber:AlarmMonitorRunner.kt$AlarmMonitorRunner$14</ID>
+    <ID>MagicNumber:DaylightHarvestingEstimator.kt$DaylightHarvestingEstimator$220</ID>
+    <ID>MagicNumber:DaylightHarvestingEstimator.kt$DaylightHarvestingEstimator$240</ID>
+    <ID>MagicNumber:DaylightHarvestingEstimator.kt$DaylightHarvestingEstimator$255</ID>
+    <ID>MagicNumber:DaylightHarvestingStateStore.kt$DaylightHarvestingStateStore$220</ID>
+    <ID>MagicNumber:DaylightHarvestingStateStore.kt$DaylightHarvestingStateStore$240</ID>
+    <ID>MagicNumber:DaylightHarvestingStateStore.kt$DaylightHarvestingStateStore$255</ID>
     <ID>MagicNumber:DiscordCrashReporter.kt$DiscordCrashReporter$0x3498DB</ID>
     <ID>MagicNumber:DiscordCrashReporter.kt$DiscordCrashReporter$0xE74C3C</ID>
     <ID>MagicNumber:DiscordCrashReporter.kt$DiscordCrashReporter$0xF1C40F</ID>
@@ -24,6 +30,9 @@
     <ID>MagicNumber:DiscordCrashReporter.kt$DiscordCrashReporter$299</ID>
     <ID>MagicNumber:DiscordCrashReporter.kt$DiscordCrashReporter$900</ID>
     <ID>MagicNumber:DiscordCrashReporter.kt$ScreenshotCapture$100</ID>
+    <ID>MagicNumber:OpenMeteoClient.kt$OpenMeteoClient$10_000</ID>
+    <ID>MagicNumber:OpenMeteoClient.kt$OpenMeteoClient$200</ID>
+    <ID>MagicNumber:OpenMeteoClient.kt$OpenMeteoClient$299</ID>
     <ID>MagicNumber:SunriseRampSupport.kt$SunriseRampSupport$2.4</ID>
     <ID>MagicNumber:SunriseRampSupport.kt$SunriseRampSupport$22.0</ID>
     <ID>MagicNumber:SunriseRampSupport.kt$SunriseRampSupport$255</ID>
@@ -41,6 +50,7 @@
     <ID>MagicNumber:ZenggeBulbController.kt$ZenggeBulbController$255</ID>
     <ID>MagicNumber:ZenggeBulbController.kt$ZenggeBulbController$700</ID>
     <ID>ReturnCount:AlarmMonitorRunner.kt$AlarmMonitorRunner$fun scanNextAlarmAndSchedule(context: Context)</ID>
+    <ID>ReturnCount:DaylightHarvestingWorker.kt$DaylightHarvestingWorker$override suspend fun doWork(): Result</ID>
     <ID>ReturnCount:DiscordCrashReporter.kt$ScreenshotCapture$private fun captureOnMainThread(activity: android.app.Activity): ByteArray?</ID>
     <ID>ReturnCount:SunriseService.kt$SunriseService$override fun onStartCommand( intent: Intent?, flags: Int, startId: Int, ): Int</ID>
     <ID>ReturnCount:SunsetSceneService.kt$SunsetSceneService$override fun onStartCommand( intent: Intent?, flags: Int, startId: Int, ): Int</ID>
@@ -60,6 +70,7 @@
     <ID>TooGenericExceptionCaught:MainActivity.kt$MainActivity$e: Exception</ID>
     <ID>TooGenericExceptionCaught:NightFadeRunner.kt$NightFadeRunner$e: Exception</ID>
     <ID>TooGenericExceptionCaught:NightFadeService.kt$NightFadeService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:OpenMeteoClient.kt$OpenMeteoClient$e: Exception</ID>
     <ID>TooGenericExceptionCaught:SunriseRampRunner.kt$SunriseRampRunner$e: Exception</ID>
     <ID>TooGenericExceptionCaught:SunriseService.kt$SunriseService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:SunsetAutomationReceiver.kt$SunsetAutomationReceiver$e: Exception</ID>

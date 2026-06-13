@@ -52,7 +52,22 @@ internal object SunriseZoneConfig {
                 brightnessPercent = 100,
             )
 
-    fun all(): List<SunriseBulbZone> = testZones ?: listOf(bureau, chambre)
+    val cuisine: SunriseBulbZone
+        get() =
+            SunriseBulbZone(
+                label = "Cuisine",
+                macAddress = BuildConfig.ZENGGE_BULB_MAC_CUISINE.trim(),
+                sunriseR = 220,
+                sunriseG = 240,
+                sunriseB = 255,
+                sunsetR = 255,
+                sunsetG = 140,
+                sunsetB = 0,
+                whiteChannel = 0,
+                brightnessPercent = 100,
+            )
+
+    fun all(): List<SunriseBulbZone> = testZones ?: listOf(bureau, chambre, cuisine)
 
     fun configuredZones(): List<SunriseBulbZone> = all().filter { it.isConfigured }
 

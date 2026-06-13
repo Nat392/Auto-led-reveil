@@ -23,13 +23,19 @@ class SunsetTimesStoreTest {
     }
 
     @Test
-    fun `save persists bureau and chambre evening start times`() {
+    fun `save persists bureau, chambre and cuisine evening start times`() {
         setUpPrefs()
 
-        SunsetTimesStore.save(context, bureauEveningStartMs = 1_000L, chambreEveningStartMs = 2_000L)
+        SunsetTimesStore.save(
+            context,
+            bureauEveningStartMs = 1_000L,
+            chambreEveningStartMs = 2_000L,
+            cuisineEveningStartMs = 3_000L,
+        )
 
         verify(exactly = 1) { editor.putLong("bureau_evening_start_ms", 1_000L) }
         verify(exactly = 1) { editor.putLong("chambre_evening_start_ms", 2_000L) }
+        verify(exactly = 1) { editor.putLong("cuisine_evening_start_ms", 3_000L) }
         verify(exactly = 1) { editor.apply() }
     }
 
@@ -51,6 +57,16 @@ class SunsetTimesStoreTest {
         val result = SunsetTimesStore.getEveningStartMs(context, SunsetAutomationScheduler.ZONE_CHAMBRE)
 
         assertEquals(2_000L, result)
+    }
+
+    @Test
+    fun `getEveningStartMs returns the stored value for the cuisine zone`() {
+        setUpPrefs()
+        every { prefs.getLong("cuisine_evening_start_ms", -1L) } returns 3_000L
+
+        val result = SunsetTimesStore.getEveningStartMs(context, SunsetAutomationScheduler.ZONE_CUISINE)
+
+        assertEquals(3_000L, result)
     }
 
     @Test
