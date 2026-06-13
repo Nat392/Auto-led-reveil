@@ -393,7 +393,7 @@ jobs:
               per_page: 100,
             });
 
-            const isDependabotRun = (run) => run.triggering_actor?.login === 'dependabot[bot]' || run.actor?.login === 'dependabot[bot]';
+            const isDependabotRun = (run) => run.head_branch?.startsWith('dependabot/');
 
             const dependabotRuns = pendingRuns.workflow_runs.filter(isDependabotRun);
 
