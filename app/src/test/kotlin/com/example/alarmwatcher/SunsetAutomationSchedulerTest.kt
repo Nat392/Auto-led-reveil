@@ -43,6 +43,7 @@ class SunsetAutomationSchedulerTest {
         mockkObject(ZenggeBulbController)
         mockkObject(SunsetTimesStore)
         mockkObject(AlarmMonitor)
+        mockkObject(DaylightHarvestingStateStore)
         every { Log.w(any(), any<String>()) } returns 0
         every { Log.i(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>()) } returns 0
@@ -54,8 +55,9 @@ class SunsetAutomationSchedulerTest {
         every { pendingIntent.cancel() } returns Unit
         every { alarmManager.cancel(any<PendingIntent>()) } returns Unit
         every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
-        every { SunsetTimesStore.save(any(), any(), any()) } returns Unit
+        every { SunsetTimesStore.save(any(), any(), any(), any()) } returns Unit
         every { AlarmMonitor.scanNextAlarmAndSchedule(any()) } returns Unit
+        every { DaylightHarvestingStateStore.deactivate(any()) } returns Unit
         SunsetAutomationScheduler.sunsetConnectionFactory = defaultConnectionFactory
         SunsetAutomationScheduler.intentFactory = defaultIntentFactory
     }
@@ -130,7 +132,7 @@ class SunsetAutomationSchedulerTest {
         }
 
     @Test
-    fun `refreshAndSchedule schedules bureau and chambre offsets from sunset`() =
+    fun `refreshAndSchedule schedules bureau, chambre and cuisine offsets from sunset`() =
         runTest {
             val sunsetInstant = Instant.parse("2030-05-23T20:00:00Z")
             val body =
@@ -158,8 +160,9 @@ class SunsetAutomationSchedulerTest {
 
             SunsetAutomationScheduler.refreshAndSchedule(context)
 
-            assertEquals(3, scheduledTimes.size)
-            assertTrue(scheduledTimes.contains(sunsetInstant.toEpochMilli() - 60 * 60 * 1000L))
+            assertEquals(4, scheduledTimes.size)
+            // Bureau et Cuisine partagent le même offset (60 min) : deux occurrences attendues.
+            assertEquals(2, scheduledTimes.count { it == sunsetInstant.toEpochMilli() - 60 * 60 * 1000L })
             assertTrue(scheduledTimes.contains(sunsetInstant.toEpochMilli() - 30 * 60 * 1000L))
         }
 
@@ -194,6 +197,21 @@ class SunsetAutomationSchedulerTest {
                     whiteChannel = 0,
                     brightnessPercent = 100,
                 )
+            // Le rattrapage de la Cuisine (même offset que Bureau, donc lui aussi expiré) ne doit
+            // rien faire car la zone n'est pas configurée.
+            val cuisine =
+                SunriseBulbZone(
+                    label = "Cuisine",
+                    macAddress = "",
+                    sunriseR = 220,
+                    sunriseG = 240,
+                    sunriseB = 255,
+                    sunsetR = 255,
+                    sunsetG = 140,
+                    sunsetB = 0,
+                    whiteChannel = 0,
+                    brightnessPercent = 100,
+                )
             val body =
                 """
                 {
@@ -206,6 +224,7 @@ class SunsetAutomationSchedulerTest {
 
             every { SunriseZoneConfig.bureau } returns bureau
             every { SunriseZoneConfig.chambre } returns chambre
+            every { SunriseZoneConfig.cuisine } returns cuisine
             SunsetAutomationScheduler.intentFactory = { _, _ -> mockk(relaxed = true) }
             SunsetAutomationScheduler.sunsetConnectionFactory = {
                 mockk<HttpURLConnection>(relaxed = true).also { connection ->
@@ -245,6 +264,34 @@ class SunsetAutomationSchedulerTest {
                     bureau.brightnessPercent,
                 )
             }
+        }
+
+    @Test
+    fun `refreshAndSchedule deactivates daylight harvesting for the new day`() =
+        runTest {
+            val sunsetInstant = Instant.parse("2030-05-23T20:00:00Z")
+            val body =
+                """
+                {
+                  "results": {
+                    "sunset": "$sunsetInstant"
+                  }
+                }
+                """.trimIndent()
+
+            SunsetAutomationScheduler.intentFactory = { _, _ -> mockk(relaxed = true) }
+            SunsetAutomationScheduler.sunsetConnectionFactory = {
+                mockk<HttpURLConnection>(relaxed = true).also { connection ->
+                    every { connection.responseCode } returns HttpURLConnection.HTTP_OK
+                    every { connection.inputStream } returns ByteArrayInputStream(body.toByteArray(Charsets.UTF_8))
+                    every { connection.disconnect() } returns Unit
+                }
+            }
+            every { alarmManager.setExactAndAllowWhileIdle(any(), any(), any()) } returns Unit
+
+            SunsetAutomationScheduler.refreshAndSchedule(context)
+
+            verify(exactly = 1) { DaylightHarvestingStateStore.deactivate(context) }
         }
 
     @Test
