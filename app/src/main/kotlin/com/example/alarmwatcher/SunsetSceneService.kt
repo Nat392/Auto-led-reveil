@@ -120,6 +120,7 @@ class SunsetSceneService : Service() {
             return when (zoneKey) {
                 SunsetAutomationScheduler.ZONE_BUREAU -> SunriseZoneConfig.bureau
                 SunsetAutomationScheduler.ZONE_CHAMBRE -> SunriseZoneConfig.chambre
+                SunsetAutomationScheduler.ZONE_CUISINE -> SunriseZoneConfig.cuisine
                 else -> null
             }
         }
@@ -128,14 +129,24 @@ class SunsetSceneService : Service() {
             context: Context,
             zoneKey: String,
         ): Boolean {
+            // La scène du soir "ferme la fenêtre" du Daylight Harvesting pour la nuit, quel que
+            // soit le résultat (succès, zone non configurée, permission manquante, échec BLE).
+            fun deactivateCuisineHarvesting() {
+                if (zoneKey == SunsetAutomationScheduler.ZONE_CUISINE) {
+                    DaylightHarvestingStateStore.deactivate(context)
+                }
+            }
+
             val zone = resolveZone(zoneKey)
             if (zone == null || !zone.isConfigured) {
                 Log.w(TAG, "Missing configured zone for sunset scene: $zoneKey")
+                deactivateCuisineHarvesting()
                 return false
             }
 
             if (!BlePermissionSupport.hasBluetoothConnectPermission(context)) {
                 Log.w(TAG, "Stopping sunset scene: BLUETOOTH_CONNECT permission is not granted")
+                deactivateCuisineHarvesting()
                 return false
             }
 
@@ -173,6 +184,12 @@ class SunsetSceneService : Service() {
                     source = "SunsetSceneService.applySunsetScene",
                 )
                 false
+            } finally {
+                // La scène du soir "ferme la fenêtre" du Daylight Harvesting pour la nuit,
+                // quel que soit le succès BLE.
+                if (zoneKey == SunsetAutomationScheduler.ZONE_CUISINE) {
+                    DaylightHarvestingStateStore.deactivate(context)
+                }
             }
         }
     }
