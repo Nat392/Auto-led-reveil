@@ -16,10 +16,11 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlin.coroutines.coroutineContext
 
 class NightFadeService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var fadeJob: Job? = null
+    private val fadeJobs = mutableMapOf<String, Job>()
     private val crashReporter: CrashReporterApi = DiscordCrashReporter
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -81,15 +82,15 @@ class NightFadeService : Service() {
         val zoneKey = intent?.getStringExtra(AlarmScheduler.EXTRA_ZONE_KEY)
         val startTimeMs = intent?.getLongExtra(AlarmScheduler.EXTRA_START_TIME_MS, 0L) ?: 0L
         val endTimeMs = intent?.getLongExtra(AlarmScheduler.EXTRA_END_TIME_MS, 0L) ?: 0L
-        val zone = zoneKey?.let { SunsetSceneService.resolveZone(it) }
 
-        val isValid =
-            zoneKey != null && startTimeMs > 0L && endTimeMs > startTimeMs && zone != null && zone.isConfigured
-
-        return if (isValid) {
-            NightFadeRequest(zone, startTimeMs, endTimeMs)
-        } else {
-            null
+        return zoneKey?.let { key ->
+            val zone = SunsetSceneService.resolveZone(key)
+            val timesValid = startTimeMs > 0L && endTimeMs > startTimeMs
+            if (zone != null && zone.isConfigured && timesValid) {
+                NightFadeRequest(key, zone, startTimeMs, endTimeMs)
+            } else {
+                null
+            }
         }
     }
 
@@ -108,8 +109,11 @@ class NightFadeService : Service() {
         }
 
     private fun startFadeJob(request: NightFadeRequest) {
-        fadeJob?.cancel()
-        fadeJob =
+        // Chaque zone a son propre job : un nouveau fondu pour une zone n'annule que le fondu
+        // précédent de cette même zone, jamais celui d'une autre zone en cours.
+        fadeJobs[request.zoneKey]?.cancel()
+        NightFadeRunningStore.markRunning(applicationContext, request.zoneKey)
+        fadeJobs[request.zoneKey] =
             serviceScope.launch {
                 try {
                     val runner = NightFadeRunner(ZenggeBulbController, crashReporter)
@@ -120,31 +124,41 @@ class NightFadeService : Service() {
                         endTimeMs = request.endTimeMs,
                     )
                 } catch (e: CancellationException) {
-                    Log.i(TAG, "Fondu nocturne annulé")
+                    Log.i(TAG, "Fondu nocturne annulé (${request.zoneKey})")
                     throw e
                 } catch (e: Exception) {
-                    Log.e(TAG, "Erreur durant le fondu nocturne", e)
+                    Log.e(TAG, "Erreur durant le fondu nocturne (${request.zoneKey})", e)
                     crashReporter.reportNonFatal(
                         context = applicationContext,
                         throwable = e,
                         source = "NightFadeService.fadeJob",
                     )
                 } finally {
-                    stopForeground(STOP_FOREGROUND_REMOVE)
-                    stopSelf()
+                    // Si un nouveau fondu pour cette même zone a déjà remplacé celui-ci, on ne
+                    // touche ni au suivi "running" ni au service : c'est le nouveau job qui en
+                    // a la responsabilité.
+                    if (fadeJobs[request.zoneKey] === coroutineContext[Job]) {
+                        fadeJobs.remove(request.zoneKey)
+                        NightFadeRunningStore.clearRunning(applicationContext, request.zoneKey)
+                        if (fadeJobs.isEmpty()) {
+                            stopForeground(STOP_FOREGROUND_REMOVE)
+                            stopSelf()
+                        }
+                    }
                 }
             }
     }
 
     private data class NightFadeRequest(
+        val zoneKey: String,
         val zone: SunriseBulbZone,
         val startTimeMs: Long,
         val endTimeMs: Long,
     )
 
     override fun onDestroy() {
-        fadeJob?.cancel()
-        fadeJob = null
+        fadeJobs.values.forEach { it.cancel() }
+        fadeJobs.clear()
         serviceScope.cancel()
         super.onDestroy()
     }
