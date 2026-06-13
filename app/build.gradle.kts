@@ -143,7 +143,7 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation("androidx.test.espresso:espresso-intents:3.7.0")
     androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
-    androidTestImplementation("io.mockk:mockk-android:1.14.9")
+    androidTestImplementation("io.mockk:mockk-android:1.14.11")
     androidTestImplementation("androidx.work:work-testing:2.11.2")
 
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.23.8")
