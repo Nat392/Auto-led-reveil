@@ -100,6 +100,18 @@ class SunriseService : Service() {
                             }
                         }.forEach { it.await() }
                     }
+
+                    // La fin de la rampe d'aube de la Cuisine "ouvre la fenêtre" du Daylight
+                    // Harvesting et initialise son vecteur RGB de référence sur le profil Jour
+                    // que la rampe vient d'atteindre.
+                    zones.forEach { zone ->
+                        if (zone.macAddress == SunriseZoneConfig.cuisine.macAddress && zone.isConfigured) {
+                            DaylightHarvestingStateStore.activate(
+                                applicationContext,
+                                Triple(zone.sunriseR, zone.sunriseG, zone.sunriseB),
+                            )
+                        }
+                    }
                 } catch (e: CancellationException) {
                     Log.i(TAG, "Rampe sunrise annulée")
                 } catch (e: InterruptedException) {

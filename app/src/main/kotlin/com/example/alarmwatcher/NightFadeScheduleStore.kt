@@ -25,6 +25,11 @@ internal object NightFadeScheduleStore {
     private const val KEY_CHAMBRE_TARGET_END_MS = "chambre_anchor_target_end_ms"
     private const val KEY_CHAMBRE_FIRED = "chambre_anchor_fired"
 
+    private const val KEY_CUISINE_EVENING_START_MS = "cuisine_anchor_evening_start_ms"
+    private const val KEY_CUISINE_ORIGINAL_START_MS = "cuisine_anchor_original_start_ms"
+    private const val KEY_CUISINE_TARGET_END_MS = "cuisine_anchor_target_end_ms"
+    private const val KEY_CUISINE_FIRED = "cuisine_anchor_fired"
+
     data class Anchor(
         val eveningStartMs: Long,
         val originalStartTimeMs: Long,
@@ -104,6 +109,13 @@ internal object NightFadeScheduleStore {
                     KEY_CHAMBRE_ORIGINAL_START_MS,
                     KEY_CHAMBRE_TARGET_END_MS,
                     KEY_CHAMBRE_FIRED,
+                )
+            SunsetAutomationScheduler.ZONE_CUISINE ->
+                Keys(
+                    KEY_CUISINE_EVENING_START_MS,
+                    KEY_CUISINE_ORIGINAL_START_MS,
+                    KEY_CUISINE_TARGET_END_MS,
+                    KEY_CUISINE_FIRED,
                 )
             else -> null
         }

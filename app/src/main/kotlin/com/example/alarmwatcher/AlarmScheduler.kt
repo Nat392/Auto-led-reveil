@@ -17,6 +17,7 @@ object AlarmScheduler : AlarmSchedulerApi {
     // --- Identifiants pour le Night Fade (un par zone) ---
     private const val REQ_CODE_NIGHT_FADE_BUREAU = 5402
     private const val REQ_CODE_NIGHT_FADE_CHAMBRE = 5403
+    private const val REQ_CODE_NIGHT_FADE_CUISINE = 5404
     const val ACTION_START_NIGHT_FADE = "com.example.alarmwatcher.ACTION_START_NIGHT_FADE"
     const val EXTRA_START_TIME_MS = "extra_start_time_ms"
     const val EXTRA_END_TIME_MS = "extra_end_time_ms"
@@ -103,6 +104,7 @@ object AlarmScheduler : AlarmSchedulerApi {
         when (zoneKey) {
             SunsetAutomationScheduler.ZONE_BUREAU -> REQ_CODE_NIGHT_FADE_BUREAU
             SunsetAutomationScheduler.ZONE_CHAMBRE -> REQ_CODE_NIGHT_FADE_CHAMBRE
+            SunsetAutomationScheduler.ZONE_CUISINE -> REQ_CODE_NIGHT_FADE_CUISINE
             else -> error("Unknown zone key: $zoneKey")
         }
 
