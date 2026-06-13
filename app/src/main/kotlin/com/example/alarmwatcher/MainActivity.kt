@@ -108,6 +108,13 @@ class MainActivity : AppCompatActivity() {
                     // 2. On applique ensuite la Chambre
                     android.util.Log.i(TAG, "Application manuelle soirée : Chambre")
                     SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_CHAMBRE)
+
+                    // Petite pause de sécurité pour laisser le contrôleur BLE respirer
+                    kotlinx.coroutines.delay(MANUAL_SEQUENCE_DELAY_MS)
+
+                    // 3. On applique enfin la Cuisine
+                    android.util.Log.i(TAG, "Application manuelle soirée : Cuisine")
+                    SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_CUISINE)
                 }
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Échec de l'application manuelle du mode soirée", e)
