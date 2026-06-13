@@ -36,11 +36,13 @@ class SunsetSceneServiceTest {
         mockkObject(SunriseZoneConfig)
         mockkObject(ZenggeBulbController)
         mockkObject(DiscordCrashReporter)
+        mockkObject(DaylightHarvestingStateStore)
         every { Log.w(any(), any<String>()) } returns 0
         every { Log.i(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>(), any<Throwable>()) } returns 0
         every { DiscordCrashReporter.reportNonFatal(any(), any(), any()) } returns mockk<Job>(relaxed = true)
+        every { DaylightHarvestingStateStore.deactivate(any()) } returns Unit
         every { service.applicationContext } returns applicationContext
         every { service.stopSelf(any()) } returns Unit
         every { service.stopForeground(any<Int>()) } returns Unit
@@ -144,11 +146,14 @@ class SunsetSceneServiceTest {
     fun `resolves known zones and rejects unknown keys`() {
         val bureau = configuredZone(label = "Bureau", macAddress = "AA:BB:CC:DD:EE:FF")
         val chambre = configuredZone(label = "Chambre", macAddress = "11:22:33:44:55:66")
+        val cuisine = configuredZone(label = "Cuisine", macAddress = "22:33:44:55:66:77")
         every { SunriseZoneConfig.bureau } returns bureau
         every { SunriseZoneConfig.chambre } returns chambre
+        every { SunriseZoneConfig.cuisine } returns cuisine
 
         assertEquals(bureau, SunsetSceneService.resolveZone(SunsetAutomationScheduler.ZONE_BUREAU))
         assertEquals(chambre, SunsetSceneService.resolveZone(SunsetAutomationScheduler.ZONE_CHAMBRE))
+        assertEquals(cuisine, SunsetSceneService.resolveZone(SunsetAutomationScheduler.ZONE_CUISINE))
         assertNull(SunsetSceneService.resolveZone("autre"))
     }
 
@@ -228,6 +233,51 @@ class SunsetSceneServiceTest {
                     source = "SunsetSceneService.applySunsetScene",
                 )
             }
+        }
+
+    @Test
+    fun `deactivates daylight harvesting after a successful cuisine scene`() =
+        runTest {
+            val cuisine = configuredZone(label = "Cuisine", macAddress = "22:33:44:55:66:77")
+            every { SunriseZoneConfig.cuisine } returns cuisine
+            every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+            coEvery {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            } returns true
+
+            val applied =
+                SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_CUISINE)
+
+            assertTrue(applied)
+            verify(exactly = 1) { DaylightHarvestingStateStore.deactivate(applicationContext) }
+        }
+
+    @Test
+    fun `deactivates daylight harvesting even when the cuisine scene fails`() =
+        runTest {
+            every { SunriseZoneConfig.cuisine } returns configuredZone(label = "Cuisine", macAddress = "")
+            every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+
+            val applied =
+                SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_CUISINE)
+
+            assertFalse(applied)
+            verify(exactly = 1) { DaylightHarvestingStateStore.deactivate(applicationContext) }
+        }
+
+    @Test
+    fun `does not touch daylight harvesting state for other zones`() =
+        runTest {
+            val bureau = configuredZone(label = "Bureau", macAddress = "AA:BB:CC:DD:EE:FF")
+            every { SunriseZoneConfig.bureau } returns bureau
+            every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+            coEvery {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            } returns true
+
+            SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_BUREAU)
+
+            verify(exactly = 0) { DaylightHarvestingStateStore.deactivate(any()) }
         }
 
     @Test
