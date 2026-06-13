@@ -113,6 +113,55 @@ class NightFadeScheduleStoreTest {
     }
 
     @Test
+    fun `saveAnchor and getAnchor round trip for the cuisine zone`() {
+        setUpPrefs()
+        every { prefs.getLong("cuisine_anchor_evening_start_ms", -1L) } returns 6_000L
+        every { prefs.getLong("cuisine_anchor_original_start_ms", -1L) } returns 6_000L
+        every { prefs.getLong("cuisine_anchor_target_end_ms", -1L) } returns 8_000L
+        every { prefs.getBoolean("cuisine_anchor_fired", false) } returns false
+
+        NightFadeScheduleStore.saveAnchor(
+            context,
+            SunsetAutomationScheduler.ZONE_CUISINE,
+            NightFadeScheduleStore.Anchor(
+                eveningStartMs = 6_000L,
+                originalStartTimeMs = 6_000L,
+                targetEndTimeMs = 8_000L,
+                fired = false,
+            ),
+        )
+        val result = NightFadeScheduleStore.getAnchor(context, SunsetAutomationScheduler.ZONE_CUISINE)
+
+        verify(exactly = 1) { editor.putLong("cuisine_anchor_evening_start_ms", 6_000L) }
+        verify(exactly = 1) { editor.putLong("cuisine_anchor_original_start_ms", 6_000L) }
+        verify(exactly = 1) { editor.putLong("cuisine_anchor_target_end_ms", 8_000L) }
+        verify(exactly = 1) { editor.putBoolean("cuisine_anchor_fired", false) }
+        verify(exactly = 1) { editor.apply() }
+        assertEquals(
+            NightFadeScheduleStore.Anchor(
+                eveningStartMs = 6_000L,
+                originalStartTimeMs = 6_000L,
+                targetEndTimeMs = 8_000L,
+                fired = false,
+            ),
+            result,
+        )
+    }
+
+    @Test
+    fun `clearAnchor removes the persisted keys for the cuisine zone`() {
+        setUpPrefs()
+
+        NightFadeScheduleStore.clearAnchor(context, SunsetAutomationScheduler.ZONE_CUISINE)
+
+        verify(exactly = 1) { editor.remove("cuisine_anchor_evening_start_ms") }
+        verify(exactly = 1) { editor.remove("cuisine_anchor_original_start_ms") }
+        verify(exactly = 1) { editor.remove("cuisine_anchor_target_end_ms") }
+        verify(exactly = 1) { editor.remove("cuisine_anchor_fired") }
+        verify(exactly = 1) { editor.apply() }
+    }
+
+    @Test
     fun `clearAnchor removes the persisted keys for the bureau zone`() {
         setUpPrefs()
 

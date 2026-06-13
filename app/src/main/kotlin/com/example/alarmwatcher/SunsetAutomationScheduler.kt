@@ -32,6 +32,7 @@ internal object SunsetAutomationScheduler {
     private const val CATCH_UP_RETRY_MS = 5 * 60 * 1000L
     private const val SUNSET_OFFSET_BUREAU_MS = 60 * 60 * 1000L
     private const val SUNSET_OFFSET_CHAMBRE_MS = 30 * 60 * 1000L
+    private const val SUNSET_OFFSET_CUISINE_MS = 60 * 60 * 1000L
     private const val REFRESH_LOCAL_HOUR = 0
     private const val REFRESH_LOCAL_MINUTE = 5
 
@@ -41,10 +42,12 @@ internal object SunsetAutomationScheduler {
 
     const val ZONE_BUREAU = "bureau"
     const val ZONE_CHAMBRE = "chambre"
+    const val ZONE_CUISINE = "cuisine"
 
     private const val REQ_REFRESH = 7101
     private const val REQ_BUREAU = 7102
     private const val REQ_CHAMBRE = 7103
+    private const val REQ_CUISINE = 7104
 
     private val schedulerScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     internal var sunsetConnectionFactory: (String) -> HttpURLConnection = { urlString ->
@@ -80,21 +83,28 @@ internal object SunsetAutomationScheduler {
         val sunsetMs = sunsetInstant.toEpochMilli()
         val bureauMs = sunsetMs - SUNSET_OFFSET_BUREAU_MS
         val chambreMs = sunsetMs - SUNSET_OFFSET_CHAMBRE_MS
+        val cuisineMs = sunsetMs - SUNSET_OFFSET_CUISINE_MS
 
-        SunsetTimesStore.save(context, bureauMs, chambreMs)
+        SunsetTimesStore.save(context, bureauMs, chambreMs, cuisineMs)
+
+        // Nouveau cycle quotidien : la fenêtre du Daylight Harvesting se rouvrira à la fin de la
+        // prochaine rampe d'aube de la Cuisine.
+        DaylightHarvestingStateStore.deactivate(context)
 
         cancelSceneAlarm(context, ZONE_BUREAU)
         cancelSceneAlarm(context, ZONE_CHAMBRE)
+        cancelSceneAlarm(context, ZONE_CUISINE)
         cancelRefreshAlarm(context)
 
         scheduleSceneAlarmIfNeeded(context, ZONE_BUREAU, bureauMs)
         scheduleSceneAlarmIfNeeded(context, ZONE_CHAMBRE, chambreMs)
+        scheduleSceneAlarmIfNeeded(context, ZONE_CUISINE, cuisineMs)
         scheduleRefreshAlarm(context, computeNextRefreshAtMillis())
 
         // Les horaires "mode soirée" viennent de changer : recalcule la planification du mode nuit par zone
         AlarmMonitor.scanNextAlarmAndSchedule(context)
 
-        Log.i(TAG, "Scheduled sunset scenes: bureau=$bureauMs chambre=$chambreMs sunset=$sunsetMs")
+        Log.i(TAG, "Scheduled sunset scenes: bureau=$bureauMs chambre=$chambreMs cuisine=$cuisineMs sunset=$sunsetMs")
     }
 
     internal suspend fun fetchSunsetInstant(): Instant? {
@@ -318,6 +328,7 @@ internal object SunsetAutomationScheduler {
         return when (zoneKey) {
             ZONE_BUREAU -> REQ_BUREAU
             ZONE_CHAMBRE -> REQ_CHAMBRE
+            ZONE_CUISINE -> REQ_CUISINE
             else -> error("Unknown zone key: $zoneKey")
         }
     }

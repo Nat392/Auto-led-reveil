@@ -169,7 +169,11 @@ internal class AlarmMonitorRunner(
         const val MORNING_WINDOW_END_HOUR = 13
 
         val NIGHT_FADE_ZONE_KEYS =
-            listOf(SunsetAutomationScheduler.ZONE_BUREAU, SunsetAutomationScheduler.ZONE_CHAMBRE)
+            listOf(
+                SunsetAutomationScheduler.ZONE_BUREAU,
+                SunsetAutomationScheduler.ZONE_CHAMBRE,
+                SunsetAutomationScheduler.ZONE_CUISINE,
+            )
 
         val ALLOWED_CLOCK_PACKAGES =
             setOf(
