@@ -13,6 +13,12 @@ class AlarmWatcherApp : Application() {
         super.onCreate()
         CrashScreenshotStore.install(this)
 
+        // Au démarrage du processus, aucun NightFadeService ne peut être en cours d'exécution :
+        // on efface les drapeaux "running" persistés pour permettre à AlarmMonitorRunner de
+        // reprendre immédiatement un fondu nocturne déjà "fired" mais interrompu (ex : service
+        // tué par une réinstallation pendant un fondu en cours).
+        NightFadeRunningStore.clearAll(this)
+
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             if (fatalDispatchInProgress.compareAndSet(false, true)) {

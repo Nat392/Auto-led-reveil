@@ -1,6 +1,8 @@
 name: Dependabot Auto-merge
 
 on:
+  schedule:
+    - cron: '*/15 * * * *'
   workflow_run:
     workflows:
       - Android CI - Alarm Watcher
@@ -371,5 +373,45 @@ jobs:
                 await enableAutoMergeForPullRequest(refreshedPullRequest);
               } catch (error) {
                 core.warning(`Error while processing PR #${pullRequestNumber}: ${error.message}`);
+              }
+            }
+
+  approve-pending-runs:
+    name: Approve pending Dependabot workflow runs
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+
+    steps:
+      - name: Approve workflow runs awaiting approval for Dependabot PRs
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { data: pendingRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              status: 'action_required',
+              per_page: 100,
+            });
+
+            const isDependabotRun = (run) => run.triggering_actor?.login === 'dependabot[bot]' || run.actor?.login === 'dependabot[bot]';
+
+            const dependabotRuns = pendingRuns.workflow_runs.filter(isDependabotRun);
+
+            if (dependabotRuns.length === 0) {
+              core.info('No pending Dependabot workflow runs awaiting approval.');
+              return;
+            }
+
+            for (const run of dependabotRuns) {
+              try {
+                await github.rest.actions.approveWorkflowRun({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  run_id: run.id,
+                });
+
+                core.info(`Approved workflow run #${run.id} (${run.name}) for ${run.head_branch}.`);
+              } catch (error) {
+                core.warning(`Unable to approve workflow run #${run.id}: ${error.message}`);
               }
             }
