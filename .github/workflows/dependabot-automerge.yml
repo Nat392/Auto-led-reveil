@@ -71,7 +71,7 @@ jobs:
               return workflowRuns.workflow_runs.some((run) => run.name === androidWorkflowName && run.conclusion === 'success');
             };
 
-            const mergePullRequest = async (pullRequest) => {
+            const mergeOrEnableAutoMerge = async (pullRequest) => {
               try {
                 await github.rest.pulls.merge({
                   owner: context.repo.owner,
@@ -81,12 +81,11 @@ jobs:
                 });
 
                 core.info(`Merged PR #${pullRequest.number}.`);
+                return;
               } catch (error) {
-                core.warning(`Unable to merge PR #${pullRequest.number}: ${error.message}`);
+                core.info(`Could not merge PR #${pullRequest.number} directly (${error.message}), falling back to auto-merge.`);
               }
-            };
 
-            const enableAutoMergeForPullRequest = async (pullRequest) => {
               if (pullRequest.auto_merge) {
                 core.info(`Auto-merge is already enabled for PR #${pullRequest.number}.`);
                 return;
@@ -117,12 +116,6 @@ jobs:
 
                 core.info(`Enabled squash auto-merge for PR #${pullRequest.number}.`);
               } catch (error) {
-                if (error.message.includes('clean status')) {
-                  core.info(`PR #${pullRequest.number} is already mergeable, merging directly.`);
-                  await mergePullRequest(pullRequest);
-                  return;
-                }
-
                 core.warning(`Unable to enable auto-merge for PR #${pullRequest.number}: ${error.message}`);
               }
             };
@@ -156,7 +149,7 @@ jobs:
                 continue;
               }
 
-              await enableAutoMergeForPullRequest(pullRequest);
+              await mergeOrEnableAutoMerge(pullRequest);
             }
 
   retroactive:
@@ -177,7 +170,7 @@ jobs:
 
             const isMergeablePullRequest = (pullRequest) => pullRequest.mergeable === true;
 
-            const mergePullRequest = async (pullRequest) => {
+            const mergeOrEnableAutoMerge = async (pullRequest) => {
               try {
                 await github.rest.pulls.merge({
                   owner: context.repo.owner,
@@ -187,12 +180,11 @@ jobs:
                 });
 
                 core.info(`Merged PR #${pullRequest.number}.`);
+                return;
               } catch (error) {
-                core.warning(`Unable to merge PR #${pullRequest.number}: ${error.message}`);
+                core.info(`Could not merge PR #${pullRequest.number} directly (${error.message}), falling back to auto-merge.`);
               }
-            };
 
-            const enableAutoMergeForPullRequest = async (pullRequest) => {
               if (pullRequest.auto_merge) {
                 core.info(`Auto-merge is already enabled for PR #${pullRequest.number}.`);
                 return;
@@ -223,12 +215,6 @@ jobs:
 
                 core.info(`Enabled squash auto-merge for PR #${pullRequest.number}.`);
               } catch (error) {
-                if (error.message.includes('clean status')) {
-                  core.info(`PR #${pullRequest.number} is already mergeable, merging directly.`);
-                  await mergePullRequest(pullRequest);
-                  return;
-                }
-
                 core.warning(`Unable to enable auto-merge for PR #${pullRequest.number}: ${error.message}`);
               }
             };
@@ -412,7 +398,7 @@ jobs:
                   continue;
                 }
 
-                await enableAutoMergeForPullRequest(refreshedPullRequest);
+                await mergeOrEnableAutoMerge(refreshedPullRequest);
               } catch (error) {
                 core.warning(`Error while processing PR #${pullRequestNumber}: ${error.message}`);
               }
