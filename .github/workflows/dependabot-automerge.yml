@@ -1,6 +1,8 @@
 name: Dependabot Auto-merge
 
 on:
+  schedule:
+    - cron: '*/15 * * * *'
   workflow_run:
     workflows:
       - Android CI - Alarm Watcher
@@ -372,4 +374,78 @@ jobs:
               } catch (error) {
                 core.warning(`Error while processing PR #${pullRequestNumber}: ${error.message}`);
               }
+            }
+
+  trigger-pending-ci:
+    name: Trigger Android CI for Dependabot PRs stuck on approval
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+
+    steps:
+      - name: Update behind branches and dispatch Android CI where needed
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const androidWorkflowName = 'Android CI - Alarm Watcher';
+            const androidWorkflowFileName = 'android.yml';
+
+            const isDependabotPullRequest = (pullRequest) => pullRequest.user?.login === 'dependabot[bot]';
+
+            const getDispatchedAndroidCiRun = async (headSha) => {
+              const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: headSha,
+                per_page: 100,
+              });
+
+              return workflowRuns.workflow_runs.find((run) => run.name === androidWorkflowName && run.event === 'workflow_dispatch');
+            };
+
+            const { data: openPullRequests } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100,
+            });
+
+            const candidates = openPullRequests.filter(isDependabotPullRequest);
+
+            if (candidates.length === 0) {
+              core.info('No open Dependabot PRs were found.');
+              return;
+            }
+
+            for (const candidate of candidates) {
+              const { data: pullRequest } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: candidate.number,
+              });
+
+              if (pullRequest.mergeable_state === 'behind') {
+                core.info(`PR #${pullRequest.number} is behind ${pullRequest.base.ref}, updating the branch...`);
+
+                await github.rest.pulls.updateBranch({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullRequest.number,
+                });
+
+                continue;
+              }
+
+              if (await getDispatchedAndroidCiRun(pullRequest.head.sha)) {
+                core.info(`Android CI already dispatched for PR #${pullRequest.number} at ${pullRequest.head.sha}.`);
+                continue;
+              }
+
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: androidWorkflowFileName,
+                ref: pullRequest.head.ref,
+              });
+
+              core.info(`Triggered Android CI for PR #${pullRequest.number} on branch ${pullRequest.head.ref} (${pullRequest.head.sha}).`);
             }

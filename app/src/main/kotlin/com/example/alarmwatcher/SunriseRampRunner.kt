@@ -37,20 +37,14 @@ internal class SunriseRampRunner(
         val rampTiming = RampTiming.from(nowMs(), durationMs)
 
         try {
-            val shouldSendFinalScene =
-                runTimedRamp(
-                    session = session,
-                    timing = rampTiming,
-                    request = request,
-                )
+            runTimedRamp(
+                session = session,
+                timing = rampTiming,
+                request = request,
+            )
 
-            if (shouldSendFinalScene) {
-                waitUntil(rampTiming.finalDeadlineMs)
-                sendFinalScene(
-                    session = session,
-                    request = request,
-                )
-            }
+            waitUntil(rampTiming.finalDeadlineMs)
+            sendFinalScene(request)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -85,7 +79,7 @@ internal class SunriseRampRunner(
         session: BulbSession,
         timing: RampTiming,
         request: RampRequest,
-    ): Boolean {
+    ) {
         var lastAppliedStep = -1
         while (nowMs() < timing.rampDeadlineMs) {
             val timeStep = computeTimedStep(timing.rampStartMs, timing.durationMs, request.steps)
@@ -110,7 +104,7 @@ internal class SunriseRampRunner(
                         throwable = IllegalStateException(errorMessage),
                         source = "$TAG.runTimedRamp",
                     )
-                    return false
+                    return
                 }
                 lastAppliedStep = timeStep
                 request.onProgress(timeStep, request.steps)
@@ -128,20 +122,18 @@ internal class SunriseRampRunner(
                 ),
             )
         }
-
-        return true
     }
 
-    private suspend fun sendFinalScene(
-        session: BulbSession,
-        request: RampRequest,
-    ) {
+    private suspend fun sendFinalScene(request: RampRequest) {
         if (
-            applyScene(
-                session,
-                request.targetR.coerceIn(MIN_RGB_VALUE, MAX_RGB_VALUE),
-                request.targetG.coerceIn(MIN_RGB_VALUE, MAX_RGB_VALUE),
-                request.targetB.coerceIn(MIN_RGB_VALUE, MAX_RGB_VALUE),
+            bulbController.applyScene(
+                context = request.context,
+                macAddress = request.macAddress,
+                red = request.targetR.coerceIn(MIN_RGB_VALUE, MAX_RGB_VALUE),
+                green = request.targetG.coerceIn(MIN_RGB_VALUE, MAX_RGB_VALUE),
+                blue = request.targetB.coerceIn(MIN_RGB_VALUE, MAX_RGB_VALUE),
+                white = 0,
+                brightnessPercent = 100,
             )
         ) {
             request.onProgress(request.steps, request.steps)
