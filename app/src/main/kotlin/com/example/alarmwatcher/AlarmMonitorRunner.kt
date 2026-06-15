@@ -99,11 +99,14 @@ internal class AlarmMonitorRunner(
         val nightFadeSchedule = NightFadeTimingSupport.computeScheduleOrNull(trigger, originalStartTimeMs, now)
         // Si le fondu a déjà été déclenché mais que l'heure de l'alarme a changé entretemps,
         // la cible (targetEndTimeMs) est recalculée et le fondu en cours est réajusté
-        // dynamiquement en relançant immédiatement le service avec la nouvelle cible.
+        // dynamiquement en relançant immédiatement le service avec la nouvelle cible. De même,
+        // si le fondu était "fired" mais que NightFadeService ne tourne plus pour cette zone
+        // (processus relancé, service tué), on le relance immédiatement vers la même cible.
         val alreadyFiredWithSameTarget =
             anchorForThisEvening?.fired == true &&
                 nightFadeSchedule != null &&
-                anchorForThisEvening.targetEndTimeMs == nightFadeSchedule.targetEndTimeMs
+                anchorForThisEvening.targetEndTimeMs == nightFadeSchedule.targetEndTimeMs &&
+                NightFadeRunningStore.isRunning(context, zoneKey)
 
         if (nightFadeSchedule != null && !alreadyFiredWithSameTarget) {
             alarmScheduler.scheduleNightFade(

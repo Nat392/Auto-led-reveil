@@ -74,6 +74,32 @@ class NightFadeRunnerTest {
         }
 
     @Test
+    fun `tapers green and blue to zero before red reaches its target`() =
+        runTest {
+            val startTimeMs = 0L
+            val endTimeMs = 1_000L
+            // 85% de progression : au-delà de GREEN_BLUE_FADE_FRACTION (0.7), seul le rouge
+            // doit encore être non nul.
+            val clock = MutableClock(850L)
+            val runner = createRunner(clock)
+
+            coEvery {
+                bulbController.applyScene(context, zone.macAddress, any(), any(), any(), 0, 100)
+            } answers {
+                clock.nowMs = endTimeMs
+                true
+            }
+
+            runner.run(context, zone, startTimeMs, endTimeMs)
+
+            // À progress=0.85, le vert et le bleu sont déjà à 0 (tapering à 0.7) alors que le
+            // rouge interpole encore vers TARGET_R=3 (lerp(255, 3, 0.85) == 40).
+            coVerify(exactly = 1) {
+                bulbController.applyScene(context, zone.macAddress, 40, 0, 0, 0, 100)
+            }
+        }
+
+    @Test
     fun `applies successive fade steps and waits between each cycle`() =
         runTest {
             val startTimeMs = 0L
