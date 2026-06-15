@@ -1,6 +1,7 @@
 package com.example.alarmwatcher
 
 import androidx.annotation.VisibleForTesting
+import com.example.alarmwatcher.settings.AppSettingsCache
 
 internal data class SunriseBulbZone(
     val label: String,
@@ -23,49 +24,55 @@ internal object SunriseZoneConfig {
     var testZones: List<SunriseBulbZone>? = null
 
     val bureau: SunriseBulbZone
-        get() =
-            SunriseBulbZone(
+        get() {
+            val settings = AppSettingsCache.current
+            return SunriseBulbZone(
                 label = "Bureau",
                 macAddress = BuildConfig.ZENGGE_BULB_MAC_BUREAU.trim(),
-                sunriseR = 220,
-                sunriseG = 240,
-                sunriseB = 255,
-                sunsetR = 255,
-                sunsetG = 140,
-                sunsetB = 0,
+                sunriseR = settings.bureauSunriseColor.red,
+                sunriseG = settings.bureauSunriseColor.green,
+                sunriseB = settings.bureauSunriseColor.blue,
+                sunsetR = settings.bureauSunsetColor.red,
+                sunsetG = settings.bureauSunsetColor.green,
+                sunsetB = settings.bureauSunsetColor.blue,
                 whiteChannel = 0,
                 brightnessPercent = 100,
             )
+        }
 
     val chambre: SunriseBulbZone
-        get() =
-            SunriseBulbZone(
+        get() {
+            val settings = AppSettingsCache.current
+            return SunriseBulbZone(
                 label = "Chambre",
                 macAddress = BuildConfig.ZENGGE_BULB_MAC_CHAMBRE.trim(),
-                sunriseR = 255,
-                sunriseG = 230,
-                sunriseB = 210,
-                sunsetR = 255,
-                sunsetG = 71,
-                sunsetB = 0,
+                sunriseR = settings.chambreSunriseColor.red,
+                sunriseG = settings.chambreSunriseColor.green,
+                sunriseB = settings.chambreSunriseColor.blue,
+                sunsetR = settings.chambreSunsetColor.red,
+                sunsetG = settings.chambreSunsetColor.green,
+                sunsetB = settings.chambreSunsetColor.blue,
                 whiteChannel = 0,
                 brightnessPercent = 100,
             )
+        }
 
     val cuisine: SunriseBulbZone
-        get() =
-            SunriseBulbZone(
+        get() {
+            val settings = AppSettingsCache.current
+            return SunriseBulbZone(
                 label = "Cuisine",
                 macAddress = BuildConfig.ZENGGE_BULB_MAC_CUISINE.trim(),
-                sunriseR = 220,
-                sunriseG = 240,
-                sunriseB = 255,
-                sunsetR = 255,
-                sunsetG = 140,
-                sunsetB = 0,
+                sunriseR = settings.cuisineSunriseColor.red,
+                sunriseG = settings.cuisineSunriseColor.green,
+                sunriseB = settings.cuisineSunriseColor.blue,
+                sunsetR = settings.cuisineSunsetColor.red,
+                sunsetG = settings.cuisineSunsetColor.green,
+                sunsetB = settings.cuisineSunsetColor.blue,
                 whiteChannel = 0,
                 brightnessPercent = 100,
             )
+        }
 
     fun all(): List<SunriseBulbZone> = testZones ?: listOf(bureau, chambre, cuisine)
 

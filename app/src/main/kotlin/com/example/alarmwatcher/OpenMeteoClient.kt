@@ -1,6 +1,8 @@
 package com.example.alarmwatcher
 
 import android.util.Log
+import com.example.alarmwatcher.settings.AppSettings
+import com.example.alarmwatcher.settings.AppSettingsCache
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -9,12 +11,13 @@ import java.net.URL
 
 /**
  * Source de données pour le Daylight Harvesting : radiation solaire actuelle via Open-Meteo, aux
- * mêmes coordonnées que [SunsetAutomationScheduler] (lat=46.6644, lng=5.5619).
+ * mêmes coordonnées que [SunsetAutomationScheduler] ([AppSettings.latitude]/[AppSettings.longitude]).
  */
 internal object OpenMeteoClient {
     private const val TAG = "OpenMeteoClient"
-    private const val OPEN_METEO_URL =
-        "https://api.open-meteo.com/v1/forecast?latitude=46.6644&longitude=5.5619" +
+
+    private fun openMeteoUrl(settings: AppSettings): String =
+        "https://api.open-meteo.com/v1/forecast?latitude=${settings.latitude}&longitude=${settings.longitude}" +
             "&current=shortwave_radiation&timezone=auto"
 
     data class CurrentConditions(
@@ -28,7 +31,7 @@ internal object OpenMeteoClient {
     suspend fun fetchCurrentConditions(): CurrentConditions? {
         return try {
             val connection =
-                openMeteoConnectionFactory(OPEN_METEO_URL).apply {
+                openMeteoConnectionFactory(openMeteoUrl(AppSettingsCache.current)).apply {
                     connectTimeout = 10_000
                     readTimeout = 10_000
                     requestMethod = "GET"

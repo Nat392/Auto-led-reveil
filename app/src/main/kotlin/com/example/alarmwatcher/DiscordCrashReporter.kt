@@ -32,6 +32,7 @@ object DiscordCrashReporter : CrashReporterApi {
     private const val SCREENSHOT_FILENAME = "crash_screenshot.png"
     private const val STACKTRACE_FILENAME = "stacktrace.txt"
     private const val DEBUG_LOG_FILENAME = "debug_log.txt"
+    private const val LOG_EXPORT_FILENAME = "app_logs.txt"
     private const val HTTP_TIMEOUT_MS = 10_000
     private const val FATAL_WAIT_TIMEOUT_MS = 4_500L
 
@@ -190,6 +191,46 @@ object DiscordCrashReporter : CrashReporterApi {
         }
     }
 
+    /**
+     * Envoie un export manuel des journaux de l'application (logcat du propre processus) vers le
+     * webhook Discord configuré, en pièce jointe.
+     */
+    suspend fun sendLogExport(
+        context: Context,
+        logText: String,
+    ): Boolean {
+        val webhookUrl = BuildConfig.DISCORD_WEBHOOK_URL.trim()
+        if (webhookUrl.isBlank()) {
+            Log.w(TAG, "DISCORD_WEBHOOK_URL is empty, skipping log export")
+            return false
+        }
+
+        val payload = buildLogExportPayload(context = context, logText = logText)
+
+        val attachments =
+            listOf(
+                Attachment(
+                    fieldName = "files[0]",
+                    fileName = LOG_EXPORT_FILENAME,
+                    contentType = "text/plain; charset=UTF-8",
+                    bytes = logText.toByteArray(Charsets.UTF_8),
+                ),
+            )
+
+        val success =
+            postMultipart(
+                webhookUrl = webhookUrl,
+                payloadJson = payload,
+                attachments = attachments,
+            )
+
+        if (!success) {
+            Log.w(TAG, "Discord webhook returned a non-success response for log export")
+        }
+
+        return success
+    }
+
     private fun captureScreenshotBestEffort(): ByteArray? {
         return try {
             CrashScreenshotStore.captureLatestScreenshot()
@@ -297,6 +338,40 @@ object DiscordCrashReporter : CrashReporterApi {
 
         return JSONObject()
             .put("content", "Un log de debug au démarrage a été capturé.")
+            .put("embeds", JSONArray().put(embed))
+    }
+
+    internal fun buildLogExportPayload(
+        context: Context,
+        logText: String,
+    ): JSONObject {
+        val timestamp = isoTimestamp()
+        val packageInfo =
+            runCatching {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }.getOrNull()
+        val appVersionName = packageInfo?.versionName ?: BuildConfig.VERSION_NAME
+        val lineCount = logText.lineSequence().count()
+
+        val embedFields =
+            JSONArray().apply {
+                put(field("Date", timestamp, inline = true))
+                put(field("App", appVersionName, inline = true))
+                put(field("Android", "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})", inline = true))
+                put(field("Appareil", "${Build.MANUFACTURER} ${Build.MODEL}", inline = true))
+                put(field("Lignes", lineCount.toString(), inline = true))
+            }
+
+        val embed =
+            JSONObject()
+                .put("title", "Export des journaux")
+                .put("color", 0x2ECC71)
+                .put("timestamp", timestamp)
+                .put("fields", embedFields)
+
+        return JSONObject()
+            .put("content", "Export manuel des journaux de l'application.")
             .put("embeds", JSONArray().put(embed))
     }
 

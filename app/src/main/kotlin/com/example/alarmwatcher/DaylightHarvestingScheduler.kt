@@ -6,24 +6,25 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import com.example.alarmwatcher.settings.AppSettingsCache
 import java.util.concurrent.TimeUnit
 
 /**
- * Programme le worker périodique du Daylight Harvesting. L'intervalle (15 min) est supérieur à
- * la durée d'un fondu ([DaylightFadeRunner], 14 min), ce qui laisse à chaque cycle le temps de se
- * terminer avant le suivant dans le cas normal.
+ * Programme le worker périodique du Daylight Harvesting. L'intervalle est piloté par
+ * [com.example.alarmwatcher.settings.AppSettings.daylightIntervalMinutes] ; WorkManager applique
+ * un minimum incompressible de 15 minutes pour le travail périodique, quelle que soit la valeur
+ * demandée.
  */
 internal object DaylightHarvestingScheduler {
-    private const val INTERVAL_MINUTES = 15L
-
     fun schedule(context: Context) {
+        val intervalMinutes = AppSettingsCache.current.daylightIntervalMinutes.toLong()
         val constraints =
             Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
 
         val request =
-            PeriodicWorkRequestBuilder<DaylightHarvestingWorker>(INTERVAL_MINUTES, TimeUnit.MINUTES)
+            PeriodicWorkRequestBuilder<DaylightHarvestingWorker>(intervalMinutes, TimeUnit.MINUTES)
                 .setConstraints(constraints)
                 .build()
 

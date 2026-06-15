@@ -3,10 +3,15 @@ package com.example.alarmwatcher
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.example.alarmwatcher.settings.AppSettingsCache
+
+private const val MILLIS_PER_MINUTE = 60_000L
+private const val STEP_DELAY_MS = 30_000L
 
 /**
- * Worker périodique (toutes les 15 min) du Daylight Harvesting : compense en continu le déficit
- * de lumière naturelle de la Cuisine en fonction de la radiation solaire actuelle (Open-Meteo).
+ * Worker périodique du Daylight Harvesting : compense en continu le déficit de lumière naturelle
+ * de la Cuisine en fonction de la radiation solaire actuelle (Open-Meteo). La fréquence est pilotée
+ * par [com.example.alarmwatcher.settings.AppSettings.daylightIntervalMinutes].
  */
 class DaylightHarvestingWorker(
     appContext: Context,
@@ -46,11 +51,16 @@ class DaylightHarvestingWorker(
             return Result.success()
         }
 
+        val durationMs = AppSettingsCache.current.daylightFadeDurationMinutes * MILLIS_PER_MINUTE
+        val steps = (durationMs / STEP_DELAY_MS).toInt().coerceAtLeast(1)
+
         DaylightFadeRunner(ZenggeBulbController, DiscordCrashReporter).fade(
             context = applicationContext,
             zone = zone,
             from = state.currentRgb,
             to = targetRgb,
+            durationMs = durationMs,
+            steps = steps,
         )
 
         return Result.success()
