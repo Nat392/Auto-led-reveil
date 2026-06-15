@@ -71,6 +71,21 @@ jobs:
               return workflowRuns.workflow_runs.some((run) => run.name === androidWorkflowName && run.conclusion === 'success');
             };
 
+            const mergePullRequest = async (pullRequest) => {
+              try {
+                await github.rest.pulls.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullRequest.number,
+                  merge_method: 'squash',
+                });
+
+                core.info(`Merged PR #${pullRequest.number}.`);
+              } catch (error) {
+                core.warning(`Unable to merge PR #${pullRequest.number}: ${error.message}`);
+              }
+            };
+
             const enableAutoMergeForPullRequest = async (pullRequest) => {
               if (pullRequest.auto_merge) {
                 core.info(`Auto-merge is already enabled for PR #${pullRequest.number}.`);
@@ -102,6 +117,12 @@ jobs:
 
                 core.info(`Enabled squash auto-merge for PR #${pullRequest.number}.`);
               } catch (error) {
+                if (error.message.includes('clean status')) {
+                  core.info(`PR #${pullRequest.number} is already mergeable, merging directly.`);
+                  await mergePullRequest(pullRequest);
+                  return;
+                }
+
                 core.warning(`Unable to enable auto-merge for PR #${pullRequest.number}: ${error.message}`);
               }
             };
@@ -156,6 +177,21 @@ jobs:
 
             const isMergeablePullRequest = (pullRequest) => pullRequest.mergeable === true;
 
+            const mergePullRequest = async (pullRequest) => {
+              try {
+                await github.rest.pulls.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullRequest.number,
+                  merge_method: 'squash',
+                });
+
+                core.info(`Merged PR #${pullRequest.number}.`);
+              } catch (error) {
+                core.warning(`Unable to merge PR #${pullRequest.number}: ${error.message}`);
+              }
+            };
+
             const enableAutoMergeForPullRequest = async (pullRequest) => {
               if (pullRequest.auto_merge) {
                 core.info(`Auto-merge is already enabled for PR #${pullRequest.number}.`);
@@ -187,6 +223,12 @@ jobs:
 
                 core.info(`Enabled squash auto-merge for PR #${pullRequest.number}.`);
               } catch (error) {
+                if (error.message.includes('clean status')) {
+                  core.info(`PR #${pullRequest.number} is already mergeable, merging directly.`);
+                  await mergePullRequest(pullRequest);
+                  return;
+                }
+
                 core.warning(`Unable to enable auto-merge for PR #${pullRequest.number}: ${error.message}`);
               }
             };
