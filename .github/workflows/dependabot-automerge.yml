@@ -402,6 +402,9 @@ jobs:
 
                   pullRequest = updatedPullRequest;
                   core.info(`PR #${pullRequest.number} updated to ${pullRequest.head.sha}.`);
+
+                  await wait(5);
+                  await approvePendingRunsForHeadSha(pullRequest.head.sha, pullRequest.number);
                 }
 
                 let existingRun = await getAndroidCiRun(pullRequest.head.sha);
