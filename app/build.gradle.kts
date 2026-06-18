@@ -182,15 +182,27 @@ val coverageExclusions =
     )
 
 fun androidCoverageClassTree() =
-    fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug").get().asFile) {
+    fileTree(
+        layout.buildDirectory
+            .dir("tmp/kotlin-classes/debug")
+            .get()
+            .asFile,
+    ) {
         exclude(coverageExclusions)
     } +
-        fileTree(layout.buildDirectory.dir("intermediates/javac/debug/classes").get().asFile) {
+        fileTree(
+            layout.buildDirectory
+                .dir("intermediates/javac/debug/classes")
+                .get()
+                .asFile,
+        ) {
             exclude(coverageExclusions)
         }
 
 fun androidCoverageExecutionData() =
-    fileTree(layout.buildDirectory.get().asFile) {
+    fileTree(
+        layout.buildDirectory.get().asFile,
+    ) {
         include("jacoco/testDebugUnitTest.exec")
     }
 
