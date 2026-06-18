@@ -42,7 +42,7 @@ class DaylightFadeRunnerTest {
         mockkStatic(Log::class)
         mockkObject(DaylightHarvestingStateStore)
         every { Log.w(any(), any<String>()) } returns 0
-        every { DaylightHarvestingStateStore.saveCurrentRgb(any(), any()) } returns Unit
+        every { DaylightHarvestingStateStore.saveCurrentRgb(any(), any(), any()) } returns Unit
     }
 
     @AfterEach
@@ -59,6 +59,7 @@ class DaylightFadeRunnerTest {
 
             runner.fade(
                 context = context,
+                zoneKey = "cuisine",
                 zone = zone,
                 from = Triple(0, 0, 0),
                 to = Triple(220, 240, 255),
@@ -69,7 +70,7 @@ class DaylightFadeRunnerTest {
             coVerify(exactly = 4) {
                 bulbController.applyScene(context, zone.macAddress, any(), any(), any(), 0, 100)
             }
-            verify(exactly = 4) { DaylightHarvestingStateStore.saveCurrentRgb(context, any()) }
+            verify(exactly = 4) { DaylightHarvestingStateStore.saveCurrentRgb(context, "cuisine", any()) }
         }
 
     @Test
@@ -81,6 +82,7 @@ class DaylightFadeRunnerTest {
 
             runner.fade(
                 context = context,
+                zoneKey = "cuisine",
                 zone = zone,
                 from = Triple(0, 0, 0),
                 to = Triple(220, 240, 255),
@@ -92,7 +94,7 @@ class DaylightFadeRunnerTest {
                 bulbController.applyScene(context, zone.macAddress, 220, 240, 255, 0, 100)
             }
             verify(exactly = 1) {
-                DaylightHarvestingStateStore.saveCurrentRgb(context, Triple(220, 240, 255))
+                DaylightHarvestingStateStore.saveCurrentRgb(context, "cuisine", Triple(220, 240, 255))
             }
         }
 
@@ -109,6 +111,7 @@ class DaylightFadeRunnerTest {
 
             runner.fade(
                 context = context,
+                zoneKey = "cuisine",
                 zone = zone,
                 from = Triple(0, 0, 0),
                 to = Triple(255, 0, 0),
@@ -132,6 +135,7 @@ class DaylightFadeRunnerTest {
 
             runner.fade(
                 context = context,
+                zoneKey = "cuisine",
                 zone = zone,
                 from = Triple(0, 0, 0),
                 to = Triple(220, 240, 255),
@@ -139,7 +143,7 @@ class DaylightFadeRunnerTest {
                 steps = 2,
             )
 
-            verify(exactly = 0) { DaylightHarvestingStateStore.saveCurrentRgb(any(), any()) }
+            verify(exactly = 0) { DaylightHarvestingStateStore.saveCurrentRgb(any(), any(), any()) }
             verify(exactly = 2) {
                 crashReporter.reportNonFatal(
                     context = context,

@@ -87,9 +87,10 @@ internal object SunsetAutomationScheduler {
 
         SunsetTimesStore.save(context, bureauMs, chambreMs, cuisineMs)
 
-        // Nouveau cycle quotidien : la fenêtre du Daylight Harvesting se rouvrira à la fin de la
-        // prochaine rampe d'aube de la Cuisine.
-        DaylightHarvestingStateStore.deactivate(context)
+        // Nouveau cycle quotidien : la fenêtre du Daylight Harvesting de chaque zone se rouvrira
+        // à la fin de la prochaine rampe d'aube de la Chambre/Cuisine.
+        DaylightHarvestingStateStore.deactivate(context, ZONE_CHAMBRE)
+        DaylightHarvestingStateStore.deactivate(context, ZONE_CUISINE)
 
         cancelSceneAlarm(context, ZONE_BUREAU)
         cancelSceneAlarm(context, ZONE_CHAMBRE)

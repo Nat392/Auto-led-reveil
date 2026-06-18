@@ -22,6 +22,7 @@ internal class DaylightFadeRunner(
 ) {
     suspend fun fade(
         context: Context,
+        zoneKey: String,
         zone: SunriseBulbZone,
         from: Triple<Int, Int, Int>,
         to: Triple<Int, Int, Int>,
@@ -48,7 +49,7 @@ internal class DaylightFadeRunner(
                 )
 
             if (success) {
-                DaylightHarvestingStateStore.saveCurrentRgb(context, Triple(red, green, blue))
+                DaylightHarvestingStateStore.saveCurrentRgb(context, zoneKey, Triple(red, green, blue))
             } else {
                 Log.w(
                     TAG,

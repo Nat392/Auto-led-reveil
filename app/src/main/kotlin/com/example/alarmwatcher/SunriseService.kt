@@ -101,13 +101,20 @@ class SunriseService : Service() {
                         }.forEach { it.await() }
                     }
 
-                    // La fin de la rampe d'aube de la Cuisine "ouvre la fenêtre" du Daylight
-                    // Harvesting et initialise son vecteur RGB de référence sur le profil Jour
-                    // que la rampe vient d'atteindre.
+                    // La fin de la rampe d'aube de la Chambre/Cuisine "ouvre la fenêtre" du
+                    // Daylight Harvesting de cette zone et initialise son vecteur RGB de référence
+                    // sur le profil Jour que la rampe vient d'atteindre.
+                    val harvestZoneKeysByMac =
+                        mapOf(
+                            SunriseZoneConfig.chambre.macAddress to SunsetAutomationScheduler.ZONE_CHAMBRE,
+                            SunriseZoneConfig.cuisine.macAddress to SunsetAutomationScheduler.ZONE_CUISINE,
+                        )
                     zones.forEach { zone ->
-                        if (zone.macAddress == SunriseZoneConfig.cuisine.macAddress && zone.isConfigured) {
+                        val zoneKey = harvestZoneKeysByMac[zone.macAddress]
+                        if (zoneKey != null && zone.isConfigured) {
                             DaylightHarvestingStateStore.activate(
                                 applicationContext,
+                                zoneKey,
                                 Triple(zone.sunriseR, zone.sunriseG, zone.sunriseB),
                             )
                         }
