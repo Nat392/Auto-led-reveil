@@ -71,6 +71,21 @@ jobs:
               return workflowRuns.workflow_runs.some((run) => run.name === androidWorkflowName && run.conclusion === 'success');
             };
 
+            const mergePullRequest = async (pullRequest) => {
+              try {
+                await github.rest.pulls.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullRequest.number,
+                  merge_method: 'squash',
+                });
+
+                core.info(`Merged PR #${pullRequest.number}.`);
+              } catch (error) {
+                core.warning(`Unable to merge PR #${pullRequest.number}: ${error.message}`);
+              }
+            };
+
             const enableAutoMergeForPullRequest = async (pullRequest) => {
               if (pullRequest.auto_merge) {
                 core.info(`Auto-merge is already enabled for PR #${pullRequest.number}.`);
@@ -102,6 +117,12 @@ jobs:
 
                 core.info(`Enabled squash auto-merge for PR #${pullRequest.number}.`);
               } catch (error) {
+                if (error.message.includes('clean status')) {
+                  core.info(`PR #${pullRequest.number} is already mergeable, merging directly.`);
+                  await mergePullRequest(pullRequest);
+                  return;
+                }
+
                 core.warning(`Unable to enable auto-merge for PR #${pullRequest.number}: ${error.message}`);
               }
             };
@@ -156,6 +177,21 @@ jobs:
 
             const isMergeablePullRequest = (pullRequest) => pullRequest.mergeable === true;
 
+            const mergePullRequest = async (pullRequest) => {
+              try {
+                await github.rest.pulls.merge({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullRequest.number,
+                  merge_method: 'squash',
+                });
+
+                core.info(`Merged PR #${pullRequest.number}.`);
+              } catch (error) {
+                core.warning(`Unable to merge PR #${pullRequest.number}: ${error.message}`);
+              }
+            };
+
             const enableAutoMergeForPullRequest = async (pullRequest) => {
               if (pullRequest.auto_merge) {
                 core.info(`Auto-merge is already enabled for PR #${pullRequest.number}.`);
@@ -187,7 +223,37 @@ jobs:
 
                 core.info(`Enabled squash auto-merge for PR #${pullRequest.number}.`);
               } catch (error) {
+                if (error.message.includes('clean status')) {
+                  core.info(`PR #${pullRequest.number} is already mergeable, merging directly.`);
+                  await mergePullRequest(pullRequest);
+                  return;
+                }
+
                 core.warning(`Unable to enable auto-merge for PR #${pullRequest.number}: ${error.message}`);
+              }
+            };
+
+            const approvePendingRunsForHeadSha = async (headSha, pullNumber) => {
+              const { data } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: headSha,
+                status: 'action_required',
+                per_page: 100,
+              });
+
+              for (const run of data.workflow_runs) {
+                try {
+                  await github.rest.actions.approveWorkflowRun({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    run_id: run.id,
+                  });
+
+                  core.info(`Approved pending run #${run.id} (${run.name}) for PR #${pullNumber}.`);
+                } catch (error) {
+                  core.warning(`Unable to approve run #${run.id} for PR #${pullNumber}: ${error.message}`);
+                }
               }
             };
 
@@ -316,6 +382,8 @@ jobs:
                   continue;
                 }
 
+                await approvePendingRunsForHeadSha(pullRequest.head.sha, pullRequest.number);
+
                 if (pullRequest.mergeable_state === 'behind') {
                   core.info(`PR #${pullRequest.number} is behind ${pullRequest.base.ref}, updating the branch...`);
 
@@ -334,6 +402,9 @@ jobs:
 
                   pullRequest = updatedPullRequest;
                   core.info(`PR #${pullRequest.number} updated to ${pullRequest.head.sha}.`);
+
+                  await wait(5);
+                  await approvePendingRunsForHeadSha(pullRequest.head.sha, pullRequest.number);
                 }
 
                 let existingRun = await getAndroidCiRun(pullRequest.head.sha);
@@ -402,6 +473,30 @@ jobs:
               return workflowRuns.workflow_runs.find((run) => run.name === androidWorkflowName && run.event === 'workflow_dispatch');
             };
 
+            const approvePendingRunsForHeadSha = async (headSha, pullNumber) => {
+              const { data } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: headSha,
+                status: 'action_required',
+                per_page: 100,
+              });
+
+              for (const run of data.workflow_runs) {
+                try {
+                  await github.rest.actions.approveWorkflowRun({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    run_id: run.id,
+                  });
+
+                  core.info(`Approved pending run #${run.id} (${run.name}) for PR #${pullNumber}.`);
+                } catch (error) {
+                  core.warning(`Unable to approve run #${run.id} for PR #${pullNumber}: ${error.message}`);
+                }
+              }
+            };
+
             const { data: openPullRequests } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -422,6 +517,8 @@ jobs:
                 repo: context.repo.repo,
                 pull_number: candidate.number,
               });
+
+              await approvePendingRunsForHeadSha(pullRequest.head.sha, pullRequest.number);
 
               if (pullRequest.mergeable_state === 'behind') {
                 core.info(`PR #${pullRequest.number} is behind ${pullRequest.base.ref}, updating the branch...`);
