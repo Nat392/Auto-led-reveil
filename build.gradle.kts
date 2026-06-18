@@ -1,5 +1,5 @@
 plugins {
-    id("com.android.application") version "8.6.0" apply false
+    id("com.android.application") version "8.9.3" apply false
     // CodeQL ne supporte pas encore Kotlin >= 2.3.30 (KotlinVersionTooRecentError).
     // Garder cette version jusqu'a ce que CodeQL mette a jour son extracteur Java/Kotlin.
     kotlin("android") version "2.3.21" apply false
