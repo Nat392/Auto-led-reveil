@@ -119,6 +119,11 @@ class MainActivity : ComponentActivity() {
                 }
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Échec de l'application manuelle du mode soirée", e)
+                DiscordCrashReporter.reportNonFatal(
+                    context = applicationContext,
+                    throwable = e,
+                    source = "MainActivity.triggerNightMode",
+                )
             }
         }.start()
     }
@@ -158,6 +163,11 @@ class MainActivity : ComponentActivity() {
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("MainActivity", "Diagnostic failed", e)
+                    DiscordCrashReporter.reportNonFatal(
+                        context = applicationContext,
+                        throwable = e,
+                        source = "MainActivity.startStartupFlow.diagnostic",
+                    )
                 }
             }.start()
         }

@@ -41,24 +41,48 @@ object ZenggeBulbController : BulbControllerApi {
         val adapter =
             getBluetoothAdapter(context) ?: run {
                 Log.w(TAG, "Bluetooth adapter unavailable")
+                DiscordCrashReporter.reportNonFatal(
+                    context = context,
+                    throwable = IllegalStateException("Bluetooth adapter unavailable (macAddress=$macAddress)"),
+                    source = "ZenggeBulbController.openSession",
+                )
                 return null
             }
 
         val normalizedMac = macAddress.trim()
         if (normalizedMac.isBlank()) {
             Log.w(TAG, "No bulb MAC configured")
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = IllegalStateException("No bulb MAC configured"),
+                source = "ZenggeBulbController.openSession",
+            )
             return null
         }
 
         val device =
             runCatching { adapter.getRemoteDevice(normalizedMac) }.getOrNull() ?: run {
                 Log.w(TAG, "Invalid bulb MAC: $normalizedMac")
+                DiscordCrashReporter.reportNonFatal(
+                    context = context,
+                    throwable = IllegalStateException("Invalid bulb MAC: $normalizedMac"),
+                    source = "ZenggeBulbController.openSession",
+                )
                 return null
             }
 
         val callback = SessionCallback()
         val gatt = connect(device, context, callback) ?: return null
         if (!discoverServices(gatt, callback)) {
+            Log.w(TAG, "Service discovery failed for $normalizedMac, status=${callback.servicesStatus}")
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable =
+                    IllegalStateException(
+                        "GATT service discovery failed (macAddress=$normalizedMac, status=${callback.servicesStatus})",
+                    ),
+                source = "ZenggeBulbController.openSession.discoverServices",
+            )
             runCatching { gatt.disconnect() }
             runCatching { gatt.close() }
             return null
@@ -88,6 +112,13 @@ object ZenggeBulbController : BulbControllerApi {
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to apply scene", e)
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = e,
+                source =
+                    "ZenggeBulbController.applyScene(macAddress=$macAddress, red=$red, green=$green, " +
+                        "blue=$blue, white=$white, brightnessPercent=$brightnessPercent)",
+            )
             false
         } finally {
             session.close()
@@ -220,6 +251,12 @@ object ZenggeBulbController : BulbControllerApi {
                     android.content.pm.PackageManager.PERMISSION_GRANTED
                 ) {
                     Log.w(TAG, "Missing BLUETOOTH_CONNECT permission")
+                    DiscordCrashReporter.reportNonFatal(
+                        context = context,
+                        throwable =
+                            SecurityException("BLUETOOTH_CONNECT permission missing (macAddress=${device.address})"),
+                        source = "ZenggeBulbController.connect",
+                    )
                     return null
                 }
             } catch (_: Exception) {
@@ -239,6 +276,11 @@ object ZenggeBulbController : BulbControllerApi {
 
         if (gatt == null) {
             Log.w(TAG, "connectGatt returned null")
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = IllegalStateException("connectGatt returned null (macAddress=${device.address})"),
+                source = "ZenggeBulbController.connect",
+            )
             return null
         }
 
@@ -246,6 +288,14 @@ object ZenggeBulbController : BulbControllerApi {
         try {
             if (withTimeoutOrNull(CONNECT_TIMEOUT_MS) { callback.awaitConnection() } == null) {
                 Log.w(TAG, "Timed out connecting to bulb")
+                DiscordCrashReporter.reportNonFatal(
+                    context = context,
+                    throwable =
+                        IllegalStateException(
+                            "Timed out connecting to bulb (macAddress=${device.address}, timeoutMs=$CONNECT_TIMEOUT_MS)",
+                        ),
+                    source = "ZenggeBulbController.connect",
+                )
                 return null
             }
 
@@ -254,6 +304,15 @@ object ZenggeBulbController : BulbControllerApi {
                     TAG,
                     "Bulb connection failed status=${callback.connectionStatus} " +
                         "state=${callback.connectionState}",
+                )
+                DiscordCrashReporter.reportNonFatal(
+                    context = context,
+                    throwable =
+                        IllegalStateException(
+                            "Bulb connection failed (macAddress=${device.address}, " +
+                                "status=${callback.connectionStatus}, state=${callback.connectionState})",
+                        ),
+                    source = "ZenggeBulbController.connect",
                 )
                 return null
             }

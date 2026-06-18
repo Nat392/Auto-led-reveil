@@ -77,6 +77,11 @@ object AlarmScheduler : AlarmSchedulerApi {
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule exact alarm for Night Fade ($zoneKey): ${e.message}")
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = e,
+                source = "AlarmScheduler.scheduleNightFade(zoneKey=$zoneKey, triggerAtMs=$triggerAtMs)",
+            )
         }
     }
 
@@ -150,6 +155,11 @@ object AlarmScheduler : AlarmSchedulerApi {
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMs, pi)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule exact alarm: ${e.message}")
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = e,
+                source = "AlarmScheduler.schedulePreWarn(whenMs=$whenMs, originalAlarmMs=$originalAlarmMs)",
+            )
         }
     }
 

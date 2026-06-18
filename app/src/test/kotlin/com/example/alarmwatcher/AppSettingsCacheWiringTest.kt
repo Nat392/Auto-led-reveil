@@ -1,5 +1,6 @@
 package com.example.alarmwatcher
 
+import android.content.Context
 import android.util.Log
 import com.example.alarmwatcher.settings.AppSettings
 import com.example.alarmwatcher.settings.AppSettingsCache
@@ -141,7 +142,7 @@ class AppSettingsCacheWiringTest {
                     }
                 }
 
-                OpenMeteoClient.fetchCurrentConditions()
+                OpenMeteoClient.fetchCurrentConditions(mockk<Context>())
 
                 assertEquals(1, requestedUrls.size)
                 assertEquals(true, requestedUrls.single().contains("latitude=12.34"))

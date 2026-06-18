@@ -20,6 +20,13 @@ class DaylightHarvestingWorker(
     override suspend fun doWork(): Result {
         val zone = SunriseZoneConfig.cuisine
         if (!zone.isConfigured) {
+            AppErrorLogStore.record(
+                context = applicationContext,
+                level = AppErrorLogStore.Level.WARNING,
+                title = "Zone non configurée",
+                source = "DaylightHarvestingWorker.doWork",
+                message = "zoneKey=${SunsetAutomationScheduler.ZONE_CUISINE}",
+            )
             return Result.success()
         }
 
@@ -36,10 +43,19 @@ class DaylightHarvestingWorker(
         }
 
         if (!BlePermissionSupport.hasBluetoothConnectPermission(applicationContext)) {
+            DiscordCrashReporter.reportNonFatal(
+                context = applicationContext,
+                throwable =
+                    SecurityException(
+                        "BLUETOOTH_CONNECT permission missing, daylight harvesting skipped " +
+                            "(zoneKey=${SunsetAutomationScheduler.ZONE_CUISINE}, macAddress=${zone.macAddress})",
+                    ),
+                source = "DaylightHarvestingWorker.doWork",
+            )
             return Result.success()
         }
 
-        val conditions = OpenMeteoClient.fetchCurrentConditions() ?: return Result.retry()
+        val conditions = OpenMeteoClient.fetchCurrentConditions(applicationContext) ?: return Result.retry()
 
         val targetRgb =
             DaylightHarvestingEstimator.calculateTargetRgb(

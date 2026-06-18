@@ -1,5 +1,6 @@
 package com.example.alarmwatcher
 
+import android.content.Context
 import android.util.Log
 import com.example.alarmwatcher.settings.AppSettings
 import com.example.alarmwatcher.settings.AppSettingsCache
@@ -28,10 +29,11 @@ internal object OpenMeteoClient {
         URL(urlString).openConnection() as HttpURLConnection
     }
 
-    suspend fun fetchCurrentConditions(): CurrentConditions? {
+    suspend fun fetchCurrentConditions(context: Context): CurrentConditions? {
+        val settings = AppSettingsCache.current
         return try {
             val connection =
-                openMeteoConnectionFactory(openMeteoUrl(AppSettingsCache.current)).apply {
+                openMeteoConnectionFactory(openMeteoUrl(settings)).apply {
                     connectTimeout = 10_000
                     readTimeout = 10_000
                     requestMethod = "GET"
@@ -43,6 +45,14 @@ internal object OpenMeteoClient {
                 val responseCode = connection.responseCode
                 if (responseCode !in 200..299) {
                     Log.w(TAG, "Open-Meteo API returned HTTP $responseCode")
+                    DiscordCrashReporter.reportNonFatal(
+                        context = context,
+                        throwable =
+                            IllegalStateException(
+                                "Open-Meteo HTTP $responseCode (lat=${settings.latitude}, lng=${settings.longitude})",
+                            ),
+                        source = "OpenMeteoClient.fetchCurrentConditions",
+                    )
                     return null
                 }
 
@@ -60,6 +70,11 @@ internal object OpenMeteoClient {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to fetch current conditions from Open-Meteo", e)
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = e,
+                source = "OpenMeteoClient.fetchCurrentConditions",
+            )
             null
         }
     }

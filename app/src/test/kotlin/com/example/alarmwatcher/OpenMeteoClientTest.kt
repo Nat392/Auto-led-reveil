@@ -1,8 +1,10 @@
 package com.example.alarmwatcher
 
+import android.content.Context
 import android.util.Log
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkObject
 import io.mockk.mockkStatic
 import io.mockk.unmockkAll
 import io.mockk.verify
@@ -18,12 +20,15 @@ import java.net.SocketTimeoutException
 
 class OpenMeteoClientTest {
     private val defaultConnectionFactory = OpenMeteoClient.openMeteoConnectionFactory
+    private val context = mockk<Context>()
 
     @BeforeEach
     fun setUp() {
         mockkStatic(Log::class)
+        mockkObject(DiscordCrashReporter)
         every { Log.w(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>(), any<Throwable>()) } returns 0
+        every { DiscordCrashReporter.reportNonFatal(any(), any(), any()) } returns mockk(relaxed = true)
     }
 
     @AfterEach
@@ -49,7 +54,7 @@ class OpenMeteoClientTest {
             every { connection.inputStream } returns ByteArrayInputStream(body.toByteArray(Charsets.UTF_8))
             every { connection.disconnect() } returns Unit
 
-            val conditions = OpenMeteoClient.fetchCurrentConditions()
+            val conditions = OpenMeteoClient.fetchCurrentConditions(context)
 
             assertEquals(123.4, conditions?.shortwaveRadiation ?: Double.NaN, 0.0001)
             verify(exactly = 1) { connection.disconnect() }
@@ -63,7 +68,7 @@ class OpenMeteoClientTest {
             every { connection.responseCode } returns 503
             every { connection.disconnect() } returns Unit
 
-            val conditions = OpenMeteoClient.fetchCurrentConditions()
+            val conditions = OpenMeteoClient.fetchCurrentConditions(context)
 
             assertNull(conditions)
             verify(exactly = 1) { connection.disconnect() }
@@ -81,7 +86,7 @@ class OpenMeteoClientTest {
                 )
             every { connection.disconnect() } returns Unit
 
-            val conditions = OpenMeteoClient.fetchCurrentConditions()
+            val conditions = OpenMeteoClient.fetchCurrentConditions(context)
 
             assertNull(conditions)
             verify(exactly = 1) { connection.disconnect() }
@@ -92,7 +97,7 @@ class OpenMeteoClientTest {
         runTest {
             OpenMeteoClient.openMeteoConnectionFactory = { throw SocketTimeoutException("timeout") }
 
-            val conditions = OpenMeteoClient.fetchCurrentConditions()
+            val conditions = OpenMeteoClient.fetchCurrentConditions(context)
 
             assertNull(conditions)
         }

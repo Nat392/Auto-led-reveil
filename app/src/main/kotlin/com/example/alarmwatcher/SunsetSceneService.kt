@@ -43,6 +43,11 @@ class SunsetSceneService : Service() {
 
         if (zoneKey == null || zone == null || !zone.isConfigured) {
             Log.w(TAG, "Missing configured zone for sunset scene: $zoneKey")
+            DiscordCrashReporter.reportNonFatal(
+                context = applicationContext,
+                throwable = IllegalStateException("Missing configured zone for sunset scene (zoneKey=$zoneKey)"),
+                source = "SunsetSceneService.onStartCommand.zoneMissing",
+            )
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf(startId)
             return START_NOT_STICKY
@@ -50,6 +55,15 @@ class SunsetSceneService : Service() {
 
         if (!BlePermissionSupport.hasBluetoothConnectPermission(applicationContext)) {
             Log.w(TAG, "Stopping sunset scene: BLUETOOTH_CONNECT permission is not granted")
+            DiscordCrashReporter.reportNonFatal(
+                context = applicationContext,
+                throwable =
+                    SecurityException(
+                        "BLUETOOTH_CONNECT permission missing, sunset scene not applied " +
+                            "(zoneKey=$zoneKey, macAddress=${zone.macAddress})",
+                    ),
+                source = "SunsetSceneService.onStartCommand.permission",
+            )
             stopSelf(startId)
             return START_NOT_STICKY
         }

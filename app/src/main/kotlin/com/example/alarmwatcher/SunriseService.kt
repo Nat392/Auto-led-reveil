@@ -218,9 +218,6 @@ class SunriseService : Service() {
         @Volatile
         internal var isRunning: Boolean = false
 
-        @Volatile
-        internal var isRunning: Boolean = false
-
         const val ACTION_START_SUNRISE = "com.example.alarmwatcher.ACTION_START_SUNRISE"
         const val EXTRA_BULB_MACS = "extra_bulb_macs"
         const val EXTRA_TARGET_RS = "extra_target_rs"

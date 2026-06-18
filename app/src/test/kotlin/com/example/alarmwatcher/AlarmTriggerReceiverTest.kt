@@ -30,11 +30,13 @@ class AlarmTriggerReceiverTest {
         mockkObject(BlePermissionSupport)
         mockkObject(SunriseZoneConfig)
         mockkObject(NotificationHelper)
+        mockkObject(DiscordCrashReporter)
 
         every { Log.w(any(), any<String>()) } returns 0
         every { Log.i(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>(), any<Throwable>()) } returns 0
+        every { DiscordCrashReporter.reportNonFatal(any(), any(), any()) } returns mockk(relaxed = true)
         every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
         every { NotificationHelper.showFallbackNotification(any()) } returns Unit
         every { context.startForegroundService(any()) } returns mockk<ComponentName>(relaxed = true)

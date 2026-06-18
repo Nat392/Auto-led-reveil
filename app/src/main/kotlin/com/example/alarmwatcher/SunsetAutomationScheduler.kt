@@ -74,7 +74,7 @@ internal object SunsetAutomationScheduler {
         val settings = AppSettingsCache.current
         val now = System.currentTimeMillis()
         val sunsetInstant =
-            fetchSunsetInstant(settings) ?: run {
+            fetchSunsetInstant(context, settings) ?: run {
                 scheduleRefreshRetry(context, now + REFRESH_RETRY_MS)
                 return
             }
@@ -106,9 +106,12 @@ internal object SunsetAutomationScheduler {
         Log.i(TAG, "Scheduled sunset scenes: bureau=$bureauMs chambre=$chambreMs cuisine=$cuisineMs sunset=$sunsetMs")
     }
 
-    internal suspend fun fetchSunsetInstant(settings: AppSettings = AppSettingsCache.current): Instant? {
+    internal suspend fun fetchSunsetInstant(
+        context: Context,
+        settings: AppSettings = AppSettingsCache.current,
+    ): Instant? {
+        val todayDate = LocalDate.now(ZoneId.systemDefault()).toString()
         return try {
-            val todayDate = LocalDate.now(ZoneId.systemDefault()).toString()
             val url =
                 "https://api.sunrise-sunset.org/json?lat=${settings.latitude}&lng=${settings.longitude}" +
                     "&formatted=0&date=$todayDate"
@@ -125,6 +128,11 @@ internal object SunsetAutomationScheduler {
                 val responseCode = connection.responseCode
                 if (responseCode !in 200..299) {
                     Log.w(TAG, "Sunset API returned HTTP $responseCode")
+                    DiscordCrashReporter.reportNonFatal(
+                        context = context,
+                        throwable = IllegalStateException("Sunset API HTTP $responseCode (date=$todayDate)"),
+                        source = "SunsetAutomationScheduler.fetchSunsetInstant",
+                    )
                     return null
                 }
 
@@ -142,6 +150,11 @@ internal object SunsetAutomationScheduler {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to fetch sunset time", e)
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = e,
+                source = "SunsetAutomationScheduler.fetchSunsetInstant",
+            )
             null
         }
     }
@@ -214,6 +227,14 @@ internal object SunsetAutomationScheduler {
 
         if (!BlePermissionSupport.hasBluetoothConnectPermission(context)) {
             Log.w(TAG, "Cannot run sunset catch-up for $zoneKey: BLUETOOTH_CONNECT permission missing")
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable =
+                    SecurityException(
+                        "BLUETOOTH_CONNECT permission missing, sunset catch-up skipped (zoneKey=$zoneKey)",
+                    ),
+                source = "SunsetAutomationScheduler.triggerSceneCatchUp.permission",
+            )
             return
         }
 
