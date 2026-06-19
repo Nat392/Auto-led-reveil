@@ -7,7 +7,6 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    kotlin("android")
     jacoco
     id("org.jlleitschuh.gradle.ktlint")
     id("io.gitlab.arturbosch.detekt")
