@@ -59,10 +59,8 @@ class DaylightFadeRunnerTest {
 
             runner.fade(
                 context = context,
-                zoneKey = "cuisine",
-                zone = zone,
-                from = Triple(0, 0, 0),
-                to = Triple(220, 240, 255),
+                fadeZone = FadeZone(key = "cuisine", bulb = zone),
+                transition = ColorTransition(from = Triple(0, 0, 0), to = Triple(220, 240, 255)),
                 durationMs = 4_000L,
                 steps = 4,
             )
@@ -82,10 +80,8 @@ class DaylightFadeRunnerTest {
 
             runner.fade(
                 context = context,
-                zoneKey = "cuisine",
-                zone = zone,
-                from = Triple(0, 0, 0),
-                to = Triple(220, 240, 255),
+                fadeZone = FadeZone(key = "cuisine", bulb = zone),
+                transition = ColorTransition(from = Triple(0, 0, 0), to = Triple(220, 240, 255)),
                 durationMs = 4_000L,
                 steps = 4,
             )
@@ -111,10 +107,8 @@ class DaylightFadeRunnerTest {
 
             runner.fade(
                 context = context,
-                zoneKey = "cuisine",
-                zone = zone,
-                from = Triple(0, 0, 0),
-                to = Triple(255, 0, 0),
+                fadeZone = FadeZone(key = "cuisine", bulb = zone),
+                transition = ColorTransition(from = Triple(0, 0, 0), to = Triple(255, 0, 0)),
                 durationMs = 2_000L,
                 steps = 2,
             )
@@ -135,10 +129,8 @@ class DaylightFadeRunnerTest {
 
             runner.fade(
                 context = context,
-                zoneKey = "cuisine",
-                zone = zone,
-                from = Triple(0, 0, 0),
-                to = Triple(220, 240, 255),
+                fadeZone = FadeZone(key = "cuisine", bulb = zone),
+                transition = ColorTransition(from = Triple(0, 0, 0), to = Triple(220, 240, 255)),
                 durationMs = 2_000L,
                 steps = 2,
             )

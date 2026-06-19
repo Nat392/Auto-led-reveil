@@ -291,8 +291,12 @@ class SunsetAutomationSchedulerTest {
 
             SunsetAutomationScheduler.refreshAndSchedule(context)
 
-            verify(exactly = 1) { DaylightHarvestingStateStore.deactivate(context, SunsetAutomationScheduler.ZONE_CHAMBRE) }
-            verify(exactly = 1) { DaylightHarvestingStateStore.deactivate(context, SunsetAutomationScheduler.ZONE_CUISINE) }
+            verify(exactly = 1) {
+                DaylightHarvestingStateStore.deactivate(context, SunsetAutomationScheduler.ZONE_CHAMBRE)
+            }
+            verify(exactly = 1) {
+                DaylightHarvestingStateStore.deactivate(context, SunsetAutomationScheduler.ZONE_CUISINE)
+            }
         }
 
     @Test

@@ -39,16 +39,13 @@ class DaylightHarvestingWorker(
     }
 
     private fun isDue(harvestZone: HarvestZone): Boolean {
-        val zone = SunsetSceneService.resolveZone(harvestZone.zoneKey) ?: return false
-        if (!zone.isConfigured) {
-            return false
-        }
-        if (!DaylightHarvestingStateStore.getState(applicationContext, harvestZone.zoneKey).active) {
-            return false
-        }
+        val zone = SunsetSceneService.resolveZone(harvestZone.zoneKey)
         val eveningStartMs =
             SunsetTimesStore.getEveningStartMs(applicationContext, harvestZone.zoneKey) ?: Long.MAX_VALUE
-        return System.currentTimeMillis() < eveningStartMs
+        return zone != null &&
+            zone.isConfigured &&
+            DaylightHarvestingStateStore.getState(applicationContext, harvestZone.zoneKey).active &&
+            System.currentTimeMillis() < eveningStartMs
     }
 
     private suspend fun applyHarvesting(
@@ -71,10 +68,8 @@ class DaylightHarvestingWorker(
 
         DaylightFadeRunner(ZenggeBulbController, DiscordCrashReporter).fade(
             context = applicationContext,
-            zoneKey = harvestZone.zoneKey,
-            zone = zone,
-            from = state.currentRgb,
-            to = targetRgb,
+            fadeZone = FadeZone(key = harvestZone.zoneKey, bulb = zone),
+            transition = ColorTransition(from = state.currentRgb, to = targetRgb),
         )
     }
 

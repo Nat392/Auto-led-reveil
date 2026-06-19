@@ -133,7 +133,10 @@ class SunsetSceneService : Service() {
             // nuit, quel que soit le résultat (succès, zone non configurée, permission
             // manquante, échec BLE).
             fun deactivateHarvestingIfApplicable() {
-                if (zoneKey == SunsetAutomationScheduler.ZONE_CHAMBRE || zoneKey == SunsetAutomationScheduler.ZONE_CUISINE) {
+                val isHarvestingZone =
+                    zoneKey == SunsetAutomationScheduler.ZONE_CHAMBRE ||
+                        zoneKey == SunsetAutomationScheduler.ZONE_CUISINE
+                if (isHarvestingZone) {
                     DaylightHarvestingStateStore.deactivate(context, zoneKey)
                 }
             }
