@@ -20,14 +20,7 @@ class DaylightHarvestingWorker(
     override suspend fun doWork(): Result {
         val zone = SunriseZoneConfig.cuisine
         if (!zone.isConfigured) {
-            AppErrorLogStore.record(
-                context = applicationContext,
-                level = AppErrorLogStore.Level.WARNING,
-                title = "Zone non configurée",
-                source = "DaylightHarvestingWorker.doWork",
-                message = "zoneKey=${SunsetAutomationScheduler.ZONE_CUISINE}",
-            )
-            return Result.success()
+            return reportZoneNotConfigured()
         }
 
         val state = DaylightHarvestingStateStore.getState(applicationContext)
@@ -43,13 +36,14 @@ class DaylightHarvestingWorker(
         }
 
         if (!BlePermissionSupport.hasBluetoothConnectPermission(applicationContext)) {
+            val permissionError =
+                SecurityException(
+                    "BLUETOOTH_CONNECT permission missing, daylight harvesting skipped " +
+                        "(zoneKey=${SunsetAutomationScheduler.ZONE_CUISINE}, macAddress=${zone.macAddress})",
+                )
             DiscordCrashReporter.reportNonFatal(
                 context = applicationContext,
-                throwable =
-                    SecurityException(
-                        "BLUETOOTH_CONNECT permission missing, daylight harvesting skipped " +
-                            "(zoneKey=${SunsetAutomationScheduler.ZONE_CUISINE}, macAddress=${zone.macAddress})",
-                    ),
+                throwable = permissionError,
                 source = "DaylightHarvestingWorker.doWork",
             )
             return Result.success()
@@ -79,6 +73,21 @@ class DaylightHarvestingWorker(
             steps = steps,
         )
 
+        return Result.success()
+    }
+
+    private fun reportZoneNotConfigured(): Result {
+        val details =
+            AppErrorLogStore.ErrorDetails(
+                title = "Zone non configurée",
+                source = "DaylightHarvestingWorker.doWork",
+                message = "zoneKey=${SunsetAutomationScheduler.ZONE_CUISINE}",
+            )
+        AppErrorLogStore.record(
+            context = applicationContext,
+            level = AppErrorLogStore.Level.WARNING,
+            details = details,
+        )
         return Result.success()
     }
 

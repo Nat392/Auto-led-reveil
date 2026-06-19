@@ -55,13 +55,14 @@ class SunsetSceneService : Service() {
 
         if (!BlePermissionSupport.hasBluetoothConnectPermission(applicationContext)) {
             Log.w(TAG, "Stopping sunset scene: BLUETOOTH_CONNECT permission is not granted")
+            val permissionError =
+                SecurityException(
+                    "BLUETOOTH_CONNECT permission missing, sunset scene not applied " +
+                        "(zoneKey=$zoneKey, macAddress=${zone.macAddress})",
+                )
             DiscordCrashReporter.reportNonFatal(
                 context = applicationContext,
-                throwable =
-                    SecurityException(
-                        "BLUETOOTH_CONNECT permission missing, sunset scene not applied " +
-                            "(zoneKey=$zoneKey, macAddress=${zone.macAddress})",
-                    ),
+                throwable = permissionError,
                 source = "SunsetSceneService.onStartCommand.permission",
             )
             stopSelf(startId)

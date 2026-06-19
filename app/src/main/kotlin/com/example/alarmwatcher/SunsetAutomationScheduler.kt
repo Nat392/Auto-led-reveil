@@ -227,12 +227,11 @@ internal object SunsetAutomationScheduler {
 
         if (!BlePermissionSupport.hasBluetoothConnectPermission(context)) {
             Log.w(TAG, "Cannot run sunset catch-up for $zoneKey: BLUETOOTH_CONNECT permission missing")
+            val permissionError =
+                SecurityException("BLUETOOTH_CONNECT permission missing, sunset catch-up skipped (zoneKey=$zoneKey)")
             DiscordCrashReporter.reportNonFatal(
                 context = context,
-                throwable =
-                    SecurityException(
-                        "BLUETOOTH_CONNECT permission missing, sunset catch-up skipped (zoneKey=$zoneKey)",
-                    ),
+                throwable = permissionError,
                 source = "SunsetAutomationScheduler.triggerSceneCatchUp.permission",
             )
             return

@@ -35,13 +35,17 @@ object AppErrorLogStore {
         val sentToDiscord: Boolean = false,
     )
 
+    data class ErrorDetails(
+        val title: String,
+        val source: String,
+        val message: String,
+        val stacktrace: String? = null,
+    )
+
     fun record(
         context: Context,
         level: Level,
-        title: String,
-        source: String,
-        message: String,
-        stacktrace: String? = null,
+        details: ErrorDetails,
     ): Entry {
         val appContext = context.applicationContext
         val entry =
@@ -49,10 +53,10 @@ object AppErrorLogStore {
                 id = UUID.randomUUID().toString(),
                 timestampMs = System.currentTimeMillis(),
                 level = level,
-                title = title,
-                source = source,
-                message = message,
-                stacktrace = truncateStacktrace(stacktrace),
+                title = details.title,
+                source = details.source,
+                message = details.message,
+                stacktrace = truncateStacktrace(details.stacktrace),
             )
         synchronized(lock) {
             val updated = (listOf(entry) + load(appContext)).take(MAX_ENTRIES)

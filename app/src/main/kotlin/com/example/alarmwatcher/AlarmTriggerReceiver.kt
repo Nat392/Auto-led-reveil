@@ -106,12 +106,13 @@ class AlarmTriggerReceiver : BroadcastReceiver() {
             }
         } catch (e: Exception) {
             Log.w(TAG, "Direct BLE control failed: ${e.message}")
+            val errorSource =
+                "AlarmTriggerReceiver.handleSunrise(zoneCount=${sunriseZones.size}, " +
+                    "macAddresses=${sunriseZones.joinToString(",") { it.macAddress }})"
             DiscordCrashReporter.reportNonFatal(
                 context = context,
                 throwable = e,
-                source =
-                    "AlarmTriggerReceiver.handleSunrise(zoneCount=${sunriseZones.size}, " +
-                        "macAddresses=${sunriseZones.joinToString(",") { it.macAddress }})",
+                source = errorSource,
             )
         }
 

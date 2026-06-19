@@ -36,6 +36,7 @@ object DiscordCrashReporter : CrashReporterApi {
     private const val CATALOG_EXPORT_FILENAME = "error_catalog.txt"
     private const val HTTP_TIMEOUT_MS = 10_000
     private const val FATAL_WAIT_TIMEOUT_MS = 4_500L
+    private const val CATALOG_SELECTION_EMBED_COLOR = 0x9B59B6
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -44,13 +45,17 @@ object DiscordCrashReporter : CrashReporterApi {
         throwable: Throwable,
         source: String?,
     ): Job {
+        val nonFatalDetails =
+            AppErrorLogStore.ErrorDetails(
+                title = throwable::class.simpleName ?: "Erreur",
+                source = source ?: "inconnu",
+                message = throwable.message.orEmpty(),
+                stacktrace = throwable.stackTraceToString(),
+            )
         AppErrorLogStore.record(
             context = context,
             level = AppErrorLogStore.Level.ERROR,
-            title = throwable::class.simpleName ?: "Erreur",
-            source = source ?: "inconnu",
-            message = throwable.message.orEmpty(),
-            stacktrace = throwable.stackTraceToString(),
+            details = nonFatalDetails,
         )
         return scope.launch {
             sendReport(
@@ -67,13 +72,17 @@ object DiscordCrashReporter : CrashReporterApi {
         throwable: Throwable,
         threadName: String?,
     ) {
+        val fatalDetails =
+            AppErrorLogStore.ErrorDetails(
+                title = throwable::class.simpleName ?: "Erreur fatale",
+                source = threadName ?: Thread.currentThread().name,
+                message = throwable.message.orEmpty(),
+                stacktrace = throwable.stackTraceToString(),
+            )
         AppErrorLogStore.record(
             context = context,
             level = AppErrorLogStore.Level.ERROR,
-            title = throwable::class.simpleName ?: "Erreur fatale",
-            source = threadName ?: Thread.currentThread().name,
-            message = throwable.message.orEmpty(),
-            stacktrace = throwable.stackTraceToString(),
+            details = fatalDetails,
         )
         runBlocking(Dispatchers.IO) {
             withTimeout(FATAL_WAIT_TIMEOUT_MS) {
@@ -473,7 +482,7 @@ object DiscordCrashReporter : CrashReporterApi {
         val embed =
             JSONObject()
                 .put("title", "Catalogue d'erreurs sélectionné")
-                .put("color", 0x9B59B6)
+                .put("color", CATALOG_SELECTION_EMBED_COLOR)
                 .put("timestamp", timestamp)
                 .put("fields", embedFields)
 

@@ -45,12 +45,13 @@ internal object OpenMeteoClient {
                 val responseCode = connection.responseCode
                 if (responseCode !in 200..299) {
                     Log.w(TAG, "Open-Meteo API returned HTTP $responseCode")
+                    val httpError =
+                        IllegalStateException(
+                            "Open-Meteo HTTP $responseCode (lat=${settings.latitude}, lng=${settings.longitude})",
+                        )
                     DiscordCrashReporter.reportNonFatal(
                         context = context,
-                        throwable =
-                            IllegalStateException(
-                                "Open-Meteo HTTP $responseCode (lat=${settings.latitude}, lng=${settings.longitude})",
-                            ),
+                        throwable = httpError,
                         source = "OpenMeteoClient.fetchCurrentConditions",
                     )
                     return null
