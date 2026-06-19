@@ -16,7 +16,9 @@ import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
-class AlarmTestContextWrapper(base: Context) : ContextWrapper(base) {
+class AlarmTestContextWrapper(
+    base: Context,
+) : ContextWrapper(base) {
     val startedServices = mutableListOf<Intent>()
 
     override fun startForegroundService(service: Intent?): ComponentName? {
