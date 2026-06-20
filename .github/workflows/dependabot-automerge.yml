@@ -34,7 +34,7 @@ jobs:
     if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
 
     steps:
-      - name: Enable auto-merge for Dependabot PRs with green CI
+      - name: Force merge for Dependabot PRs with green CI
         uses: actions/github-script@v9
         with:
           script: |
@@ -79,58 +79,26 @@ jobs:
             };
 
             const mergePullRequest = async (pullRequest) => {
-              try {
-                await github.rest.pulls.merge({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: pullRequest.number,
-                  merge_method: 'squash',
-                });
-
-                core.info(`Merged PR #${pullRequest.number}.`);
-              } catch (error) {
-                core.warning(`Unable to merge PR #${pullRequest.number}: ${error.message}`);
-              }
-            };
-
-            const enableAutoMergeForPullRequest = async (pullRequest) => {
-              if (pullRequest.auto_merge) {
-                core.info(`Auto-merge is already enabled for PR #${pullRequest.number}.`);
-                return;
-              }
-
-              try {
-                await github.graphql(
-                  `
-                    mutation EnablePullRequestAutoMerge($pullRequestId: ID!) {
-                      enablePullRequestAutoMerge(input: {
-                        pullRequestId: $pullRequestId
-                        mergeMethod: SQUASH
-                      }) {
-                        pullRequest {
-                          number
-                          autoMergeRequest {
-                            enabledAt
-                            mergeMethod
-                          }
-                        }
-                      }
-                    }
-                  `,
-                  {
-                    pullRequestId: pullRequest.node_id,
+              const maxAttempts = 3;
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                  core.info(`Merge attempt ${attempt}/${maxAttempts} for PR #${pullRequest.number}...`);
+                  await github.rest.pulls.merge({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pullRequest.number,
+                    merge_method: 'squash',
+                  });
+                  core.info(`✅ Successfully merged PR #${pullRequest.number}.`);
+                  return true;
+                } catch (error) {
+                  core.warning(`Attempt ${attempt} failed for PR #${pullRequest.number}: ${error.message}`);
+                  if (attempt === maxAttempts) {
+                    core.error(`❌ Unable to merge PR #${pullRequest.number} after ${maxAttempts} attempts.`);
+                    return false;
                   }
-                );
-
-                core.info(`Enabled squash auto-merge for PR #${pullRequest.number}.`);
-              } catch (error) {
-                if (error.message.includes('clean status')) {
-                  core.info(`PR #${pullRequest.number} is already mergeable, merging directly.`);
-                  await mergePullRequest(pullRequest);
-                  return;
+                  await wait(5); 
                 }
-
-                core.warning(`Unable to enable auto-merge for PR #${pullRequest.number}: ${error.message}`);
               }
             };
 
@@ -163,11 +131,12 @@ jobs:
                 continue;
               }
 
-              await enableAutoMergeForPullRequest(pullRequest);
+              core.info(`CI is green. Forcing merge for PR #${pullRequest.number} now...`);
+              await mergePullRequest(pullRequest);
             }
 
   retroactive:
-    name: Update, wait for CI, and enable auto-merge for Dependabot PRs
+    name: Update, wait for CI, and force merge for Dependabot PRs
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
     timeout-minutes: 90
@@ -185,58 +154,26 @@ jobs:
             const isMergeablePullRequest = (pullRequest) => pullRequest.mergeable === true;
 
             const mergePullRequest = async (pullRequest) => {
-              try {
-                await github.rest.pulls.merge({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: pullRequest.number,
-                  merge_method: 'squash',
-                });
-
-                core.info(`Merged PR #${pullRequest.number}.`);
-              } catch (error) {
-                core.warning(`Unable to merge PR #${pullRequest.number}: ${error.message}`);
-              }
-            };
-
-            const enableAutoMergeForPullRequest = async (pullRequest) => {
-              if (pullRequest.auto_merge) {
-                core.info(`Auto-merge is already enabled for PR #${pullRequest.number}.`);
-                return;
-              }
-
-              try {
-                await github.graphql(
-                  `
-                    mutation EnablePullRequestAutoMerge($pullRequestId: ID!) {
-                      enablePullRequestAutoMerge(input: {
-                        pullRequestId: $pullRequestId
-                        mergeMethod: SQUASH
-                      }) {
-                        pullRequest {
-                          number
-                          autoMergeRequest {
-                            enabledAt
-                            mergeMethod
-                          }
-                        }
-                      }
-                    }
-                  `,
-                  {
-                    pullRequestId: pullRequest.node_id,
+              const maxAttempts = 3;
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                  core.info(`Merge attempt ${attempt}/${maxAttempts} for PR #${pullRequest.number}...`);
+                  await github.rest.pulls.merge({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pullRequest.number,
+                    merge_method: 'squash',
+                  });
+                  core.info(`✅ Successfully merged PR #${pullRequest.number}.`);
+                  return true;
+                } catch (error) {
+                  core.warning(`Attempt ${attempt} failed for PR #${pullRequest.number}: ${error.message}`);
+                  if (attempt === maxAttempts) {
+                    core.error(`❌ Unable to merge PR #${pullRequest.number} after ${maxAttempts} attempts.`);
+                    return false;
                   }
-                );
-
-                core.info(`Enabled squash auto-merge for PR #${pullRequest.number}.`);
-              } catch (error) {
-                if (error.message.includes('clean status')) {
-                  core.info(`PR #${pullRequest.number} is already mergeable, merging directly.`);
-                  await mergePullRequest(pullRequest);
-                  return;
+                  await wait(5); 
                 }
-
-                core.warning(`Unable to enable auto-merge for PR #${pullRequest.number}: ${error.message}`);
               }
             };
 
@@ -421,7 +358,8 @@ jobs:
                   continue;
                 }
 
-                await enableAutoMergeForPullRequest(refreshedPullRequest);
+                core.info(`CI is green and PR #${refreshedPullRequest.number} is mergeable. Forcing merge now...`);
+                await mergePullRequest(refreshedPullRequest);
               } catch (error) {
                 core.warning(`Error while processing PR #${pullRequestNumber}: ${error.message}`);
               }
