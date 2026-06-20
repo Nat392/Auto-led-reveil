@@ -214,6 +214,52 @@ class SunsetSceneServiceTest {
         }
 
     @Test
+    fun `retries the controller and succeeds without reporting after a transient failure`() =
+        runTest {
+            val bureau = configuredZone()
+            every { SunriseZoneConfig.bureau } returns bureau
+            every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+            coEvery {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            } returnsMany listOf(false, true)
+
+            val applied = SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_BUREAU)
+
+            assertTrue(applied)
+            coVerify(exactly = 2) {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            }
+            verify(exactly = 0) {
+                DiscordCrashReporter.reportNonFatal(any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `reports a non fatal error only after exhausting retries`() =
+        runTest {
+            val bureau = configuredZone()
+            every { SunriseZoneConfig.bureau } returns bureau
+            every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+            coEvery {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            } returns false
+
+            val applied = SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_BUREAU)
+
+            assertFalse(applied)
+            coVerify(exactly = 3) {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            }
+            verify(exactly = 1) {
+                DiscordCrashReporter.reportNonFatal(
+                    context = applicationContext,
+                    throwable = any(),
+                    source = "SunsetSceneService.applySunsetScene",
+                )
+            }
+        }
+
+    @Test
     fun `returns false and reports a non fatal error when the controller fails`() =
         runTest {
             val bureau = configuredZone()
