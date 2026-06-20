@@ -22,11 +22,6 @@ permissions:
   contents: write
   actions: write
   pull-requests: write
-  workflows: write
-
-concurrency:
-  group: dependabot-automerge
-  cancel-in-progress: false
 
 concurrency:
   group: dependabot-automerge
