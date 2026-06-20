@@ -17,7 +17,7 @@ class DaylightHarvestingStateStoreTest {
 
     private fun setUpPrefs() {
         every { context.applicationContext } returns context
-        every { context.getSharedPreferences("daylight_harvesting", Context.MODE_PRIVATE) } returns prefs
+        every { context.getSharedPreferences("daylight_harvesting_cuisine", Context.MODE_PRIVATE) } returns prefs
         every { prefs.edit() } returns editor
         every { editor.putBoolean(any(), any()) } returns editor
         every { editor.putInt(any(), any()) } returns editor
@@ -32,7 +32,7 @@ class DaylightHarvestingStateStoreTest {
         every { prefs.getInt("current_g", 240) } returns 240
         every { prefs.getInt("current_b", 255) } returns 255
 
-        val state = DaylightHarvestingStateStore.getState(context)
+        val state = DaylightHarvestingStateStore.getState(context, "cuisine")
 
         assertFalse(state.active)
         assertEquals(Triple(220, 240, 255), state.currentRgb)
@@ -46,7 +46,7 @@ class DaylightHarvestingStateStoreTest {
         every { prefs.getInt("current_g", 240) } returns 20
         every { prefs.getInt("current_b", 255) } returns 30
 
-        val state = DaylightHarvestingStateStore.getState(context)
+        val state = DaylightHarvestingStateStore.getState(context, "cuisine")
 
         assertTrue(state.active)
         assertEquals(Triple(10, 20, 30), state.currentRgb)
@@ -56,7 +56,7 @@ class DaylightHarvestingStateStoreTest {
     fun `activate persists the active flag and the initial rgb vector`() {
         setUpPrefs()
 
-        DaylightHarvestingStateStore.activate(context, Triple(220, 240, 255))
+        DaylightHarvestingStateStore.activate(context, "cuisine", Triple(220, 240, 255))
 
         verify(exactly = 1) { editor.putBoolean("active", true) }
         verify(exactly = 1) { editor.putInt("current_r", 220) }
@@ -69,7 +69,7 @@ class DaylightHarvestingStateStoreTest {
     fun `deactivate clears the active flag without touching the rgb vector`() {
         setUpPrefs()
 
-        DaylightHarvestingStateStore.deactivate(context)
+        DaylightHarvestingStateStore.deactivate(context, "cuisine")
 
         verify(exactly = 1) { editor.putBoolean("active", false) }
         verify(exactly = 0) { editor.putInt(any(), any()) }
@@ -80,7 +80,7 @@ class DaylightHarvestingStateStoreTest {
     fun `saveCurrentRgb updates the rgb vector without touching the active flag`() {
         setUpPrefs()
 
-        DaylightHarvestingStateStore.saveCurrentRgb(context, Triple(1, 2, 3))
+        DaylightHarvestingStateStore.saveCurrentRgb(context, "cuisine", Triple(1, 2, 3))
 
         verify(exactly = 1) { editor.putInt("current_r", 1) }
         verify(exactly = 1) { editor.putInt("current_g", 2) }

@@ -1,6 +1,5 @@
 package com.example.alarmwatcher
 
-import com.example.alarmwatcher.settings.AppSettingsCache
 import kotlin.math.ln
 import kotlin.math.roundToInt
 
@@ -8,6 +7,11 @@ import kotlin.math.roundToInt
  * Calcule la couleur cible du Daylight Harvesting en fonction de la radiation solaire actuelle
  * (`shortwave_radiation`, en W/m²), selon la loi psychophysique de Weber-Fechner : la réponse
  * perceptuelle à l'intensité d'un stimulus lumineux est logarithmique, pas linéaire.
+ *
+ * Le seuil de saturation (radiation à partir de laquelle l'éclairage artificiel est totalement
+ * éteint) dépend de la zone : une grande baie vitrée laisse entrer beaucoup de lumière pour une
+ * même radiation extérieure et sature donc à un seuil plus bas qu'une petite fenêtre. Voir
+ * [DaylightHarvestingWorker] pour les valeurs par zone.
  */
 internal object DaylightHarvestingEstimator {
     // I₀ : seuil de référence évitant ln(0), et en deçà duquel la radiation est considérée nulle.
@@ -18,7 +22,7 @@ internal object DaylightHarvestingEstimator {
     fun calculateTargetRgb(
         shortwaveRadiation: Double,
         dayProfile: Triple<Int, Int, Int> = DEFAULT_DAY_PROFILE,
-        saturationRadiationWm2: Double = AppSettingsCache.current.solarSaturationThresholdWm2,
+        saturationRadiationWm2: Double,
     ): Triple<Int, Int, Int> {
         val logSaturationRatio = ln(1.0 + saturationRadiationWm2 / REFERENCE_RADIATION_WM2)
         val naturalFraction =
