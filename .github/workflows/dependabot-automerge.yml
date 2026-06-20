@@ -78,6 +78,30 @@ jobs:
               return workflowRuns.workflow_runs.some((run) => run.name === androidWorkflowName && run.conclusion === 'success');
             };
 
+            // GitHub only finishes computing mergeable_state ("clean" once every required status check has
+            // reported, not just the Android CI one we track above) a little while after the checks complete,
+            // so wait for it instead of immediately attempting a merge that branch protection would reject.
+            const waitForCleanMergeState = async (pullNumber, { timeoutMinutes = 5, pollIntervalSeconds = 15 } = {}) => {
+              const deadline = Date.now() + timeoutMinutes * 60 * 1000;
+              let pullRequest;
+
+              do {
+                ({ data: pullRequest } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullNumber,
+                }));
+
+                if (pullRequest.mergeable_state === 'clean' || !isMergeablePullRequest(pullRequest)) {
+                  return pullRequest;
+                }
+
+                await wait(pollIntervalSeconds);
+              } while (Date.now() < deadline);
+
+              return pullRequest;
+            };
+
             const mergePullRequest = async (pullRequest) => {
               const maxAttempts = 3;
               for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -97,7 +121,7 @@ jobs:
                     core.error(`❌ Unable to merge PR #${pullRequest.number} after ${maxAttempts} attempts.`);
                     return false;
                   }
-                  await wait(5); 
+                  await wait(5);
                 }
               }
             };
@@ -131,8 +155,15 @@ jobs:
                 continue;
               }
 
-              core.info(`CI is green. Forcing merge for PR #${pullRequest.number} now...`);
-              await mergePullRequest(pullRequest);
+              const cleanPullRequest = await waitForCleanMergeState(pullRequest.number);
+
+              if (cleanPullRequest.mergeable_state !== 'clean') {
+                core.info(`Skipping PR #${cleanPullRequest.number} because required status checks are not all green yet (mergeable_state="${cleanPullRequest.mergeable_state}"); will retry on the next trigger.`);
+                continue;
+              }
+
+              core.info(`CI is green. Forcing merge for PR #${cleanPullRequest.number} now...`);
+              await mergePullRequest(cleanPullRequest);
             }
 
   retroactive:
@@ -231,6 +262,30 @@ jobs:
                 }));
 
                 if (pullRequest.mergeable !== null) {
+                  return pullRequest;
+                }
+
+                await wait(pollIntervalSeconds);
+              } while (Date.now() < deadline);
+
+              return pullRequest;
+            };
+
+            // GitHub only finishes computing mergeable_state ("clean" once every required status check has
+            // reported, not just the Android CI one we track above) a little while after the checks complete,
+            // so wait for it instead of immediately attempting a merge that branch protection would reject.
+            const waitForCleanMergeState = async (pullNumber, { timeoutMinutes = 5, pollIntervalSeconds = 15 } = {}) => {
+              const deadline = Date.now() + timeoutMinutes * 60 * 1000;
+              let pullRequest;
+
+              do {
+                ({ data: pullRequest } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullNumber,
+                }));
+
+                if (pullRequest.mergeable_state === 'clean' || !isMergeablePullRequest(pullRequest)) {
                   return pullRequest;
                 }
 
@@ -358,8 +413,15 @@ jobs:
                   continue;
                 }
 
-                core.info(`CI is green and PR #${refreshedPullRequest.number} is mergeable. Forcing merge now...`);
-                await mergePullRequest(refreshedPullRequest);
+                const cleanPullRequest = await waitForCleanMergeState(refreshedPullRequest.number);
+
+                if (cleanPullRequest.mergeable_state !== 'clean') {
+                  core.warning(`Skipping PR #${cleanPullRequest.number} because required status checks are not all green yet (mergeable_state="${cleanPullRequest.mergeable_state}"); will retry on the next trigger.`);
+                  continue;
+                }
+
+                core.info(`CI is green and PR #${cleanPullRequest.number} is mergeable. Forcing merge now...`);
+                await mergePullRequest(cleanPullRequest);
               } catch (error) {
                 core.warning(`Error while processing PR #${pullRequestNumber}: ${error.message}`);
               }
