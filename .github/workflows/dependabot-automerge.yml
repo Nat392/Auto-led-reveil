@@ -1,6 +1,9 @@
 name: Dependabot Auto-merge
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     - cron: '*/15 * * * *'
   workflow_run:
@@ -19,6 +22,10 @@ permissions:
   contents: write
   actions: write
   pull-requests: write
+
+concurrency:
+  group: dependabot-automerge
+  cancel-in-progress: false
 
 jobs:
   automerge:
@@ -233,30 +240,6 @@ jobs:
               }
             };
 
-            const approvePendingRunsForHeadSha = async (headSha, pullNumber) => {
-              const { data } = await github.rest.actions.listWorkflowRunsForRepo({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                head_sha: headSha,
-                status: 'action_required',
-                per_page: 100,
-              });
-
-              for (const run of data.workflow_runs) {
-                try {
-                  await github.rest.actions.approveWorkflowRun({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    run_id: run.id,
-                  });
-
-                  core.info(`Approved pending run #${run.id} (${run.name}) for PR #${pullNumber}.`);
-                } catch (error) {
-                  core.warning(`Unable to approve run #${run.id} for PR #${pullNumber}: ${error.message}`);
-                }
-              }
-            };
-
             const triggerAndroidCiRun = async (pullRequest) => {
               await github.rest.actions.createWorkflowDispatch({
                 owner: context.repo.owner,
@@ -382,8 +365,6 @@ jobs:
                   continue;
                 }
 
-                await approvePendingRunsForHeadSha(pullRequest.head.sha, pullRequest.number);
-
                 if (pullRequest.mergeable_state === 'behind') {
                   core.info(`PR #${pullRequest.number} is behind ${pullRequest.base.ref}, updating the branch...`);
 
@@ -402,9 +383,6 @@ jobs:
 
                   pullRequest = updatedPullRequest;
                   core.info(`PR #${pullRequest.number} updated to ${pullRequest.head.sha}.`);
-
-                  await wait(5);
-                  await approvePendingRunsForHeadSha(pullRequest.head.sha, pullRequest.number);
                 }
 
                 let existingRun = await getAndroidCiRun(pullRequest.head.sha);
@@ -450,7 +428,7 @@ jobs:
   trigger-pending-ci:
     name: Trigger Android CI for Dependabot PRs stuck on approval
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule'
+    if: github.event_name == 'schedule' || github.event_name == 'push'
 
     steps:
       - name: Update behind branches and dispatch Android CI where needed
@@ -473,28 +451,26 @@ jobs:
               return workflowRuns.workflow_runs.find((run) => run.name === androidWorkflowName && run.event === 'workflow_dispatch');
             };
 
-            const approvePendingRunsForHeadSha = async (headSha, pullNumber) => {
-              const { data } = await github.rest.actions.listWorkflowRunsForRepo({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                head_sha: headSha,
-                status: 'action_required',
-                per_page: 100,
-              });
+            const wait = (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 
-              for (const run of data.workflow_runs) {
-                try {
-                  await github.rest.actions.approveWorkflowRun({
-                    owner: context.repo.owner,
-                    repo: context.repo.repo,
-                    run_id: run.id,
-                  });
+            const waitForBranchUpdate = async (pullNumber, previousHeadSha, { timeoutMinutes = 5, pollIntervalSeconds = 10 } = {}) => {
+              const deadline = Date.now() + timeoutMinutes * 60 * 1000;
 
-                  core.info(`Approved pending run #${run.id} (${run.name}) for PR #${pullNumber}.`);
-                } catch (error) {
-                  core.warning(`Unable to approve run #${run.id} for PR #${pullNumber}: ${error.message}`);
+              while (Date.now() < deadline) {
+                const { data: pullRequest } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullNumber,
+                });
+
+                if (pullRequest.head.sha !== previousHeadSha) {
+                  return pullRequest;
                 }
+
+                await wait(pollIntervalSeconds);
               }
+
+              return null;
             };
 
             const { data: openPullRequests } = await github.rest.pulls.list({
@@ -512,13 +488,11 @@ jobs:
             }
 
             for (const candidate of candidates) {
-              const { data: pullRequest } = await github.rest.pulls.get({
+              let { data: pullRequest } = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: candidate.number,
               });
-
-              await approvePendingRunsForHeadSha(pullRequest.head.sha, pullRequest.number);
 
               if (pullRequest.mergeable_state === 'behind') {
                 core.info(`PR #${pullRequest.number} is behind ${pullRequest.base.ref}, updating the branch...`);
@@ -529,7 +503,15 @@ jobs:
                   pull_number: pullRequest.number,
                 });
 
-                continue;
+                const updatedPullRequest = await waitForBranchUpdate(pullRequest.number, pullRequest.head.sha);
+
+                if (!updatedPullRequest) {
+                  core.warning(`Timed out waiting for the branch update of PR #${pullRequest.number}.`);
+                  continue;
+                }
+
+                pullRequest = updatedPullRequest;
+                core.info(`PR #${pullRequest.number} updated to ${pullRequest.head.sha}.`);
               }
 
               if (await getDispatchedAndroidCiRun(pullRequest.head.sha)) {
