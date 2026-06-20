@@ -7,7 +7,6 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    kotlin("android")
     id("org.jetbrains.kotlin.plugin.compose")
     jacoco
     id("org.jlleitschuh.gradle.ktlint")
@@ -158,9 +157,9 @@ dependencies {
 
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
-    testImplementation("io.mockk:mockk:1.14.9")
+    testImplementation("io.mockk:mockk:1.14.11")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
-    testImplementation("org.json:json:20240303")
+    testImplementation("org.json:json:20260522")
 
     androidTestImplementation("androidx.test:core:1.7.0")
     androidTestImplementation("androidx.test:runner:1.7.0")
