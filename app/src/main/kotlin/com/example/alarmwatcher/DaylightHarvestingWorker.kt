@@ -3,15 +3,19 @@ package com.example.alarmwatcher
 import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.example.alarmwatcher.settings.AppSettings
+import com.example.alarmwatcher.settings.AppSettingsCache
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 /**
  * Worker périodique (toutes les 15 min) du Daylight Harvesting : compense en continu le déficit
  * de lumière naturelle de la Chambre et de la Cuisine en fonction de la radiation solaire actuelle
- * (Open-Meteo). Chaque zone a son propre seuil de saturation ([HARVEST_ZONES]), calibré sur la
- * taille de sa fenêtre : la Cuisine (baie vitrée ~200-225 cm) sature à une radiation bien plus
- * faible que la Chambre (fenêtre ~74 cm), qui laisse entrer beaucoup moins de lumière naturelle.
+ * (Open-Meteo). Chaque zone a son propre seuil de saturation, calibré sur la taille de sa fenêtre
+ * ([HARVEST_ZONES]) : la Cuisine (baie vitrée ~200-225 cm) sature à une radiation bien plus faible
+ * que la Chambre (fenêtre ~74 cm), qui laisse entrer beaucoup moins de lumière naturelle. Ce
+ * calibrage par zone est exprimé en proportion du réglage utilisateur [AppSettings.solarSaturationThresholdWm2]
+ * (par défaut 600 W/m²), qui reste donc le levier réel pour ajuster les deux zones à la fois.
  */
 class DaylightHarvestingWorker(
     appContext: Context,
@@ -54,12 +58,14 @@ class DaylightHarvestingWorker(
     ) {
         val zone = SunsetSceneService.resolveZone(harvestZone.zoneKey) ?: return
         val state = DaylightHarvestingStateStore.getState(applicationContext, harvestZone.zoneKey)
+        val saturationRadiationWm2 =
+            harvestZone.calibrationRatio * AppSettingsCache.current.solarSaturationThresholdWm2
 
         val targetRgb =
             DaylightHarvestingEstimator.calculateTargetRgb(
                 shortwaveRadiation,
                 Triple(zone.sunriseR, zone.sunriseG, zone.sunriseB),
-                harvestZone.saturationRadiationWm2,
+                saturationRadiationWm2,
             )
 
         if (targetRgb == state.currentRgb) {
@@ -75,18 +81,25 @@ class DaylightHarvestingWorker(
 
     private data class HarvestZone(
         val zoneKey: String,
-        val saturationRadiationWm2: Double,
+        val calibrationRatio: Double,
     )
 
     companion object {
         const val UNIQUE_WORK_NAME = "daylight_harvesting_periodic"
 
-        // Seuils calibrés proportionnellement à la largeur de vitrage de chaque zone (largeur
-        // de référence 100 cm ↔ 300 W/m²) : Chambre ~74 cm → ~400 W/m², Cuisine ~212 cm → ~150 W/m².
+        // Ratios calibrés proportionnellement à la largeur de vitrage de chaque zone (largeur
+        // de référence 100 cm ↔ 300 W/m²), exprimés par rapport au réglage utilisateur par défaut
+        // (600 W/m²) : Chambre ~74 cm → ~400 W/m², Cuisine ~212 cm → ~150 W/m².
         private val HARVEST_ZONES =
             listOf(
-                HarvestZone(SunsetAutomationScheduler.ZONE_CHAMBRE, saturationRadiationWm2 = 400.0),
-                HarvestZone(SunsetAutomationScheduler.ZONE_CUISINE, saturationRadiationWm2 = 150.0),
+                HarvestZone(
+                    SunsetAutomationScheduler.ZONE_CHAMBRE,
+                    calibrationRatio = 400.0 / AppSettings.DEFAULT_SOLAR_SATURATION_THRESHOLD_WM2,
+                ),
+                HarvestZone(
+                    SunsetAutomationScheduler.ZONE_CUISINE,
+                    calibrationRatio = 150.0 / AppSettings.DEFAULT_SOLAR_SATURATION_THRESHOLD_WM2,
+                ),
             )
     }
 }
