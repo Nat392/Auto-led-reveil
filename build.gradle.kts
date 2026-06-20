@@ -1,6 +1,7 @@
 plugins {
-    id("com.android.application") version "8.6.0" apply false
-    kotlin("android") version "2.3.21" apply false
+    // AGP 9+ integre Kotlin nativement ; le plugin org.jetbrains.kotlin.android ne doit
+    // plus etre applique (cf. https://kotl.in/gradle/agp-built-in-kotlin).
+    id("com.android.application") version "9.2.1" apply false
     id("org.jlleitschuh.gradle.ktlint") version "12.1.2" apply false
     id("io.gitlab.arturbosch.detekt") version "1.23.8" apply false
 }

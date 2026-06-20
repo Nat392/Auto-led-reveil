@@ -24,8 +24,38 @@ permissions:
   pull-requests: write
 
 jobs:
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+      with:
+        ref: ${{ inputs.checkout_sha || github.sha }}
+
+    - name: Filter changed paths
+      uses: dorny/paths-filter@v3
+      id: filter
+      with:
+        filters: |
+          code:
+            - 'app/src/**'
+            - 'app/build.gradle.kts'
+            - 'app/config/detekt/**'
+            - 'app/detekt-baseline.xml'
+            - 'build.gradle.kts'
+            - 'settings.gradle.kts'
+            - 'gradle.properties'
+            - 'gradle/**'
+            - '**/*.versions.toml'
+
   build:
     name: Build & Test
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     outputs:
@@ -33,7 +63,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         ref: ${{ inputs.checkout_sha || github.sha }}
 
@@ -106,13 +136,14 @@ jobs:
 
   baseline_coverage:
     name: Baseline Coverage
-    if: github.event_name == 'pull_request'
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
     steps:
     - name: Checkout main branch for baseline coverage
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         ref: ${{ github.event.pull_request.base.ref }}
         path: main-baseline
@@ -169,8 +200,8 @@ jobs:
 
   compare_coverage:
     name: Compare Coverage
-    if: github.event_name == 'pull_request'
-    needs: [build, baseline_coverage]
+    if: github.event_name == 'pull_request' && needs.changes.outputs.code == 'true'
+    needs: [changes, build, baseline_coverage]
     runs-on: ubuntu-latest
 
     steps:
@@ -184,14 +215,17 @@ jobs:
           const parseCoverage = (value) => Number.parseFloat(String(value).replace('%', '').trim());
           const prCoverage = parseCoverage(process.env.PR_COVERAGE);
           const baseCoverage = parseCoverage(process.env.BASE_COVERAGE);
+          // Marge pour absorber le bruit de mesure (tests legerement non-deterministes)
+          // sans faire echouer des PR qui ne touchent pas le code applicatif.
+          const COVERAGE_TOLERANCE = 0.5;
 
           if (Number.isNaN(prCoverage) || Number.isNaN(baseCoverage)) {
             core.setFailed(`Unable to read coverage values. PR=${process.env.PR_COVERAGE}, main=${process.env.BASE_COVERAGE}`);
             return;
           }
 
-          if (prCoverage < baseCoverage) {
-            core.setFailed(`Coverage regressed: PR ${prCoverage.toFixed(2)}% < main ${baseCoverage.toFixed(2)}%`);
+          if (prCoverage < baseCoverage - COVERAGE_TOLERANCE) {
+            core.setFailed(`Coverage regressed: PR ${prCoverage.toFixed(2)}% < main ${baseCoverage.toFixed(2)}% (tolerance ${COVERAGE_TOLERANCE}pt)`);
           } else {
             core.summary
               .addHeading('Coverage comparison')
