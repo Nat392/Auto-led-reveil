@@ -1,14 +1,20 @@
 package com.example.alarmwatcher
 
+import com.example.alarmwatcher.settings.AppSettingsCache
 import java.time.Instant
 import java.time.ZoneId
 import kotlin.math.max
 
 internal object NightFadeTimingSupport {
-    private const val LEAD_TIME_MS = (8 * 60 + 35) * 60 * 1000L
     private const val MINUTES_PER_HOUR = 60
-    private const val MORNING_WINDOW_START_MINUTES = 7 * MINUTES_PER_HOUR
-    private const val MORNING_WINDOW_END_MINUTES = 9 * MINUTES_PER_HOUR + 30
+    private const val MILLIS_PER_MINUTE = 60_000L
+
+    private val leadTimeMs: Long
+        get() = AppSettingsCache.current.nightFadeLeadTimeMinutes * MILLIS_PER_MINUTE
+    private val morningWindowStartMinutes: Int
+        get() = AppSettingsCache.current.nightFadeMorningStartMinutes
+    private val morningWindowEndMinutes: Int
+        get() = AppSettingsCache.current.nightFadeMorningEndMinutes
 
     data class Schedule(
         val alarmTriggerAtMs: Long,
@@ -29,13 +35,13 @@ internal object NightFadeTimingSupport {
     ): Schedule? {
         val alarmZdt = Instant.ofEpochMilli(alarmTimeMs).atZone(ZoneId.systemDefault())
         val minutesOfDay = alarmZdt.hour * MINUTES_PER_HOUR + alarmZdt.minute
-        val targetEndMs = alarmTimeMs - LEAD_TIME_MS
+        val targetEndMs = alarmTimeMs - leadTimeMs
 
-        // L'alarme doit être future, dans la fenêtre 07:00-09:30, avec une rampe encore réalisable
-        // et un début de fondu avant la fin visée du mode nuit.
+        // L'alarme doit être future, dans la fenêtre matinale configurée, avec une rampe encore
+        // réalisable et un début de fondu avant la fin visée du mode nuit.
         val isSchedulable =
             alarmTimeMs > now &&
-                minutesOfDay in MORNING_WINDOW_START_MINUTES..MORNING_WINDOW_END_MINUTES &&
+                minutesOfDay in morningWindowStartMinutes..morningWindowEndMinutes &&
                 targetEndMs > now &&
                 originalStartTimeMs < targetEndMs
 

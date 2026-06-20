@@ -45,7 +45,15 @@ class SunsetAutomationReceiver : BroadcastReceiver() {
         intent: Intent,
     ) {
         if (!BlePermissionSupport.hasBluetoothConnectPermission(context)) {
+            val zoneKey = intent.getStringExtra(SunsetAutomationScheduler.EXTRA_TARGET_ZONE)
             Log.w(TAG, "Skipping sunset scene: BLUETOOTH_CONNECT permission is not granted")
+            val permissionError =
+                SecurityException("BLUETOOTH_CONNECT permission missing, sunset scene skipped (zoneKey=$zoneKey)")
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = permissionError,
+                source = "SunsetAutomationReceiver.handleApplyScene.permission",
+            )
             return
         }
 

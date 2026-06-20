@@ -119,6 +119,23 @@ class DiscordCrashReporterTest {
         assertTrue(debugFields.all { it.getString("value").length <= 900 })
     }
 
+    @Test
+    fun `buildLogExportPayload assembles the log export embed with line count`() {
+        val payload =
+            DiscordCrashReporter.buildLogExportPayload(
+                context = context,
+                logText = "ligne 1\nligne 2\nligne 3",
+            )
+
+        assertEquals("Export manuel des journaux de l'application.", payload.getString("content"))
+
+        val embed = firstEmbed(payload)
+        assertEquals("Export des journaux", embed.getString("title"))
+        assertEquals(0x2ECC71, embed.getInt("color"))
+        assertEquals("3", fieldValue(embed.getJSONArray("fields"), "Lignes"))
+        assertEquals("9.9.9", fieldValue(embed.getJSONArray("fields"), "App"))
+    }
+
     private fun firstEmbed(payload: JSONObject): JSONObject {
         return payload.getJSONArray("embeds").getJSONObject(0)
     }

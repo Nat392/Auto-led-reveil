@@ -44,10 +44,12 @@ class SunsetAutomationSchedulerTest {
         mockkObject(SunsetTimesStore)
         mockkObject(AlarmMonitor)
         mockkObject(DaylightHarvestingStateStore)
+        mockkObject(DiscordCrashReporter)
         every { Log.w(any(), any<String>()) } returns 0
         every { Log.i(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>(), any<Throwable>()) } returns 0
+        every { DiscordCrashReporter.reportNonFatal(any(), any(), any()) } returns mockk(relaxed = true)
         every { context.getSystemService(AlarmManager::class.java) } returns alarmManager
         every { context.applicationContext } returns context
         every { alarmManager.canScheduleExactAlarms() } returns true
@@ -57,7 +59,7 @@ class SunsetAutomationSchedulerTest {
         every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
         every { SunsetTimesStore.save(any(), any(), any(), any()) } returns Unit
         every { AlarmMonitor.scanNextAlarmAndSchedule(any()) } returns Unit
-        every { DaylightHarvestingStateStore.deactivate(any()) } returns Unit
+        every { DaylightHarvestingStateStore.deactivate(any(), any()) } returns Unit
         SunsetAutomationScheduler.sunsetConnectionFactory = defaultConnectionFactory
         SunsetAutomationScheduler.intentFactory = defaultIntentFactory
     }
@@ -87,7 +89,7 @@ class SunsetAutomationSchedulerTest {
             every { connection.inputStream } returns ByteArrayInputStream(body.toByteArray(Charsets.UTF_8))
             every { connection.disconnect() } returns Unit
 
-            val sunsetInstant = SunsetAutomationScheduler.fetchSunsetInstant()
+            val sunsetInstant = SunsetAutomationScheduler.fetchSunsetInstant(context)
 
             assertEquals(Instant.parse("2026-05-23T18:47:00Z"), sunsetInstant)
             verify(exactly = 1) { connection.disconnect() }
@@ -102,7 +104,7 @@ class SunsetAutomationSchedulerTest {
             every { connection.responseCode } returns 503
             every { connection.disconnect() } returns Unit
 
-            val sunsetInstant = SunsetAutomationScheduler.fetchSunsetInstant()
+            val sunsetInstant = SunsetAutomationScheduler.fetchSunsetInstant(context)
 
             assertNull(sunsetInstant)
             verify(exactly = 1) { connection.disconnect() }
@@ -125,7 +127,7 @@ class SunsetAutomationSchedulerTest {
                 )
             every { connection.disconnect() } returns Unit
 
-            val sunsetInstant = SunsetAutomationScheduler.fetchSunsetInstant()
+            val sunsetInstant = SunsetAutomationScheduler.fetchSunsetInstant(context)
 
             assertNull(sunsetInstant)
             verify(exactly = 1) { connection.disconnect() }
@@ -291,7 +293,12 @@ class SunsetAutomationSchedulerTest {
 
             SunsetAutomationScheduler.refreshAndSchedule(context)
 
-            verify(exactly = 1) { DaylightHarvestingStateStore.deactivate(context) }
+            verify(exactly = 1) {
+                DaylightHarvestingStateStore.deactivate(context, SunsetAutomationScheduler.ZONE_CHAMBRE)
+            }
+            verify(exactly = 1) {
+                DaylightHarvestingStateStore.deactivate(context, SunsetAutomationScheduler.ZONE_CUISINE)
+            }
         }
 
     @Test

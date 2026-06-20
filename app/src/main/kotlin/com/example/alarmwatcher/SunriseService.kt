@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.example.alarmwatcher.settings.AppSettingsCache
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -101,13 +102,20 @@ class SunriseService : Service() {
                         }.forEach { it.await() }
                     }
 
-                    // La fin de la rampe d'aube de la Cuisine "ouvre la fenêtre" du Daylight
-                    // Harvesting et initialise son vecteur RGB de référence sur le profil Jour
-                    // que la rampe vient d'atteindre.
+                    // La fin de la rampe d'aube de la Chambre/Cuisine "ouvre la fenêtre" du
+                    // Daylight Harvesting de cette zone et initialise son vecteur RGB de référence
+                    // sur le profil Jour que la rampe vient d'atteindre.
+                    val harvestZoneKeysByMac =
+                        mapOf(
+                            SunriseZoneConfig.chambre.macAddress to SunsetAutomationScheduler.ZONE_CHAMBRE,
+                            SunriseZoneConfig.cuisine.macAddress to SunsetAutomationScheduler.ZONE_CUISINE,
+                        )
                     zones.forEach { zone ->
-                        if (zone.macAddress == SunriseZoneConfig.cuisine.macAddress && zone.isConfigured) {
+                        val zoneKey = harvestZoneKeysByMac[zone.macAddress]
+                        if (zoneKey != null && zone.isConfigured) {
                             DaylightHarvestingStateStore.activate(
                                 applicationContext,
+                                zoneKey,
                                 Triple(zone.sunriseR, zone.sunriseG, zone.sunriseB),
                             )
                         }
@@ -146,9 +154,10 @@ class SunriseService : Service() {
      * Met à jour [currentTargetAlarmMs] lorsque le redémarrage n'est pas ignoré.
      */
     private fun shouldSkipRestart(originalAlarmMs: Long): Boolean {
+        val snoozeToleranceMs = AppSettingsCache.current.snoozeToleranceMinutes * MILLIS_PER_MINUTE
         val isSnooze =
             currentTargetAlarmMs > 0L && originalAlarmMs > 0L &&
-                kotlin.math.abs(originalAlarmMs - currentTargetAlarmMs) <= SNOOZE_TOLERANCE_MS
+                kotlin.math.abs(originalAlarmMs - currentTargetAlarmMs) <= snoozeToleranceMs
         val shouldDeduplicate = originalAlarmMs > 0L && (currentTargetAlarmMs == originalAlarmMs || isSnooze)
 
         if (rampJob?.isActive == true && shouldDeduplicate) {
@@ -211,7 +220,7 @@ class SunriseService : Service() {
         private const val TAG = "SunriseService"
         private const val NOTIFICATION_ID = 401
         private const val NOTIFICATION_CHANNEL_ID = "sunrise_service"
-        private const val SNOOZE_TOLERANCE_MS = 30 * 60 * 1000L
+        private const val MILLIS_PER_MINUTE = 60_000L
 
         @Volatile
         internal var isRunning: Boolean = false

@@ -5,6 +5,7 @@ import android.app.Application
 import android.os.Bundle
 import android.os.Process
 import android.util.Log
+import com.example.alarmwatcher.settings.AppSettingsCache
 import java.lang.ref.WeakReference
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -12,6 +13,7 @@ class AlarmWatcherApp : Application() {
     override fun onCreate() {
         super.onCreate()
         CrashScreenshotStore.install(this)
+        AppSettingsCache.start(this)
 
         // Au démarrage du processus, aucun NightFadeService ne peut être en cours d'exécution :
         // on efface les drapeaux "running" persistés pour permettre à AlarmMonitorRunner de

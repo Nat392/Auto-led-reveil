@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class SunsetSceneService : Service() {
@@ -43,6 +44,11 @@ class SunsetSceneService : Service() {
 
         if (zoneKey == null || zone == null || !zone.isConfigured) {
             Log.w(TAG, "Missing configured zone for sunset scene: $zoneKey")
+            DiscordCrashReporter.reportNonFatal(
+                context = applicationContext,
+                throwable = IllegalStateException("Missing configured zone for sunset scene (zoneKey=$zoneKey)"),
+                source = "SunsetSceneService.onStartCommand.zoneMissing",
+            )
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf(startId)
             return START_NOT_STICKY
@@ -50,6 +56,16 @@ class SunsetSceneService : Service() {
 
         if (!BlePermissionSupport.hasBluetoothConnectPermission(applicationContext)) {
             Log.w(TAG, "Stopping sunset scene: BLUETOOTH_CONNECT permission is not granted")
+            val permissionError =
+                SecurityException(
+                    "BLUETOOTH_CONNECT permission missing, sunset scene not applied " +
+                        "(zoneKey=$zoneKey, macAddress=${zone.macAddress})",
+                )
+            DiscordCrashReporter.reportNonFatal(
+                context = applicationContext,
+                throwable = permissionError,
+                source = "SunsetSceneService.onStartCommand.permission",
+            )
             stopSelf(startId)
             return START_NOT_STICKY
         }
@@ -115,6 +131,8 @@ class SunsetSceneService : Service() {
         private const val TAG = "SunsetSceneService"
         private const val NOTIFICATION_ID = 402
         private const val NOTIFICATION_CHANNEL_ID = "sunset_scene_service"
+        private const val SCENE_APPLY_MAX_ATTEMPTS = 3
+        private const val SCENE_APPLY_RETRY_DELAY_MS = 1_500L
 
         internal fun resolveZone(zoneKey: String?): SunriseBulbZone? {
             return when (zoneKey) {
@@ -129,38 +147,48 @@ class SunsetSceneService : Service() {
             context: Context,
             zoneKey: String,
         ): Boolean {
-            // La scène du soir "ferme la fenêtre" du Daylight Harvesting pour la nuit, quel que
-            // soit le résultat (succès, zone non configurée, permission manquante, échec BLE).
-            fun deactivateCuisineHarvesting() {
-                if (zoneKey == SunsetAutomationScheduler.ZONE_CUISINE) {
-                    DaylightHarvestingStateStore.deactivate(context)
+            // La scène du soir "ferme la fenêtre" du Daylight Harvesting de cette zone pour la
+            // nuit, quel que soit le résultat (succès, zone non configurée, permission
+            // manquante, échec BLE).
+            fun deactivateHarvestingIfApplicable() {
+                val isHarvestingZone =
+                    zoneKey == SunsetAutomationScheduler.ZONE_CHAMBRE ||
+                        zoneKey == SunsetAutomationScheduler.ZONE_CUISINE
+                if (isHarvestingZone) {
+                    DaylightHarvestingStateStore.deactivate(context, zoneKey)
                 }
             }
 
             val zone = resolveZone(zoneKey)
             if (zone == null || !zone.isConfigured) {
                 Log.w(TAG, "Missing configured zone for sunset scene: $zoneKey")
-                deactivateCuisineHarvesting()
+                deactivateHarvestingIfApplicable()
                 return false
             }
 
             if (!BlePermissionSupport.hasBluetoothConnectPermission(context)) {
                 Log.w(TAG, "Stopping sunset scene: BLUETOOTH_CONNECT permission is not granted")
-                deactivateCuisineHarvesting()
+                deactivateHarvestingIfApplicable()
                 return false
             }
 
             return try {
-                val applied =
-                    ZenggeBulbController.applyScene(
-                        context = context,
-                        macAddress = zone.macAddress,
-                        red = zone.sunsetR,
-                        green = zone.sunsetG,
-                        blue = zone.sunsetB,
-                        white = zone.whiteChannel,
-                        brightnessPercent = zone.brightnessPercent,
-                    )
+                var applied = false
+                for (attempt in 1..SCENE_APPLY_MAX_ATTEMPTS) {
+                    applied =
+                        ZenggeBulbController.applyScene(
+                            context = context,
+                            macAddress = zone.macAddress,
+                            red = zone.sunsetR,
+                            green = zone.sunsetG,
+                            blue = zone.sunsetB,
+                            white = zone.whiteChannel,
+                            brightnessPercent = zone.brightnessPercent,
+                        )
+                    if (applied || attempt == SCENE_APPLY_MAX_ATTEMPTS) break
+                    Log.w(TAG, "Retrying sunset scene for ${zone.label} (attempt $attempt failed)")
+                    delay(SCENE_APPLY_RETRY_DELAY_MS)
+                }
 
                 if (!applied) {
                     Log.w(TAG, "Failed to apply sunset scene for ${zone.label}")
@@ -185,11 +213,9 @@ class SunsetSceneService : Service() {
                 )
                 false
             } finally {
-                // La scène du soir "ferme la fenêtre" du Daylight Harvesting pour la nuit,
-                // quel que soit le succès BLE.
-                if (zoneKey == SunsetAutomationScheduler.ZONE_CUISINE) {
-                    DaylightHarvestingStateStore.deactivate(context)
-                }
+                // La scène du soir "ferme la fenêtre" du Daylight Harvesting de cette zone pour
+                // la nuit, quel que soit le succès BLE.
+                deactivateHarvestingIfApplicable()
             }
         }
     }

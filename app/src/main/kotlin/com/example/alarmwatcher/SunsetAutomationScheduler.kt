@@ -10,6 +10,8 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.workDataOf
+import com.example.alarmwatcher.settings.AppSettings
+import com.example.alarmwatcher.settings.AppSettingsCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,19 +24,15 @@ import java.net.URL
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.OffsetDateTime
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 
 internal object SunsetAutomationScheduler {
     private const val TAG = "SunsetAutomation"
-    private const val SUNSET_API_URL = "https://api.sunrise-sunset.org/json?lat=46.6644&lng=5.5619&formatted=0"
     private const val REFRESH_RETRY_MS = 60 * 60 * 1000L
     private const val CATCH_UP_RETRY_MS = 5 * 60 * 1000L
-    private const val SUNSET_OFFSET_BUREAU_MS = 60 * 60 * 1000L
-    private const val SUNSET_OFFSET_CHAMBRE_MS = 30 * 60 * 1000L
-    private const val SUNSET_OFFSET_CUISINE_MS = 60 * 60 * 1000L
-    private const val REFRESH_LOCAL_HOUR = 0
-    private const val REFRESH_LOCAL_MINUTE = 5
+    private const val MILLIS_PER_MINUTE = 60_000L
 
     const val ACTION_REFRESH_SCHEDULE = "com.example.alarmwatcher.ACTION_REFRESH_SUNSET_SCHEDULE"
     const val ACTION_APPLY_SCENE = "com.example.alarmwatcher.ACTION_APPLY_SUNSET_SCENE"
@@ -73,23 +71,25 @@ internal object SunsetAutomationScheduler {
     }
 
     suspend fun refreshAndSchedule(context: Context) {
+        val settings = AppSettingsCache.current
         val now = System.currentTimeMillis()
         val sunsetInstant =
-            fetchSunsetInstant() ?: run {
+            fetchSunsetInstant(context, settings) ?: run {
                 scheduleRefreshRetry(context, now + REFRESH_RETRY_MS)
                 return
             }
 
         val sunsetMs = sunsetInstant.toEpochMilli()
-        val bureauMs = sunsetMs - SUNSET_OFFSET_BUREAU_MS
-        val chambreMs = sunsetMs - SUNSET_OFFSET_CHAMBRE_MS
-        val cuisineMs = sunsetMs - SUNSET_OFFSET_CUISINE_MS
+        val bureauMs = sunsetMs - settings.bureauSunsetOffsetMinutes * MILLIS_PER_MINUTE
+        val chambreMs = sunsetMs - settings.chambreSunsetOffsetMinutes * MILLIS_PER_MINUTE
+        val cuisineMs = sunsetMs - settings.cuisineSunsetOffsetMinutes * MILLIS_PER_MINUTE
 
         SunsetTimesStore.save(context, bureauMs, chambreMs, cuisineMs)
 
-        // Nouveau cycle quotidien : la fenêtre du Daylight Harvesting se rouvrira à la fin de la
-        // prochaine rampe d'aube de la Cuisine.
-        DaylightHarvestingStateStore.deactivate(context)
+        // Nouveau cycle quotidien : la fenêtre du Daylight Harvesting de chaque zone se rouvrira
+        // à la fin de la prochaine rampe d'aube de la Chambre/Cuisine.
+        DaylightHarvestingStateStore.deactivate(context, ZONE_CHAMBRE)
+        DaylightHarvestingStateStore.deactivate(context, ZONE_CUISINE)
 
         cancelSceneAlarm(context, ZONE_BUREAU)
         cancelSceneAlarm(context, ZONE_CHAMBRE)
@@ -107,10 +107,15 @@ internal object SunsetAutomationScheduler {
         Log.i(TAG, "Scheduled sunset scenes: bureau=$bureauMs chambre=$chambreMs cuisine=$cuisineMs sunset=$sunsetMs")
     }
 
-    internal suspend fun fetchSunsetInstant(): Instant? {
+    internal suspend fun fetchSunsetInstant(
+        context: Context,
+        settings: AppSettings = AppSettingsCache.current,
+    ): Instant? {
+        val todayDate = LocalDate.now(ZoneId.systemDefault()).toString()
         return try {
-            val todayDate = LocalDate.now(ZoneId.systemDefault()).toString()
-            val url = "$SUNSET_API_URL&date=$todayDate"
+            val url =
+                "https://api.sunrise-sunset.org/json?lat=${settings.latitude}&lng=${settings.longitude}" +
+                    "&formatted=0&date=$todayDate"
             val connection =
                 sunsetConnectionFactory(url).apply {
                     connectTimeout = 10_000
@@ -124,6 +129,11 @@ internal object SunsetAutomationScheduler {
                 val responseCode = connection.responseCode
                 if (responseCode !in 200..299) {
                     Log.w(TAG, "Sunset API returned HTTP $responseCode")
+                    DiscordCrashReporter.reportNonFatal(
+                        context = context,
+                        throwable = IllegalStateException("Sunset API HTTP $responseCode (date=$todayDate)"),
+                        source = "SunsetAutomationScheduler.fetchSunsetInstant",
+                    )
                     return null
                 }
 
@@ -135,12 +145,17 @@ internal object SunsetAutomationScheduler {
                     JSONObject(body)
                         .getJSONObject("results")
                         .getString("sunset")
-                Instant.parse(sunsetIso)
+                OffsetDateTime.parse(sunsetIso).toInstant()
             } finally {
                 connection.disconnect()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to fetch sunset time", e)
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = e,
+                source = "SunsetAutomationScheduler.fetchSunsetInstant",
+            )
             null
         }
     }
@@ -213,6 +228,13 @@ internal object SunsetAutomationScheduler {
 
         if (!BlePermissionSupport.hasBluetoothConnectPermission(context)) {
             Log.w(TAG, "Cannot run sunset catch-up for $zoneKey: BLUETOOTH_CONNECT permission missing")
+            val permissionError =
+                SecurityException("BLUETOOTH_CONNECT permission missing, sunset catch-up skipped (zoneKey=$zoneKey)")
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = permissionError,
+                source = "SunsetAutomationScheduler.triggerSceneCatchUp.permission",
+            )
             return
         }
 
@@ -306,20 +328,17 @@ internal object SunsetAutomationScheduler {
     internal fun computeNextRefreshAtMillis(
         nowMillis: Long = System.currentTimeMillis(),
         zoneId: ZoneId = ZoneId.systemDefault(),
+        settings: AppSettings = AppSettingsCache.current,
     ): Long {
         val now = Instant.ofEpochMilli(nowMillis).atZone(zoneId)
         val today = now.toLocalDate()
-        val todayRefresh =
-            today
-                .atTime(LocalTime.of(REFRESH_LOCAL_HOUR, REFRESH_LOCAL_MINUTE))
-                .atZone(zoneId)
+        val refreshTime = LocalTime.of(settings.sunsetRefreshHour, settings.sunsetRefreshMinute)
+        val todayRefresh = today.atTime(refreshTime).atZone(zoneId)
         val nextRefresh =
             if (todayRefresh.isAfter(now)) {
                 todayRefresh
             } else {
-                today.plusDays(1)
-                    .atTime(LocalTime.of(REFRESH_LOCAL_HOUR, REFRESH_LOCAL_MINUTE))
-                    .atZone(zoneId)
+                today.plusDays(1).atTime(refreshTime).atZone(zoneId)
             }
         return nextRefresh.toInstant().toEpochMilli()
     }

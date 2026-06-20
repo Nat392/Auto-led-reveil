@@ -42,7 +42,7 @@ class SunsetSceneServiceTest {
         every { Log.e(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>(), any<Throwable>()) } returns 0
         every { DiscordCrashReporter.reportNonFatal(any(), any(), any()) } returns mockk<Job>(relaxed = true)
-        every { DaylightHarvestingStateStore.deactivate(any()) } returns Unit
+        every { DaylightHarvestingStateStore.deactivate(any(), any()) } returns Unit
         every { service.applicationContext } returns applicationContext
         every { service.stopSelf(any()) } returns Unit
         every { service.stopForeground(any<Int>()) } returns Unit
@@ -214,6 +214,52 @@ class SunsetSceneServiceTest {
         }
 
     @Test
+    fun `retries the controller and succeeds without reporting after a transient failure`() =
+        runTest {
+            val bureau = configuredZone()
+            every { SunriseZoneConfig.bureau } returns bureau
+            every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+            coEvery {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            } returnsMany listOf(false, true)
+
+            val applied = SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_BUREAU)
+
+            assertTrue(applied)
+            coVerify(exactly = 2) {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            }
+            verify(exactly = 0) {
+                DiscordCrashReporter.reportNonFatal(any(), any(), any())
+            }
+        }
+
+    @Test
+    fun `reports a non fatal error only after exhausting retries`() =
+        runTest {
+            val bureau = configuredZone()
+            every { SunriseZoneConfig.bureau } returns bureau
+            every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+            coEvery {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            } returns false
+
+            val applied = SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_BUREAU)
+
+            assertFalse(applied)
+            coVerify(exactly = 3) {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            }
+            verify(exactly = 1) {
+                DiscordCrashReporter.reportNonFatal(
+                    context = applicationContext,
+                    throwable = any(),
+                    source = "SunsetSceneService.applySunsetScene",
+                )
+            }
+        }
+
+    @Test
     fun `returns false and reports a non fatal error when the controller fails`() =
         runTest {
             val bureau = configuredZone()
@@ -249,7 +295,28 @@ class SunsetSceneServiceTest {
                 SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_CUISINE)
 
             assertTrue(applied)
-            verify(exactly = 1) { DaylightHarvestingStateStore.deactivate(applicationContext) }
+            verify(exactly = 1) {
+                DaylightHarvestingStateStore.deactivate(applicationContext, SunsetAutomationScheduler.ZONE_CUISINE)
+            }
+        }
+
+    @Test
+    fun `deactivates daylight harvesting after a successful chambre scene`() =
+        runTest {
+            val chambre = configuredZone(label = "Chambre", macAddress = "11:22:33:44:55:66")
+            every { SunriseZoneConfig.chambre } returns chambre
+            every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+            coEvery {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            } returns true
+
+            val applied =
+                SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_CHAMBRE)
+
+            assertTrue(applied)
+            verify(exactly = 1) {
+                DaylightHarvestingStateStore.deactivate(applicationContext, SunsetAutomationScheduler.ZONE_CHAMBRE)
+            }
         }
 
     @Test
@@ -262,7 +329,9 @@ class SunsetSceneServiceTest {
                 SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_CUISINE)
 
             assertFalse(applied)
-            verify(exactly = 1) { DaylightHarvestingStateStore.deactivate(applicationContext) }
+            verify(exactly = 1) {
+                DaylightHarvestingStateStore.deactivate(applicationContext, SunsetAutomationScheduler.ZONE_CUISINE)
+            }
         }
 
     @Test
@@ -277,7 +346,7 @@ class SunsetSceneServiceTest {
 
             SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_BUREAU)
 
-            verify(exactly = 0) { DaylightHarvestingStateStore.deactivate(any()) }
+            verify(exactly = 0) { DaylightHarvestingStateStore.deactivate(any(), any()) }
         }
 
     @Test
