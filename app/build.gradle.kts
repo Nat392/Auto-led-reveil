@@ -202,7 +202,9 @@ val coverageExclusions =
     )
 
 fun androidCoverageClassTree() =
-    fileTree(layout.buildDirectory.dir("tmp/kotlin-classes/debug").get().asFile) {
+    // AGP 9+ compile Kotlin nativement et place les .class sous
+    // intermediates/built_in_kotlinc (tmp/kotlin-classes/debug n'existe plus).
+    fileTree(layout.buildDirectory.dir("intermediates/built_in_kotlinc/debug/compileDebugKotlin/classes").get().asFile) {
         exclude(coverageExclusions)
     } +
         fileTree(layout.buildDirectory.dir("intermediates/javac/debug/classes").get().asFile) {
