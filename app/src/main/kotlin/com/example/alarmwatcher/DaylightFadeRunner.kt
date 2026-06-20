@@ -16,18 +16,29 @@ import kotlin.math.roundToInt
  * prochain réveil du worker reprend depuis la dernière couleur réellement appliquée, et non
  * depuis une valeur potentiellement obsolète de plusieurs minutes.
  */
+internal data class ColorTransition(
+    val from: Triple<Int, Int, Int>,
+    val to: Triple<Int, Int, Int>,
+)
+
+internal data class FadeZone(
+    val key: String,
+    val bulb: SunriseBulbZone,
+)
+
 internal class DaylightFadeRunner(
     private val bulbController: BulbControllerApi,
     private val crashReporter: CrashReporterApi,
 ) {
     suspend fun fade(
         context: Context,
-        zone: SunriseBulbZone,
-        from: Triple<Int, Int, Int>,
-        to: Triple<Int, Int, Int>,
+        fadeZone: FadeZone,
+        transition: ColorTransition,
         durationMs: Long = DEFAULT_DURATION_MS,
         steps: Int = DEFAULT_STEPS,
     ) {
+        val (zoneKey, zone) = fadeZone
+        val (from, to) = transition
         val stepDelayMs = durationMs / steps
 
         for (step in 1..steps) {
@@ -48,7 +59,7 @@ internal class DaylightFadeRunner(
                 )
 
             if (success) {
-                DaylightHarvestingStateStore.saveCurrentRgb(context, Triple(red, green, blue))
+                DaylightHarvestingStateStore.saveCurrentRgb(context, zoneKey, Triple(red, green, blue))
             } else {
                 Log.w(
                     TAG,

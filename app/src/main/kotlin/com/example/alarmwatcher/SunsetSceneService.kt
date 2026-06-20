@@ -129,24 +129,28 @@ class SunsetSceneService : Service() {
             context: Context,
             zoneKey: String,
         ): Boolean {
-            // La scène du soir "ferme la fenêtre" du Daylight Harvesting pour la nuit, quel que
-            // soit le résultat (succès, zone non configurée, permission manquante, échec BLE).
-            fun deactivateCuisineHarvesting() {
-                if (zoneKey == SunsetAutomationScheduler.ZONE_CUISINE) {
-                    DaylightHarvestingStateStore.deactivate(context)
+            // La scène du soir "ferme la fenêtre" du Daylight Harvesting de cette zone pour la
+            // nuit, quel que soit le résultat (succès, zone non configurée, permission
+            // manquante, échec BLE).
+            fun deactivateHarvestingIfApplicable() {
+                val isHarvestingZone =
+                    zoneKey == SunsetAutomationScheduler.ZONE_CHAMBRE ||
+                        zoneKey == SunsetAutomationScheduler.ZONE_CUISINE
+                if (isHarvestingZone) {
+                    DaylightHarvestingStateStore.deactivate(context, zoneKey)
                 }
             }
 
             val zone = resolveZone(zoneKey)
             if (zone == null || !zone.isConfigured) {
                 Log.w(TAG, "Missing configured zone for sunset scene: $zoneKey")
-                deactivateCuisineHarvesting()
+                deactivateHarvestingIfApplicable()
                 return false
             }
 
             if (!BlePermissionSupport.hasBluetoothConnectPermission(context)) {
                 Log.w(TAG, "Stopping sunset scene: BLUETOOTH_CONNECT permission is not granted")
-                deactivateCuisineHarvesting()
+                deactivateHarvestingIfApplicable()
                 return false
             }
 
@@ -185,11 +189,9 @@ class SunsetSceneService : Service() {
                 )
                 false
             } finally {
-                // La scène du soir "ferme la fenêtre" du Daylight Harvesting pour la nuit,
-                // quel que soit le succès BLE.
-                if (zoneKey == SunsetAutomationScheduler.ZONE_CUISINE) {
-                    DaylightHarvestingStateStore.deactivate(context)
-                }
+                // La scène du soir "ferme la fenêtre" du Daylight Harvesting de cette zone pour
+                // la nuit, quel que soit le succès BLE.
+                deactivateHarvestingIfApplicable()
             }
         }
     }
