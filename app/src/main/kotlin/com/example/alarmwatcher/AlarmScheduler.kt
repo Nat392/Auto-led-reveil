@@ -6,9 +6,11 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
+import com.example.alarmwatcher.settings.AppSettingsCache
 
 object AlarmScheduler : AlarmSchedulerApi {
     private const val TAG = "AlarmScheduler"
+    private const val MILLIS_PER_MINUTE = 60_000L
 
     // --- Identifiants pour le Sunrise ---
     private const val REQ_CODE = 5401
@@ -23,7 +25,8 @@ object AlarmScheduler : AlarmSchedulerApi {
     const val EXTRA_END_TIME_MS = "extra_end_time_ms"
     const val EXTRA_ZONE_KEY = "extra_zone_key"
 
-    const val PREWARN_MS = DEFAULT_PREWARN_MS
+    val PREWARN_MS: Long
+        get() = AppSettingsCache.current.preWarnMinutes * MILLIS_PER_MINUTE
 
     internal var intentFactory: (Context, Class<*>) -> Intent = { context, targetClass ->
         Intent(context, targetClass)
@@ -74,6 +77,11 @@ object AlarmScheduler : AlarmSchedulerApi {
             )
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule exact alarm for Night Fade ($zoneKey): ${e.message}")
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = e,
+                source = "AlarmScheduler.scheduleNightFade(zoneKey=$zoneKey, triggerAtMs=$triggerAtMs)",
+            )
         }
     }
 
@@ -147,6 +155,11 @@ object AlarmScheduler : AlarmSchedulerApi {
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMs, pi)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to schedule exact alarm: ${e.message}")
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = e,
+                source = "AlarmScheduler.schedulePreWarn(whenMs=$whenMs, originalAlarmMs=$originalAlarmMs)",
+            )
         }
     }
 

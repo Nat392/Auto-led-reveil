@@ -32,8 +32,11 @@ object DiscordCrashReporter : CrashReporterApi {
     private const val SCREENSHOT_FILENAME = "crash_screenshot.png"
     private const val STACKTRACE_FILENAME = "stacktrace.txt"
     private const val DEBUG_LOG_FILENAME = "debug_log.txt"
+    private const val LOG_EXPORT_FILENAME = "app_logs.txt"
+    private const val CATALOG_EXPORT_FILENAME = "error_catalog.txt"
     private const val HTTP_TIMEOUT_MS = 10_000
     private const val FATAL_WAIT_TIMEOUT_MS = 4_500L
+    private const val CATALOG_SELECTION_EMBED_COLOR = 0x9B59B6
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -41,8 +44,20 @@ object DiscordCrashReporter : CrashReporterApi {
         context: Context,
         throwable: Throwable,
         source: String?,
-    ): Job =
-        scope.launch {
+    ): Job {
+        val nonFatalDetails =
+            AppErrorLogStore.ErrorDetails(
+                title = throwable::class.simpleName ?: "Erreur",
+                source = source ?: "inconnu",
+                message = throwable.message.orEmpty(),
+                stacktrace = throwable.stackTraceToString(),
+            )
+        AppErrorLogStore.record(
+            context = context,
+            level = AppErrorLogStore.Level.ERROR,
+            details = nonFatalDetails,
+        )
+        return scope.launch {
             sendReport(
                 context = context.applicationContext,
                 throwable = throwable,
@@ -50,12 +65,25 @@ object DiscordCrashReporter : CrashReporterApi {
                 fatal = false,
             )
         }
+    }
 
     override fun reportFatalBlocking(
         context: Context,
         throwable: Throwable,
         threadName: String?,
     ) {
+        val fatalDetails =
+            AppErrorLogStore.ErrorDetails(
+                title = throwable::class.simpleName ?: "Erreur fatale",
+                source = threadName ?: Thread.currentThread().name,
+                message = throwable.message.orEmpty(),
+                stacktrace = throwable.stackTraceToString(),
+            )
+        AppErrorLogStore.record(
+            context = context,
+            level = AppErrorLogStore.Level.ERROR,
+            details = fatalDetails,
+        )
         runBlocking(Dispatchers.IO) {
             withTimeout(FATAL_WAIT_TIMEOUT_MS) {
                 sendReport(
@@ -190,6 +218,102 @@ object DiscordCrashReporter : CrashReporterApi {
         }
     }
 
+    /**
+     * Envoie un export manuel des journaux de l'application (logcat du propre processus) vers le
+     * webhook Discord configuré, en pièce jointe.
+     */
+    suspend fun sendLogExport(
+        context: Context,
+        logText: String,
+    ): Boolean {
+        val webhookUrl = BuildConfig.DISCORD_WEBHOOK_URL.trim()
+        if (webhookUrl.isBlank()) {
+            Log.w(TAG, "DISCORD_WEBHOOK_URL is empty, skipping log export")
+            return false
+        }
+
+        val payload = buildLogExportPayload(context = context, logText = logText)
+
+        val attachments =
+            listOf(
+                Attachment(
+                    fieldName = "files[0]",
+                    fileName = LOG_EXPORT_FILENAME,
+                    contentType = "text/plain; charset=UTF-8",
+                    bytes = logText.toByteArray(Charsets.UTF_8),
+                ),
+            )
+
+        val success =
+            postMultipart(
+                webhookUrl = webhookUrl,
+                payloadJson = payload,
+                attachments = attachments,
+            )
+
+        if (!success) {
+            Log.w(TAG, "Discord webhook returned a non-success response for log export")
+        }
+
+        return success
+    }
+
+    /**
+     * Envoie une sélection d'entrées du catalogue d'erreurs persistant ([AppErrorLogStore]) vers le
+     * webhook Discord, en pièce jointe (un bloc texte par entrée). N'agit pas sur [AppErrorLogStore] :
+     * c'est à l'appelant de marquer les entrées comme envoyées ([AppErrorLogStore.markSent]) une fois
+     * le succès confirmé.
+     */
+    suspend fun sendCatalogEntries(
+        context: Context,
+        entries: List<AppErrorLogStore.Entry>,
+    ): Boolean {
+        val webhookUrl = BuildConfig.DISCORD_WEBHOOK_URL.trim()
+        if (webhookUrl.isBlank()) {
+            Log.w(TAG, "DISCORD_WEBHOOK_URL is empty, skipping catalog export")
+            return false
+        }
+
+        val combinedText = buildCatalogText(entries)
+        val payload = buildCatalogPayload(context = context, entryCount = entries.size)
+
+        val attachments =
+            listOf(
+                Attachment(
+                    fieldName = "files[0]",
+                    fileName = CATALOG_EXPORT_FILENAME,
+                    contentType = "text/plain; charset=UTF-8",
+                    bytes = combinedText.toByteArray(Charsets.UTF_8),
+                ),
+            )
+
+        val success =
+            postMultipart(
+                webhookUrl = webhookUrl,
+                payloadJson = payload,
+                attachments = attachments,
+            )
+
+        if (!success) {
+            Log.w(TAG, "Discord webhook returned a non-success response for catalog export")
+        }
+
+        return success
+    }
+
+    internal fun buildCatalogText(entries: List<AppErrorLogStore.Entry>): String =
+        entries.joinToString(separator = "\n\n") { entry ->
+            buildString {
+                append("[${entry.level}] ${entry.title} — ${entry.source} — ${isoTimestamp(entry.timestampMs)}\n")
+                if (entry.message.isNotBlank()) {
+                    append("${entry.message}\n")
+                }
+                if (!entry.stacktrace.isNullOrBlank()) {
+                    append(entry.stacktrace)
+                }
+            }
+        }
+
     private fun captureScreenshotBestEffort(): ByteArray? {
         return try {
             CrashScreenshotStore.captureLatestScreenshot()
@@ -300,6 +424,73 @@ object DiscordCrashReporter : CrashReporterApi {
             .put("embeds", JSONArray().put(embed))
     }
 
+    internal fun buildLogExportPayload(
+        context: Context,
+        logText: String,
+    ): JSONObject {
+        val timestamp = isoTimestamp()
+        val packageInfo =
+            runCatching {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }.getOrNull()
+        val appVersionName = packageInfo?.versionName ?: BuildConfig.VERSION_NAME
+        val lineCount = logText.lineSequence().count()
+
+        val embedFields =
+            JSONArray().apply {
+                put(field("Date", timestamp, inline = true))
+                put(field("App", appVersionName, inline = true))
+                put(field("Android", "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})", inline = true))
+                put(field("Appareil", "${Build.MANUFACTURER} ${Build.MODEL}", inline = true))
+                put(field("Lignes", lineCount.toString(), inline = true))
+            }
+
+        val embed =
+            JSONObject()
+                .put("title", "Export des journaux")
+                .put("color", 0x2ECC71)
+                .put("timestamp", timestamp)
+                .put("fields", embedFields)
+
+        return JSONObject()
+            .put("content", "Export manuel des journaux de l'application.")
+            .put("embeds", JSONArray().put(embed))
+    }
+
+    internal fun buildCatalogPayload(
+        context: Context,
+        entryCount: Int,
+    ): JSONObject {
+        val timestamp = isoTimestamp()
+        val packageInfo =
+            runCatching {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }.getOrNull()
+        val appVersionName = packageInfo?.versionName ?: BuildConfig.VERSION_NAME
+
+        val embedFields =
+            JSONArray().apply {
+                put(field("Date", timestamp, inline = true))
+                put(field("App", appVersionName, inline = true))
+                put(field("Android", "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})", inline = true))
+                put(field("Appareil", "${Build.MANUFACTURER} ${Build.MODEL}", inline = true))
+                put(field("Entrées", entryCount.toString(), inline = true))
+            }
+
+        val embed =
+            JSONObject()
+                .put("title", "Catalogue d'erreurs sélectionné")
+                .put("color", CATALOG_SELECTION_EMBED_COLOR)
+                .put("timestamp", timestamp)
+                .put("fields", embedFields)
+
+        return JSONObject()
+            .put("content", "Envoi sélectif depuis le catalogue d'erreurs de l'application.")
+            .put("embeds", JSONArray().put(embed))
+    }
+
     private fun field(
         name: String,
         value: String,
@@ -398,10 +589,10 @@ object DiscordCrashReporter : CrashReporterApi {
         output.writeBytes("\r\n")
     }
 
-    private fun isoTimestamp(): String {
+    private fun isoTimestamp(epochMs: Long = System.currentTimeMillis()): String {
         val formatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.US)
         formatter.timeZone = TimeZone.getDefault()
-        return formatter.format(Date())
+        return formatter.format(Date(epochMs))
     }
 
     private data class Attachment(

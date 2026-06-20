@@ -8,22 +8,24 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.widget.Button
-import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.example.alarmwatcher.ui.AppRoot
+import com.example.alarmwatcher.ui.theme.AlarmWatcherTheme
 import java.text.DateFormat
 import java.util.Date
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : ComponentActivity() {
     private var pendingStartupPrompts = 0
     private var startupFlowStarted = false
 
-    // Composants de l'interface utilisateur
-    private lateinit var tvAlarmStatus: TextView
-    private lateinit var tvBleStatus: TextView
-    private lateinit var btnTriggerNightMode: Button
+    private var alarmStatusText by mutableStateOf("Analyse des alarmes système en cours...")
+    private var bleStatusText by mutableStateOf("Vérification des adresses MAC...")
 
     private val requestBluetoothConnect =
         registerForActivityResult(
@@ -48,16 +50,15 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        // On attache la vue XML qu'on vient de créer
-        setContentView(R.layout.activity_main)
 
-        tvAlarmStatus = findViewById(R.id.tvAlarmStatus)
-        tvBleStatus = findViewById(R.id.tvBleStatus)
-        btnTriggerNightMode = findViewById(R.id.btnTriggerNightMode)
-
-        // Action du bouton
-        btnTriggerNightMode.setOnClickListener {
-            triggerNightMode()
+        setContent {
+            AlarmWatcherTheme {
+                AppRoot(
+                    alarmStatusText = alarmStatusText,
+                    bleStatusText = bleStatusText,
+                    onTriggerNightMode = { triggerNightMode() },
+                )
+            }
         }
 
         // --- Gestion des permissions (inchangée) ---
@@ -85,8 +86,8 @@ class MainActivity : AppCompatActivity() {
         if (pendingStartupPrompts == 0) {
             startStartupFlow()
         } else {
-            tvAlarmStatus.text = "Configuration et demande des permissions en cours..."
-            tvBleStatus.text = "En attente des permissions..."
+            alarmStatusText = "Configuration et demande des permissions en cours..."
+            bleStatusText = "En attente des permissions..."
         }
     }
 
@@ -118,6 +119,11 @@ class MainActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 android.util.Log.e(TAG, "Échec de l'application manuelle du mode soirée", e)
+                DiscordCrashReporter.reportNonFatal(
+                    context = applicationContext,
+                    throwable = e,
+                    source = "MainActivity.triggerNightMode",
+                )
             }
         }.start()
     }
@@ -157,6 +163,11 @@ class MainActivity : AppCompatActivity() {
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("MainActivity", "Diagnostic failed", e)
+                    DiscordCrashReporter.reportNonFatal(
+                        context = applicationContext,
+                        throwable = e,
+                        source = "MainActivity.startStartupFlow.diagnostic",
+                    )
                 }
             }.start()
         }
@@ -189,13 +200,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
         alarmText.append(exactAlarmStatusLine(alarmManager))
-        tvAlarmStatus.text = alarmText.toString()
+        alarmStatusText = alarmText.toString()
 
         val bleText = java.lang.StringBuilder()
         bleStatusLines().forEach { line ->
             bleText.append("• ").append(line).append("\n\n")
         }
-        tvBleStatus.text = bleText.toString().trim()
+        bleStatusText = bleText.toString().trim()
     }
 
     private fun exactAlarmStatusLine(alarmManager: AlarmManager?): String {

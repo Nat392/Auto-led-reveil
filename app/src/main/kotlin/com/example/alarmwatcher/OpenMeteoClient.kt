@@ -1,6 +1,9 @@
 package com.example.alarmwatcher
 
+import android.content.Context
 import android.util.Log
+import com.example.alarmwatcher.settings.AppSettings
+import com.example.alarmwatcher.settings.AppSettingsCache
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -9,12 +12,13 @@ import java.net.URL
 
 /**
  * Source de données pour le Daylight Harvesting : radiation solaire actuelle via Open-Meteo, aux
- * mêmes coordonnées que [SunsetAutomationScheduler] (lat=46.6644, lng=5.5619).
+ * mêmes coordonnées que [SunsetAutomationScheduler] ([AppSettings.latitude]/[AppSettings.longitude]).
  */
 internal object OpenMeteoClient {
     private const val TAG = "OpenMeteoClient"
-    private const val OPEN_METEO_URL =
-        "https://api.open-meteo.com/v1/forecast?latitude=46.6644&longitude=5.5619" +
+
+    private fun openMeteoUrl(settings: AppSettings): String =
+        "https://api.open-meteo.com/v1/forecast?latitude=${settings.latitude}&longitude=${settings.longitude}" +
             "&current=shortwave_radiation&timezone=auto"
 
     data class CurrentConditions(
@@ -25,10 +29,11 @@ internal object OpenMeteoClient {
         URL(urlString).openConnection() as HttpURLConnection
     }
 
-    suspend fun fetchCurrentConditions(): CurrentConditions? {
+    suspend fun fetchCurrentConditions(context: Context): CurrentConditions? {
+        val settings = AppSettingsCache.current
         return try {
             val connection =
-                openMeteoConnectionFactory(OPEN_METEO_URL).apply {
+                openMeteoConnectionFactory(openMeteoUrl(settings)).apply {
                     connectTimeout = 10_000
                     readTimeout = 10_000
                     requestMethod = "GET"
@@ -40,6 +45,15 @@ internal object OpenMeteoClient {
                 val responseCode = connection.responseCode
                 if (responseCode !in 200..299) {
                     Log.w(TAG, "Open-Meteo API returned HTTP $responseCode")
+                    val httpError =
+                        IllegalStateException(
+                            "Open-Meteo HTTP $responseCode (lat=${settings.latitude}, lng=${settings.longitude})",
+                        )
+                    DiscordCrashReporter.reportNonFatal(
+                        context = context,
+                        throwable = httpError,
+                        source = "OpenMeteoClient.fetchCurrentConditions",
+                    )
                     return null
                 }
 
@@ -57,6 +71,11 @@ internal object OpenMeteoClient {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to fetch current conditions from Open-Meteo", e)
+            DiscordCrashReporter.reportNonFatal(
+                context = context,
+                throwable = e,
+                source = "OpenMeteoClient.fetchCurrentConditions",
+            )
             null
         }
     }

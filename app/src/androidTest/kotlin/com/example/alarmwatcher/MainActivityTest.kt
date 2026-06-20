@@ -1,11 +1,8 @@
 package com.example.alarmwatcher
 
 import android.Manifest
-import androidx.test.espresso.Espresso.onView
-import androidx.test.espresso.assertion.ViewAssertions.matches
-import androidx.test.espresso.matcher.ViewMatchers.isDisplayed
-import androidx.test.espresso.matcher.ViewMatchers.withId
-import androidx.test.ext.junit.rules.ActivityScenarioRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithText
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import io.mockk.coEvery
@@ -23,7 +20,7 @@ class MainActivityTest {
     // Si l'environnement CI refuse, on continue silencieusement.
 
     @get:Rule
-    val activityRule = ActivityScenarioRule(MainActivity::class.java)
+    val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @Before
     fun setUp() {
@@ -64,8 +61,9 @@ class MainActivityTest {
 
     @Test
     fun testMainActivityLaunchesAndDisplaysStatusText() {
-        // V?rifie simplement que l'activity se lance sans crasher
-        onView(withId(R.id.tvAlarmStatus)).check(matches(isDisplayed()))
-        onView(withId(R.id.tvBleStatus)).check(matches(isDisplayed()))
+        // Vérifie simplement que l'activity se lance sans crasher et affiche le tableau de bord
+        composeTestRule.onNodeWithText("Alarm Watcher").assertExists()
+        composeTestRule.onNodeWithText("Synchronisation Android").assertExists()
+        composeTestRule.onNodeWithText("Modules LED (Zengge BLE)").assertExists()
     }
 }

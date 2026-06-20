@@ -27,7 +27,7 @@ class DaylightHarvestingWorker(
             return Result.success()
         }
 
-        val conditions = OpenMeteoClient.fetchCurrentConditions() ?: return Result.retry()
+        val conditions = OpenMeteoClient.fetchCurrentConditions(applicationContext) ?: return Result.retry()
 
         coroutineScope {
             dueZones.forEach { harvestZone ->
