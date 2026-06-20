@@ -259,7 +259,9 @@ jobs:
                 per_page: 100,
               });
 
-              return workflowRuns.workflow_runs.find((run) => run.name === androidWorkflowName);
+              // Dependabot's pull_request-triggered run is always stuck on "action_required" (it can't be
+              // approved, since it's not a fork PR) — ignore it so callers fall back to the workflow_dispatch run.
+              return workflowRuns.workflow_runs.find((run) => run.name === androidWorkflowName && run.conclusion !== 'action_required');
             };
 
             const wait = (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000));
@@ -488,43 +490,47 @@ jobs:
             }
 
             for (const candidate of candidates) {
-              let { data: pullRequest } = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: candidate.number,
-              });
-
-              if (pullRequest.mergeable_state === 'behind') {
-                core.info(`PR #${pullRequest.number} is behind ${pullRequest.base.ref}, updating the branch...`);
-
-                await github.rest.pulls.updateBranch({
+              try {
+                let { data: pullRequest } = await github.rest.pulls.get({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  pull_number: pullRequest.number,
+                  pull_number: candidate.number,
                 });
 
-                const updatedPullRequest = await waitForBranchUpdate(pullRequest.number, pullRequest.head.sha);
+                if (pullRequest.mergeable_state === 'behind') {
+                  core.info(`PR #${pullRequest.number} is behind ${pullRequest.base.ref}, updating the branch...`);
 
-                if (!updatedPullRequest) {
-                  core.warning(`Timed out waiting for the branch update of PR #${pullRequest.number}.`);
+                  await github.rest.pulls.updateBranch({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pullRequest.number,
+                  });
+
+                  const updatedPullRequest = await waitForBranchUpdate(pullRequest.number, pullRequest.head.sha);
+
+                  if (!updatedPullRequest) {
+                    core.warning(`Timed out waiting for the branch update of PR #${pullRequest.number}.`);
+                    continue;
+                  }
+
+                  pullRequest = updatedPullRequest;
+                  core.info(`PR #${pullRequest.number} updated to ${pullRequest.head.sha}.`);
+                }
+
+                if (await getDispatchedAndroidCiRun(pullRequest.head.sha)) {
+                  core.info(`Android CI already dispatched for PR #${pullRequest.number} at ${pullRequest.head.sha}.`);
                   continue;
                 }
 
-                pullRequest = updatedPullRequest;
-                core.info(`PR #${pullRequest.number} updated to ${pullRequest.head.sha}.`);
+                await github.rest.actions.createWorkflowDispatch({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: androidWorkflowFileName,
+                  ref: pullRequest.head.ref,
+                });
+
+                core.info(`Triggered Android CI for PR #${pullRequest.number} on branch ${pullRequest.head.ref} (${pullRequest.head.sha}).`);
+              } catch (error) {
+                core.warning(`Error while processing PR #${candidate.number}: ${error.message}`);
               }
-
-              if (await getDispatchedAndroidCiRun(pullRequest.head.sha)) {
-                core.info(`Android CI already dispatched for PR #${pullRequest.number} at ${pullRequest.head.sha}.`);
-                continue;
-              }
-
-              await github.rest.actions.createWorkflowDispatch({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                workflow_id: androidWorkflowFileName,
-                ref: pullRequest.head.ref,
-              });
-
-              core.info(`Triggered Android CI for PR #${pullRequest.number} on branch ${pullRequest.head.ref} (${pullRequest.head.sha}).`);
             }
