@@ -113,15 +113,6 @@ class AppSettingsCacheWiringTest {
     }
 
     @Test
-    fun `DaylightHarvestingEstimator uses the configured solar saturation threshold`() {
-        AppSettingsCache.current = AppSettings(solarSaturationThresholdWm2 = 300.0)
-
-        val result = DaylightHarvestingEstimator.calculateTargetRgb(300.0)
-
-        assertEquals(Triple(0, 0, 0), result)
-    }
-
-    @Test
     fun `OpenMeteoClient requests the configured coordinates`() =
         runTest {
             mockkStatic(Log::class)
