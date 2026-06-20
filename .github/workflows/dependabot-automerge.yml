@@ -37,6 +37,7 @@ jobs:
       - name: Force merge for Dependabot PRs with green CI
         uses: actions/github-script@v9
         with:
+          github-token: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
           script: |
             const androidWorkflowName = 'Android CI - Alarm Watcher';
 
@@ -176,6 +177,7 @@ jobs:
       - name: Process Dependabot PRs
         uses: actions/github-script@v9
         with:
+          github-token: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
           script: |
             const androidWorkflowName = 'Android CI - Alarm Watcher';
             const androidWorkflowFileName = 'android.yml';
@@ -436,6 +438,7 @@ jobs:
       - name: Update behind branches and dispatch Android CI where needed
         uses: actions/github-script@v9
         with:
+          github-token: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
           script: |
             const androidWorkflowName = 'Android CI - Alarm Watcher';
             const androidWorkflowFileName = 'android.yml';
@@ -453,7 +456,46 @@ jobs:
               return workflowRuns.workflow_runs.find((run) => run.name === androidWorkflowName && run.event === 'workflow_dispatch');
             };
 
+            const hasSuccessfulAndroidCiRun = async (headSha) => {
+              const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: headSha,
+                per_page: 100,
+              });
+
+              return workflowRuns.workflow_runs.some((run) => run.name === androidWorkflowName && run.conclusion === 'success');
+            };
+
             const wait = (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+
+            // automerge only retries the merge on the next "Android CI - Alarm Watcher" workflow_run
+            // completion; if mergeable_state isn't "clean" yet by the time it checks (e.g. CodeQL still
+            // reporting), nothing else retries the merge for an already-green PR until this job's next
+            // push/schedule trigger picks it up here instead of just re-dispatching CI.
+            const mergePullRequest = async (pullRequest) => {
+              const maxAttempts = 3;
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                  core.info(`Merge attempt ${attempt}/${maxAttempts} for PR #${pullRequest.number}...`);
+                  await github.rest.pulls.merge({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pullRequest.number,
+                    merge_method: 'squash',
+                  });
+                  core.info(`✅ Successfully merged PR #${pullRequest.number}.`);
+                  return true;
+                } catch (error) {
+                  core.warning(`Attempt ${attempt} failed for PR #${pullRequest.number}: ${error.message}`);
+                  if (attempt === maxAttempts) {
+                    core.error(`❌ Unable to merge PR #${pullRequest.number} after ${maxAttempts} attempts.`);
+                    return false;
+                  }
+                  await wait(5);
+                }
+              }
+            };
 
             const waitForBranchUpdate = async (pullNumber, previousHeadSha, { timeoutMinutes = 5, pollIntervalSeconds = 10 } = {}) => {
               const deadline = Date.now() + timeoutMinutes * 60 * 1000;
@@ -515,6 +557,17 @@ jobs:
 
                   pullRequest = updatedPullRequest;
                   core.info(`PR #${pullRequest.number} updated to ${pullRequest.head.sha}.`);
+                }
+
+                if (pullRequest.mergeable === true && (await hasSuccessfulAndroidCiRun(pullRequest.head.sha))) {
+                  if (pullRequest.mergeable_state === 'clean') {
+                    core.info(`CI is green and PR #${pullRequest.number} is clean. Forcing merge now...`);
+                    await mergePullRequest(pullRequest);
+                    continue;
+                  }
+
+                  core.info(`CI succeeded for PR #${pullRequest.number} but mergeable_state is "${pullRequest.mergeable_state}"; will check again next run.`);
+                  continue;
                 }
 
                 if (await getDispatchedAndroidCiRun(pullRequest.head.sha)) {
