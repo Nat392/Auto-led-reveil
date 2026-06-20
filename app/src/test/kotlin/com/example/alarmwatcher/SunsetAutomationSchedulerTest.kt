@@ -57,7 +57,7 @@ class SunsetAutomationSchedulerTest {
         every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
         every { SunsetTimesStore.save(any(), any(), any(), any()) } returns Unit
         every { AlarmMonitor.scanNextAlarmAndSchedule(any()) } returns Unit
-        every { DaylightHarvestingStateStore.deactivate(any()) } returns Unit
+        every { DaylightHarvestingStateStore.deactivate(any(), any()) } returns Unit
         SunsetAutomationScheduler.sunsetConnectionFactory = defaultConnectionFactory
         SunsetAutomationScheduler.intentFactory = defaultIntentFactory
     }
@@ -291,7 +291,12 @@ class SunsetAutomationSchedulerTest {
 
             SunsetAutomationScheduler.refreshAndSchedule(context)
 
-            verify(exactly = 1) { DaylightHarvestingStateStore.deactivate(context) }
+            verify(exactly = 1) {
+                DaylightHarvestingStateStore.deactivate(context, SunsetAutomationScheduler.ZONE_CHAMBRE)
+            }
+            verify(exactly = 1) {
+                DaylightHarvestingStateStore.deactivate(context, SunsetAutomationScheduler.ZONE_CUISINE)
+            }
         }
 
     @Test
