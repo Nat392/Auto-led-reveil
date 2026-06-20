@@ -22,6 +22,7 @@ permissions:
   contents: write
   actions: write
   pull-requests: write
+  workflows: write
 
 concurrency:
   group: dependabot-automerge
@@ -259,7 +260,9 @@ jobs:
                 per_page: 100,
               });
 
-              return workflowRuns.workflow_runs.find((run) => run.name === androidWorkflowName);
+              // Dependabot's pull_request-triggered run is always stuck on "action_required" (it can't be
+              // approved, since it's not a fork PR) — ignore it so callers fall back to the workflow_dispatch run.
+              return workflowRuns.workflow_runs.find((run) => run.name === androidWorkflowName && run.conclusion !== 'action_required');
             };
 
             const wait = (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000));
