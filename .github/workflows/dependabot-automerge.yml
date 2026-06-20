@@ -1,6 +1,9 @@
 name: Dependabot Auto-merge
 
 on:
+  push:
+    branches:
+      - main
   schedule:
     - cron: '*/15 * * * *'
   workflow_run:
@@ -20,6 +23,10 @@ permissions:
   actions: write
   pull-requests: write
 
+concurrency:
+  group: dependabot-automerge
+  cancel-in-progress: false
+
 jobs:
   automerge:
     name: Enable auto-merge after CI success
@@ -27,9 +34,10 @@ jobs:
     if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success'
 
     steps:
-      - name: Enable auto-merge for Dependabot PRs with green CI
+      - name: Force merge for Dependabot PRs with green CI
         uses: actions/github-script@v9
         with:
+          github-token: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
           script: |
             const androidWorkflowName = 'Android CI - Alarm Watcher';
 
@@ -71,59 +79,51 @@ jobs:
               return workflowRuns.workflow_runs.some((run) => run.name === androidWorkflowName && run.conclusion === 'success');
             };
 
-            const mergePullRequest = async (pullRequest) => {
-              try {
-                await github.rest.pulls.merge({
+            // GitHub only finishes computing mergeable_state ("clean" once every required status check has
+            // reported, not just the Android CI one we track above) a little while after the checks complete,
+            // so wait for it instead of immediately attempting a merge that branch protection would reject.
+            const waitForCleanMergeState = async (pullNumber, { timeoutMinutes = 5, pollIntervalSeconds = 15 } = {}) => {
+              const deadline = Date.now() + timeoutMinutes * 60 * 1000;
+              let pullRequest;
+
+              do {
+                ({ data: pullRequest } = await github.rest.pulls.get({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  pull_number: pullRequest.number,
-                  merge_method: 'squash',
-                });
+                  pull_number: pullNumber,
+                }));
 
-                core.info(`Merged PR #${pullRequest.number}.`);
-              } catch (error) {
-                core.warning(`Unable to merge PR #${pullRequest.number}: ${error.message}`);
-              }
-            };
-
-            const enableAutoMergeForPullRequest = async (pullRequest) => {
-              if (pullRequest.auto_merge) {
-                core.info(`Auto-merge is already enabled for PR #${pullRequest.number}.`);
-                return;
-              }
-
-              try {
-                await github.graphql(
-                  `
-                    mutation EnablePullRequestAutoMerge($pullRequestId: ID!) {
-                      enablePullRequestAutoMerge(input: {
-                        pullRequestId: $pullRequestId
-                        mergeMethod: SQUASH
-                      }) {
-                        pullRequest {
-                          number
-                          autoMergeRequest {
-                            enabledAt
-                            mergeMethod
-                          }
-                        }
-                      }
-                    }
-                  `,
-                  {
-                    pullRequestId: pullRequest.node_id,
-                  }
-                );
-
-                core.info(`Enabled squash auto-merge for PR #${pullRequest.number}.`);
-              } catch (error) {
-                if (error.message.includes('clean status')) {
-                  core.info(`PR #${pullRequest.number} is already mergeable, merging directly.`);
-                  await mergePullRequest(pullRequest);
-                  return;
+                if (pullRequest.mergeable_state === 'clean' || !isMergeablePullRequest(pullRequest)) {
+                  return pullRequest;
                 }
 
-                core.warning(`Unable to enable auto-merge for PR #${pullRequest.number}: ${error.message}`);
+                await wait(pollIntervalSeconds);
+              } while (Date.now() < deadline);
+
+              return pullRequest;
+            };
+
+            const mergePullRequest = async (pullRequest) => {
+              const maxAttempts = 3;
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                  core.info(`Merge attempt ${attempt}/${maxAttempts} for PR #${pullRequest.number}...`);
+                  await github.rest.pulls.merge({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pullRequest.number,
+                    merge_method: 'squash',
+                  });
+                  core.info(`✅ Successfully merged PR #${pullRequest.number}.`);
+                  return true;
+                } catch (error) {
+                  core.warning(`Attempt ${attempt} failed for PR #${pullRequest.number}: ${error.message}`);
+                  if (attempt === maxAttempts) {
+                    core.error(`❌ Unable to merge PR #${pullRequest.number} after ${maxAttempts} attempts.`);
+                    return false;
+                  }
+                  await wait(5);
+                }
               }
             };
 
@@ -156,11 +156,19 @@ jobs:
                 continue;
               }
 
-              await enableAutoMergeForPullRequest(pullRequest);
+              const cleanPullRequest = await waitForCleanMergeState(pullRequest.number);
+
+              if (cleanPullRequest.mergeable_state !== 'clean') {
+                core.info(`Skipping PR #${cleanPullRequest.number} because required status checks are not all green yet (mergeable_state="${cleanPullRequest.mergeable_state}"); will retry on the next trigger.`);
+                continue;
+              }
+
+              core.info(`CI is green. Forcing merge for PR #${cleanPullRequest.number} now...`);
+              await mergePullRequest(cleanPullRequest);
             }
 
   retroactive:
-    name: Update, wait for CI, and enable auto-merge for Dependabot PRs
+    name: Update, wait for CI, and force merge for Dependabot PRs
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
     timeout-minutes: 90
@@ -169,6 +177,7 @@ jobs:
       - name: Process Dependabot PRs
         uses: actions/github-script@v9
         with:
+          github-token: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
           script: |
             const androidWorkflowName = 'Android CI - Alarm Watcher';
             const androidWorkflowFileName = 'android.yml';
@@ -178,58 +187,26 @@ jobs:
             const isMergeablePullRequest = (pullRequest) => pullRequest.mergeable === true;
 
             const mergePullRequest = async (pullRequest) => {
-              try {
-                await github.rest.pulls.merge({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  pull_number: pullRequest.number,
-                  merge_method: 'squash',
-                });
-
-                core.info(`Merged PR #${pullRequest.number}.`);
-              } catch (error) {
-                core.warning(`Unable to merge PR #${pullRequest.number}: ${error.message}`);
-              }
-            };
-
-            const enableAutoMergeForPullRequest = async (pullRequest) => {
-              if (pullRequest.auto_merge) {
-                core.info(`Auto-merge is already enabled for PR #${pullRequest.number}.`);
-                return;
-              }
-
-              try {
-                await github.graphql(
-                  `
-                    mutation EnablePullRequestAutoMerge($pullRequestId: ID!) {
-                      enablePullRequestAutoMerge(input: {
-                        pullRequestId: $pullRequestId
-                        mergeMethod: SQUASH
-                      }) {
-                        pullRequest {
-                          number
-                          autoMergeRequest {
-                            enabledAt
-                            mergeMethod
-                          }
-                        }
-                      }
-                    }
-                  `,
-                  {
-                    pullRequestId: pullRequest.node_id,
+              const maxAttempts = 3;
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                  core.info(`Merge attempt ${attempt}/${maxAttempts} for PR #${pullRequest.number}...`);
+                  await github.rest.pulls.merge({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pullRequest.number,
+                    merge_method: 'squash',
+                  });
+                  core.info(`✅ Successfully merged PR #${pullRequest.number}.`);
+                  return true;
+                } catch (error) {
+                  core.warning(`Attempt ${attempt} failed for PR #${pullRequest.number}: ${error.message}`);
+                  if (attempt === maxAttempts) {
+                    core.error(`❌ Unable to merge PR #${pullRequest.number} after ${maxAttempts} attempts.`);
+                    return false;
                   }
-                );
-
-                core.info(`Enabled squash auto-merge for PR #${pullRequest.number}.`);
-              } catch (error) {
-                if (error.message.includes('clean status')) {
-                  core.info(`PR #${pullRequest.number} is already mergeable, merging directly.`);
-                  await mergePullRequest(pullRequest);
-                  return;
+                  await wait(5); 
                 }
-
-                core.warning(`Unable to enable auto-merge for PR #${pullRequest.number}: ${error.message}`);
               }
             };
 
@@ -252,7 +229,9 @@ jobs:
                 per_page: 100,
               });
 
-              return workflowRuns.workflow_runs.find((run) => run.name === androidWorkflowName);
+              // Dependabot's pull_request-triggered run is always stuck on "action_required" (it can't be
+              // approved, since it's not a fork PR) — ignore it so callers fall back to the workflow_dispatch run.
+              return workflowRuns.workflow_runs.find((run) => run.name === androidWorkflowName && run.conclusion !== 'action_required');
             };
 
             const wait = (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000));
@@ -285,6 +264,30 @@ jobs:
                 }));
 
                 if (pullRequest.mergeable !== null) {
+                  return pullRequest;
+                }
+
+                await wait(pollIntervalSeconds);
+              } while (Date.now() < deadline);
+
+              return pullRequest;
+            };
+
+            // GitHub only finishes computing mergeable_state ("clean" once every required status check has
+            // reported, not just the Android CI one we track above) a little while after the checks complete,
+            // so wait for it instead of immediately attempting a merge that branch protection would reject.
+            const waitForCleanMergeState = async (pullNumber, { timeoutMinutes = 5, pollIntervalSeconds = 15 } = {}) => {
+              const deadline = Date.now() + timeoutMinutes * 60 * 1000;
+              let pullRequest;
+
+              do {
+                ({ data: pullRequest } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullNumber,
+                }));
+
+                if (pullRequest.mergeable_state === 'clean' || !isMergeablePullRequest(pullRequest)) {
                   return pullRequest;
                 }
 
@@ -412,7 +415,15 @@ jobs:
                   continue;
                 }
 
-                await enableAutoMergeForPullRequest(refreshedPullRequest);
+                const cleanPullRequest = await waitForCleanMergeState(refreshedPullRequest.number);
+
+                if (cleanPullRequest.mergeable_state !== 'clean') {
+                  core.warning(`Skipping PR #${cleanPullRequest.number} because required status checks are not all green yet (mergeable_state="${cleanPullRequest.mergeable_state}"); will retry on the next trigger.`);
+                  continue;
+                }
+
+                core.info(`CI is green and PR #${cleanPullRequest.number} is mergeable. Forcing merge now...`);
+                await mergePullRequest(cleanPullRequest);
               } catch (error) {
                 core.warning(`Error while processing PR #${pullRequestNumber}: ${error.message}`);
               }
@@ -421,12 +432,13 @@ jobs:
   trigger-pending-ci:
     name: Trigger Android CI for Dependabot PRs stuck on approval
     runs-on: ubuntu-latest
-    if: github.event_name == 'schedule'
+    if: github.event_name == 'schedule' || github.event_name == 'push'
 
     steps:
       - name: Update behind branches and dispatch Android CI where needed
         uses: actions/github-script@v9
         with:
+          github-token: ${{ secrets.DEPENDABOT_AUTOMERGE_TOKEN }}
           script: |
             const androidWorkflowName = 'Android CI - Alarm Watcher';
             const androidWorkflowFileName = 'android.yml';
@@ -444,6 +456,67 @@ jobs:
               return workflowRuns.workflow_runs.find((run) => run.name === androidWorkflowName && run.event === 'workflow_dispatch');
             };
 
+            const hasSuccessfulAndroidCiRun = async (headSha) => {
+              const { data: workflowRuns } = await github.rest.actions.listWorkflowRunsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                head_sha: headSha,
+                per_page: 100,
+              });
+
+              return workflowRuns.workflow_runs.some((run) => run.name === androidWorkflowName && run.conclusion === 'success');
+            };
+
+            const wait = (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+
+            // automerge only retries the merge on the next "Android CI - Alarm Watcher" workflow_run
+            // completion; if mergeable_state isn't "clean" yet by the time it checks (e.g. CodeQL still
+            // reporting), nothing else retries the merge for an already-green PR until this job's next
+            // push/schedule trigger picks it up here instead of just re-dispatching CI.
+            const mergePullRequest = async (pullRequest) => {
+              const maxAttempts = 3;
+              for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                  core.info(`Merge attempt ${attempt}/${maxAttempts} for PR #${pullRequest.number}...`);
+                  await github.rest.pulls.merge({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pullRequest.number,
+                    merge_method: 'squash',
+                  });
+                  core.info(`✅ Successfully merged PR #${pullRequest.number}.`);
+                  return true;
+                } catch (error) {
+                  core.warning(`Attempt ${attempt} failed for PR #${pullRequest.number}: ${error.message}`);
+                  if (attempt === maxAttempts) {
+                    core.error(`❌ Unable to merge PR #${pullRequest.number} after ${maxAttempts} attempts.`);
+                    return false;
+                  }
+                  await wait(5);
+                }
+              }
+            };
+
+            const waitForBranchUpdate = async (pullNumber, previousHeadSha, { timeoutMinutes = 5, pollIntervalSeconds = 10 } = {}) => {
+              const deadline = Date.now() + timeoutMinutes * 60 * 1000;
+
+              while (Date.now() < deadline) {
+                const { data: pullRequest } = await github.rest.pulls.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: pullNumber,
+                });
+
+                if (pullRequest.head.sha !== previousHeadSha) {
+                  return pullRequest;
+                }
+
+                await wait(pollIntervalSeconds);
+              }
+
+              return null;
+            };
+
             const { data: openPullRequests } = await github.rest.pulls.list({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -459,35 +532,58 @@ jobs:
             }
 
             for (const candidate of candidates) {
-              const { data: pullRequest } = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: candidate.number,
-              });
-
-              if (pullRequest.mergeable_state === 'behind') {
-                core.info(`PR #${pullRequest.number} is behind ${pullRequest.base.ref}, updating the branch...`);
-
-                await github.rest.pulls.updateBranch({
+              try {
+                let { data: pullRequest } = await github.rest.pulls.get({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  pull_number: pullRequest.number,
+                  pull_number: candidate.number,
                 });
 
-                continue;
+                if (pullRequest.mergeable_state === 'behind') {
+                  core.info(`PR #${pullRequest.number} is behind ${pullRequest.base.ref}, updating the branch...`);
+
+                  await github.rest.pulls.updateBranch({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    pull_number: pullRequest.number,
+                  });
+
+                  const updatedPullRequest = await waitForBranchUpdate(pullRequest.number, pullRequest.head.sha);
+
+                  if (!updatedPullRequest) {
+                    core.warning(`Timed out waiting for the branch update of PR #${pullRequest.number}.`);
+                    continue;
+                  }
+
+                  pullRequest = updatedPullRequest;
+                  core.info(`PR #${pullRequest.number} updated to ${pullRequest.head.sha}.`);
+                }
+
+                if (pullRequest.mergeable === true && (await hasSuccessfulAndroidCiRun(pullRequest.head.sha))) {
+                  if (pullRequest.mergeable_state === 'clean') {
+                    core.info(`CI is green and PR #${pullRequest.number} is clean. Forcing merge now...`);
+                    await mergePullRequest(pullRequest);
+                    continue;
+                  }
+
+                  core.info(`CI succeeded for PR #${pullRequest.number} but mergeable_state is "${pullRequest.mergeable_state}"; will check again next run.`);
+                  continue;
+                }
+
+                if (await getDispatchedAndroidCiRun(pullRequest.head.sha)) {
+                  core.info(`Android CI already dispatched for PR #${pullRequest.number} at ${pullRequest.head.sha}.`);
+                  continue;
+                }
+
+                await github.rest.actions.createWorkflowDispatch({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: androidWorkflowFileName,
+                  ref: pullRequest.head.ref,
+                });
+
+                core.info(`Triggered Android CI for PR #${pullRequest.number} on branch ${pullRequest.head.ref} (${pullRequest.head.sha}).`);
+              } catch (error) {
+                core.warning(`Error while processing PR #${candidate.number}: ${error.message}`);
               }
-
-              if (await getDispatchedAndroidCiRun(pullRequest.head.sha)) {
-                core.info(`Android CI already dispatched for PR #${pullRequest.number} at ${pullRequest.head.sha}.`);
-                continue;
-              }
-
-              await github.rest.actions.createWorkflowDispatch({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                workflow_id: androidWorkflowFileName,
-                ref: pullRequest.head.ref,
-              });
-
-              core.info(`Triggered Android CI for PR #${pullRequest.number} on branch ${pullRequest.head.ref} (${pullRequest.head.sha}).`);
             }
