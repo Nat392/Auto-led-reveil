@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class SunsetSceneService : Service() {
@@ -115,6 +116,8 @@ class SunsetSceneService : Service() {
         private const val TAG = "SunsetSceneService"
         private const val NOTIFICATION_ID = 402
         private const val NOTIFICATION_CHANNEL_ID = "sunset_scene_service"
+        private const val SCENE_APPLY_MAX_ATTEMPTS = 3
+        private const val SCENE_APPLY_RETRY_DELAY_MS = 1_500L
 
         internal fun resolveZone(zoneKey: String?): SunriseBulbZone? {
             return when (zoneKey) {
@@ -155,16 +158,22 @@ class SunsetSceneService : Service() {
             }
 
             return try {
-                val applied =
-                    ZenggeBulbController.applyScene(
-                        context = context,
-                        macAddress = zone.macAddress,
-                        red = zone.sunsetR,
-                        green = zone.sunsetG,
-                        blue = zone.sunsetB,
-                        white = zone.whiteChannel,
-                        brightnessPercent = zone.brightnessPercent,
-                    )
+                var applied = false
+                for (attempt in 1..SCENE_APPLY_MAX_ATTEMPTS) {
+                    applied =
+                        ZenggeBulbController.applyScene(
+                            context = context,
+                            macAddress = zone.macAddress,
+                            red = zone.sunsetR,
+                            green = zone.sunsetG,
+                            blue = zone.sunsetB,
+                            white = zone.whiteChannel,
+                            brightnessPercent = zone.brightnessPercent,
+                        )
+                    if (applied || attempt == SCENE_APPLY_MAX_ATTEMPTS) break
+                    Log.w(TAG, "Retrying sunset scene for ${zone.label} (attempt $attempt failed)")
+                    delay(SCENE_APPLY_RETRY_DELAY_MS)
+                }
 
                 if (!applied) {
                     Log.w(TAG, "Failed to apply sunset scene for ${zone.label}")
