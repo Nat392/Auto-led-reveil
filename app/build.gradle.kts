@@ -199,6 +199,11 @@ val coverageExclusions =
         "**/*Dagger*.*",
         "**/di/**",
         "**/databinding/**",
+        // Composables Compose : couverts par des tests UI (androidTest), pas par les tests unitaires.
+        "**/ui/screens/**",
+        "**/ui/theme/**",
+        "**/ui/AppRoot*.*",
+        "**/ComposableSingletons*.*",
     )
 
 fun androidCoverageClassTree() =
