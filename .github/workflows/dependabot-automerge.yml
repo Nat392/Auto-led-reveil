@@ -27,6 +27,10 @@ concurrency:
   group: dependabot-automerge
   cancel-in-progress: false
 
+concurrency:
+  group: dependabot-automerge
+  cancel-in-progress: false
+
 jobs:
   automerge:
     name: Enable auto-merge after CI success
