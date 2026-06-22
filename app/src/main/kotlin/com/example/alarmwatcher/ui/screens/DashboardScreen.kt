@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 fun DashboardScreen(
     alarmStatusText: String,
     bleStatusText: String,
+    liveStatusText: String,
     onTriggerNightMode: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -53,6 +54,13 @@ fun DashboardScreen(
             title = "Modules LED (Zengge BLE)",
             titleColor = MaterialTheme.colorScheme.secondary,
             body = bleStatusText,
+            modifier = Modifier.padding(bottom = 16.dp),
+        )
+
+        StatusCard(
+            title = "État actuel",
+            titleColor = MaterialTheme.colorScheme.tertiary,
+            body = liveStatusText,
             modifier = Modifier.padding(bottom = 24.dp),
         )
     }

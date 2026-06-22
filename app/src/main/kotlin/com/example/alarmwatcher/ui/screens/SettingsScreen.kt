@@ -9,8 +9,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -40,6 +44,7 @@ fun SettingsScreen(
         NightFadeSection(settings, viewModel)
         DaylightHarvestingSection(settings, viewModel)
         LocationSection(settings, viewModel)
+        BleDevicesSection(settings, viewModel)
         AdvancedSection(settings, viewModel)
     }
 }
@@ -167,11 +172,14 @@ private fun DaylightHarvestingSection(
     settings: AppSettings,
     viewModel: SettingsViewModel,
 ) {
-    val intervalHelp = "Fréquence de vérification de la luminosité extérieure pour ajuster les lampes Bureau/Cuisine."
+    val intervalHelp = "Fréquence de vérification de la luminosité extérieure pour ajuster les lampes Chambre/Cuisine."
     val fadeHelp = "Temps pour qu'une lampe passe en douceur d'un état lumineux à un autre lors d'un ajustement."
-    val thresholdHelp = "Au-delà de cette luminosité, Bureau et Cuisine s'éteignent (jour suffisant)."
+    val thresholdHelp =
+        "Au-delà de cette luminosité extérieure (mesurée en W/m²), cette pièce considère qu'elle reçoit assez " +
+            "de lumière du jour et la lampe s'éteint. Plus une pièce a de petites fenêtres, plus ce seuil doit " +
+            "être bas."
 
-    SettingsSectionTitle("Récupération de la lumière du jour")
+    SettingsSectionTitle("Récupération de la lumière du jour — Chambre et Cuisine uniquement")
     IntSliderSetting(
         label = SettingLabel("Intervalle de vérification", intervalHelp),
         value = settings.daylightIntervalMinutes,
@@ -187,12 +195,65 @@ private fun DaylightHarvestingSection(
         valueText = { "$it min" },
     )
     DoubleSliderSetting(
-        label = SettingLabel("Seuil de saturation solaire", thresholdHelp),
-        value = settings.solarSaturationThresholdWm2,
-        onValueChange = { viewModel.update { s -> s.copy(solarSaturationThresholdWm2 = it) } },
-        sliderRange = SliderRange(range = 100f..1000f, steps = 89),
+        label = SettingLabel("Seuil de saturation solaire — Chambre", thresholdHelp),
+        value = settings.chambreSolarThresholdWm2,
+        onValueChange = { viewModel.update { s -> s.copy(chambreSolarThresholdWm2 = it) } },
+        sliderRange = SliderRange(range = 50f..1000f, steps = 94),
         valueText = { "${it.toInt()} W/m²" },
     )
+    DoubleSliderSetting(
+        label = SettingLabel("Seuil de saturation solaire — Cuisine", thresholdHelp),
+        value = settings.cuisineSolarThresholdWm2,
+        onValueChange = { viewModel.update { s -> s.copy(cuisineSolarThresholdWm2 = it) } },
+        sliderRange = SliderRange(range = 50f..1000f, steps = 94),
+        valueText = { "${it.toInt()} W/m²" },
+    )
+}
+
+@Composable
+private fun BleDevicesSection(
+    settings: AppSettings,
+    viewModel: SettingsViewModel,
+) {
+    var showScanDialog by remember { mutableStateOf(false) }
+    val macHelp = "Laisser vide pour utiliser l'adresse configurée à la compilation (local.properties)."
+
+    SettingsSectionTitle("Appareils BLE")
+    TextButton(onClick = { showScanDialog = true }) {
+        Text("Scanner les ampoules BLE à proximité")
+    }
+    MacAddressField(
+        label = SettingLabel("Adresse MAC — Bureau", macHelp),
+        value = settings.bureauMacAddress,
+        onValueChange = { viewModel.update { s -> s.copy(bureauMacAddress = it) } },
+    )
+    MacAddressField(
+        label = SettingLabel("Adresse MAC — Chambre", macHelp),
+        value = settings.chambreMacAddress,
+        onValueChange = { viewModel.update { s -> s.copy(chambreMacAddress = it) } },
+    )
+    MacAddressField(
+        label = SettingLabel("Adresse MAC — Cuisine", macHelp),
+        value = settings.cuisineMacAddress,
+        onValueChange = { viewModel.update { s -> s.copy(cuisineMacAddress = it) } },
+    )
+
+    if (showScanDialog) {
+        BleScanDialog(
+            onDismiss = { showScanDialog = false },
+            onAssign = { zoneLabel, macAddress ->
+                viewModel.update { s ->
+                    when (zoneLabel) {
+                        "Bureau" -> s.copy(bureauMacAddress = macAddress)
+                        "Chambre" -> s.copy(chambreMacAddress = macAddress)
+                        "Cuisine" -> s.copy(cuisineMacAddress = macAddress)
+                        else -> s
+                    }
+                }
+                showScanDialog = false
+            },
+        )
+    }
 }
 
 @Composable
@@ -221,6 +282,10 @@ private fun AdvancedSection(
     viewModel: SettingsViewModel,
 ) {
     val refreshHelp = "Heure à laquelle l'app recalcule chaque jour l'heure du coucher de soleil du lendemain."
+    val retryAttemptsHelp = "Nombre de tentatives avant d'abandonner l'envoi d'une commande BLE à une ampoule."
+    val retryDelayHelp = "Temps d'attente entre deux tentatives d'envoi d'une commande BLE."
+    val connectTimeoutHelp = "Temps maximal accordé à une ampoule pour répondre à une demande de connexion BLE."
+    val opTimeoutHelp = "Temps maximal accordé à une ampoule pour répondre à une commande BLE une fois connectée."
 
     SettingsSectionTitle("Avancé")
     TimeOfDaySetting(
@@ -229,5 +294,35 @@ private fun AdvancedSection(
         minute = settings.sunsetRefreshMinute,
         onHourChange = { h -> viewModel.update { it.copy(sunsetRefreshHour = h) } },
         onMinuteChange = { m -> viewModel.update { it.copy(sunsetRefreshMinute = m) } },
+    )
+
+    SettingsSectionTitle("Avancé — robustesse BLE")
+    IntSliderSetting(
+        label = SettingLabel("Tentatives de connexion BLE (mode soirée)", retryAttemptsHelp),
+        value = settings.sunsetSceneRetryAttempts,
+        onValueChange = { viewModel.update { s -> s.copy(sunsetSceneRetryAttempts = it) } },
+        valueRange = 1..6,
+        valueText = { "$it tentative(s)" },
+    )
+    DoubleSliderSetting(
+        label = SettingLabel("Délai entre tentatives", retryDelayHelp),
+        value = settings.sunsetSceneRetryDelaySeconds,
+        onValueChange = { viewModel.update { s -> s.copy(sunsetSceneRetryDelaySeconds = it) } },
+        sliderRange = SliderRange(range = 0.5f..5.0f, steps = 8),
+        valueText = { "$it s" },
+    )
+    IntSliderSetting(
+        label = SettingLabel("Timeout de connexion BLE", connectTimeoutHelp),
+        value = settings.bleConnectTimeoutSeconds,
+        onValueChange = { viewModel.update { s -> s.copy(bleConnectTimeoutSeconds = it) } },
+        valueRange = 5..30,
+        valueText = { "$it s" },
+    )
+    IntSliderSetting(
+        label = SettingLabel("Timeout d'une commande BLE", opTimeoutHelp),
+        value = settings.bleOperationTimeoutSeconds,
+        onValueChange = { viewModel.update { s -> s.copy(bleOperationTimeoutSeconds = it) } },
+        valueRange = 2..20,
+        valueText = { "$it s" },
     )
 }

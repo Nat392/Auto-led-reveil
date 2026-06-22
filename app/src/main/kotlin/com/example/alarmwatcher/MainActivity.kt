@@ -15,8 +15,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.lifecycleScope
 import com.example.alarmwatcher.ui.AppRoot
 import com.example.alarmwatcher.ui.theme.AlarmWatcherTheme
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
 
@@ -26,6 +29,7 @@ class MainActivity : ComponentActivity() {
 
     private var alarmStatusText by mutableStateOf("Analyse des alarmes système en cours...")
     private var bleStatusText by mutableStateOf("Vérification des adresses MAC...")
+    private var liveStatusText by mutableStateOf("Chargement...")
 
     private val requestBluetoothConnect =
         registerForActivityResult(
@@ -56,6 +60,7 @@ class MainActivity : ComponentActivity() {
                 AppRoot(
                     alarmStatusText = alarmStatusText,
                     bleStatusText = bleStatusText,
+                    liveStatusText = liveStatusText,
                     onTriggerNightMode = { triggerNightMode() },
                 )
             }
@@ -173,6 +178,13 @@ class MainActivity : ComponentActivity() {
         }
 
         updateUIWithStatus()
+
+        lifecycleScope.launch {
+            while (isActive) {
+                kotlinx.coroutines.delay(LIVE_STATUS_REFRESH_INTERVAL_MS)
+                updateUIWithStatus()
+            }
+        }
     }
 
     private fun updateUIWithStatus() {
@@ -207,6 +219,8 @@ class MainActivity : ComponentActivity() {
             bleText.append("• ").append(line).append("\n\n")
         }
         bleStatusText = bleText.toString().trim()
+
+        liveStatusText = LiveStatusFormatter.build(applicationContext)
     }
 
     private fun exactAlarmStatusLine(alarmManager: AlarmManager?): String {
@@ -270,5 +284,6 @@ class MainActivity : ComponentActivity() {
         const val TAG = "MainActivity"
         const val MANUAL_SEQUENCE_DELAY_MS = 1_000L
         const val ONE_MINUTE_MS = 60_000L
+        const val LIVE_STATUS_REFRESH_INTERVAL_MS = 30_000L
     }
 }

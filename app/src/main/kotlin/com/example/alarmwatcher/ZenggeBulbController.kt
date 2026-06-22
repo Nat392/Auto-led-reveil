@@ -12,6 +12,7 @@ import android.content.Context
 import android.os.Build
 import android.util.Log
 import androidx.annotation.WorkerThread
+import com.example.alarmwatcher.settings.AppSettingsCache
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
@@ -22,8 +23,11 @@ import kotlin.math.roundToInt
 
 object ZenggeBulbController : BulbControllerApi {
     private const val TAG = "ZenggeBulbController"
-    private const val CONNECT_TIMEOUT_MS = 12_000L
-    private const val OP_TIMEOUT_MS = 5_000L
+    private const val MILLIS_PER_SECOND = 1_000L
+    private val CONNECT_TIMEOUT_MS: Long
+        get() = AppSettingsCache.current.bleConnectTimeoutSeconds * MILLIS_PER_SECOND
+    private val OP_TIMEOUT_MS: Long
+        get() = AppSettingsCache.current.bleOperationTimeoutSeconds * MILLIS_PER_SECOND
     private const val MIN_BRIGHTNESS_PERCENT = 0
     private const val MAX_BRIGHTNESS_PERCENT = 100
     private const val MIN_RGB_VALUE = 0
@@ -122,6 +126,26 @@ object ZenggeBulbController : BulbControllerApi {
                 source = errorSource,
             )
             false
+        } finally {
+            session.close()
+        }
+    }
+
+    /**
+     * Test de compatibilité silencieux : se connecte, découvre les services GATT, vérifie la
+     * présence de la caractéristique RGBW Zengge ([UUID_RGBW_NEW]/[UUID_RGBW_LEGACY]) puis se
+     * déconnecte — sans jamais écrire de commande. Permet de confirmer qu'une adresse MAC
+     * détectée par un scan BLE correspond bien à une ampoule pilotable par ce protocole, sans
+     * changer sa couleur ni son état d'allumage.
+     */
+    @WorkerThread
+    suspend fun verifyBulbCharacteristic(
+        context: Context,
+        macAddress: String,
+    ): Boolean {
+        val session = openSession(context, macAddress) as? Session ?: return false
+        return try {
+            session.gatt.findCharacteristic() != null
         } finally {
             session.close()
         }

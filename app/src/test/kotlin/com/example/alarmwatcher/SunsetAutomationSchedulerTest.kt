@@ -57,7 +57,7 @@ class SunsetAutomationSchedulerTest {
         every { pendingIntent.cancel() } returns Unit
         every { alarmManager.cancel(any<PendingIntent>()) } returns Unit
         every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
-        every { SunsetTimesStore.save(any(), any(), any(), any()) } returns Unit
+        every { SunsetTimesStore.save(any(), any(), any(), any(), any()) } returns Unit
         every { AlarmMonitor.scanNextAlarmAndSchedule(any()) } returns Unit
         every { DaylightHarvestingStateStore.deactivate(any(), any()) } returns Unit
         SunsetAutomationScheduler.sunsetConnectionFactory = defaultConnectionFactory

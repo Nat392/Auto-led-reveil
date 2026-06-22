@@ -165,6 +165,53 @@ class ZenggeBulbControllerTest {
         }
 
     @Test
+    fun `verifyBulbCharacteristic - confirme la compatibilite sans jamais ecrire de commande`() =
+        runTest {
+            val context = mockk<Context>(relaxed = true)
+            val bluetoothManager = mockk<BluetoothManager>()
+            val bluetoothAdapter = mockk<BluetoothAdapter>()
+            val bluetoothDevice = mockk<BluetoothDevice>(relaxed = true)
+            val bluetoothGatt = mockk<BluetoothGatt>(relaxed = true)
+
+            every { context.getSystemService(BluetoothManager::class.java) } returns bluetoothManager
+            every { bluetoothManager.adapter } returns bluetoothAdapter
+            every { bluetoothAdapter.getRemoteDevice(any<String>()) } returns bluetoothDevice
+
+            val callbackSlot = slot<BluetoothGattCallback>()
+
+            every { bluetoothDevice.connectGatt(any(), any(), capture(callbackSlot), any()) } answers {
+                val cb = callbackSlot.captured
+                cb.onConnectionStateChange(bluetoothGatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED)
+                bluetoothGatt
+            }
+            every { bluetoothDevice.connectGatt(any(), any(), capture(callbackSlot)) } answers {
+                val cb = callbackSlot.captured
+                cb.onConnectionStateChange(bluetoothGatt, BluetoothGatt.GATT_SUCCESS, BluetoothProfile.STATE_CONNECTED)
+                bluetoothGatt
+            }
+
+            every { bluetoothGatt.discoverServices() } answers {
+                callbackSlot.captured.onServicesDiscovered(bluetoothGatt, BluetoothGatt.GATT_SUCCESS)
+                true
+            }
+
+            val service = mockk<BluetoothGattService>(relaxed = true)
+            val characteristic = mockk<BluetoothGattCharacteristic>(relaxed = true)
+            every { bluetoothGatt.services } returns listOf(service)
+            every { service.getCharacteristic(any()) } returns characteristic
+            every { characteristic.properties } returns BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE
+
+            val result = ZenggeBulbController.verifyBulbCharacteristic(context, "AA:BB:CC:DD:EE:FF")
+
+            assertTrue(result, "La caractéristique RGBW doit être trouvée pour une ampoule compatible")
+            verify(exactly = 1) { bluetoothGatt.discoverServices() }
+            verify(exactly = 0) { bluetoothGatt.writeCharacteristic(any(), any(), any()) }
+            verify(exactly = 0) { bluetoothGatt.writeCharacteristic(any()) }
+            verify(exactly = 1) { bluetoothGatt.disconnect() }
+            verify(exactly = 1) { bluetoothGatt.close() }
+        }
+
+    @Test
     fun `openSession - expire et interrompt proprement en cas de timeout Gatt Hardware`() =
         runTest {
             val context = mockk<Context>(relaxed = true)
