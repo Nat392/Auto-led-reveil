@@ -51,11 +51,19 @@ class AppSettingsStoreTest {
             assertEquals(9 * 60 + 30, settings.nightFadeMorningEndMinutes)
             assertEquals(15, settings.daylightIntervalMinutes)
             assertEquals(14, settings.daylightFadeDurationMinutes)
-            assertEquals(600.0, settings.solarSaturationThresholdWm2)
+            assertEquals(400.0, settings.chambreSolarThresholdWm2)
+            assertEquals(150.0, settings.cuisineSolarThresholdWm2)
             assertEquals(46.6644, settings.latitude)
             assertEquals(5.5619, settings.longitude)
             assertEquals(0, settings.sunsetRefreshHour)
             assertEquals(5, settings.sunsetRefreshMinute)
+            assertEquals("", settings.bureauMacAddress)
+            assertEquals("", settings.chambreMacAddress)
+            assertEquals("", settings.cuisineMacAddress)
+            assertEquals(3, settings.sunsetSceneRetryAttempts)
+            assertEquals(1.5, settings.sunsetSceneRetryDelaySeconds)
+            assertEquals(12, settings.bleConnectTimeoutSeconds)
+            assertEquals(5, settings.bleOperationTimeoutSeconds)
         }
 
     @Test

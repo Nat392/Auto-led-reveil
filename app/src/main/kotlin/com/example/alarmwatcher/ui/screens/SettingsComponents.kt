@@ -79,7 +79,7 @@ fun HelpDialogButton(
 }
 
 @Composable
-private fun SettingHeaderRow(
+internal fun SettingHeaderRow(
     label: SettingLabel,
     modifier: Modifier = Modifier,
 ) {

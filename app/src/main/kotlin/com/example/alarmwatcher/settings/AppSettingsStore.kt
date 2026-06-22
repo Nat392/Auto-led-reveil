@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -46,11 +47,19 @@ internal class AppSettingsStore(
             nightFadeMorningEndMinutes = this[Keys.nightFadeMorningEndMinutes, d.nightFadeMorningEndMinutes],
             daylightIntervalMinutes = this[Keys.daylightIntervalMinutes, d.daylightIntervalMinutes],
             daylightFadeDurationMinutes = this[Keys.daylightFadeDurationMinutes, d.daylightFadeDurationMinutes],
-            solarSaturationThresholdWm2 = this[Keys.solarSaturationThresholdWm2, d.solarSaturationThresholdWm2],
+            chambreSolarThresholdWm2 = this[Keys.chambreSolarThresholdWm2, d.chambreSolarThresholdWm2],
+            cuisineSolarThresholdWm2 = this[Keys.cuisineSolarThresholdWm2, d.cuisineSolarThresholdWm2],
             latitude = this[Keys.latitude, d.latitude],
             longitude = this[Keys.longitude, d.longitude],
             sunsetRefreshHour = this[Keys.sunsetRefreshHour, d.sunsetRefreshHour],
             sunsetRefreshMinute = this[Keys.sunsetRefreshMinute, d.sunsetRefreshMinute],
+            bureauMacAddress = this[Keys.bureauMacAddress, d.bureauMacAddress],
+            chambreMacAddress = this[Keys.chambreMacAddress, d.chambreMacAddress],
+            cuisineMacAddress = this[Keys.cuisineMacAddress, d.cuisineMacAddress],
+            sunsetSceneRetryAttempts = this[Keys.sunsetSceneRetryAttempts, d.sunsetSceneRetryAttempts],
+            sunsetSceneRetryDelaySeconds = this[Keys.sunsetSceneRetryDelaySeconds, d.sunsetSceneRetryDelaySeconds],
+            bleConnectTimeoutSeconds = this[Keys.bleConnectTimeoutSeconds, d.bleConnectTimeoutSeconds],
+            bleOperationTimeoutSeconds = this[Keys.bleOperationTimeoutSeconds, d.bleOperationTimeoutSeconds],
         )
     }
 
@@ -86,11 +95,19 @@ internal class AppSettingsStore(
         this[Keys.nightFadeMorningEndMinutes] = settings.nightFadeMorningEndMinutes
         this[Keys.daylightIntervalMinutes] = settings.daylightIntervalMinutes
         this[Keys.daylightFadeDurationMinutes] = settings.daylightFadeDurationMinutes
-        this[Keys.solarSaturationThresholdWm2] = settings.solarSaturationThresholdWm2
+        this[Keys.chambreSolarThresholdWm2] = settings.chambreSolarThresholdWm2
+        this[Keys.cuisineSolarThresholdWm2] = settings.cuisineSolarThresholdWm2
         this[Keys.latitude] = settings.latitude
         this[Keys.longitude] = settings.longitude
         this[Keys.sunsetRefreshHour] = settings.sunsetRefreshHour
         this[Keys.sunsetRefreshMinute] = settings.sunsetRefreshMinute
+        this[Keys.bureauMacAddress] = settings.bureauMacAddress
+        this[Keys.chambreMacAddress] = settings.chambreMacAddress
+        this[Keys.cuisineMacAddress] = settings.cuisineMacAddress
+        this[Keys.sunsetSceneRetryAttempts] = settings.sunsetSceneRetryAttempts
+        this[Keys.sunsetSceneRetryDelaySeconds] = settings.sunsetSceneRetryDelaySeconds
+        this[Keys.bleConnectTimeoutSeconds] = settings.bleConnectTimeoutSeconds
+        this[Keys.bleOperationTimeoutSeconds] = settings.bleOperationTimeoutSeconds
     }
 
     private fun MutablePreferences.writeColor(
@@ -130,13 +147,23 @@ internal class AppSettingsStore(
 
         val daylightIntervalMinutes = intPreferencesKey("daylight_interval_minutes")
         val daylightFadeDurationMinutes = intPreferencesKey("daylight_fade_duration_minutes")
-        val solarSaturationThresholdWm2 = doublePreferencesKey("solar_saturation_threshold_wm2")
+        val chambreSolarThresholdWm2 = doublePreferencesKey("chambre_solar_threshold_wm2")
+        val cuisineSolarThresholdWm2 = doublePreferencesKey("cuisine_solar_threshold_wm2")
 
         val latitude = doublePreferencesKey("latitude")
         val longitude = doublePreferencesKey("longitude")
 
         val sunsetRefreshHour = intPreferencesKey("sunset_refresh_hour")
         val sunsetRefreshMinute = intPreferencesKey("sunset_refresh_minute")
+
+        val bureauMacAddress = stringPreferencesKey("bureau_mac_address")
+        val chambreMacAddress = stringPreferencesKey("chambre_mac_address")
+        val cuisineMacAddress = stringPreferencesKey("cuisine_mac_address")
+
+        val sunsetSceneRetryAttempts = intPreferencesKey("sunset_scene_retry_attempts")
+        val sunsetSceneRetryDelaySeconds = doublePreferencesKey("sunset_scene_retry_delay_seconds")
+        val bleConnectTimeoutSeconds = intPreferencesKey("ble_connect_timeout_seconds")
+        val bleOperationTimeoutSeconds = intPreferencesKey("ble_operation_timeout_seconds")
     }
 
     companion object {
