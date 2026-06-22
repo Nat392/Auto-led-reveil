@@ -115,7 +115,7 @@ class SunriseRampRunnerTest {
         }
 
     @Test
-    fun `stops the ramp and closes the session when a BLE write fails softly`() =
+    fun `retries the BLE write 3 times before stopping the ramp and closing the session`() =
         runTest {
             val runner = createRunner()
             coEvery { bulbController.openSession(context, any()) } returns session
@@ -131,8 +131,44 @@ class SunriseRampRunnerTest {
                 durationMs = 1_000L,
             )
 
-            coVerify(exactly = 1) { session.applyScene(any(), any(), any(), any()) }
+            coVerify(exactly = 3) { session.applyScene(any(), any(), any(), any()) }
             coVerify(exactly = 1) { bulbController.applyScene(context, "AA:BB:CC:DD:EE:FF", 255, 128, 64, 0, 100) }
+            verify(exactly = 1) { session.close() }
+        }
+
+    @Test
+    fun `recovers from a transient BLE write failure during the ramp and continues without reporting`() =
+        runTest {
+            val clock = MutableClock(0L)
+            val runner = createRunner(clock)
+            val progress = mutableListOf<Pair<Int, Int>>()
+            var callCount = 0
+
+            coEvery { bulbController.openSession(context, "AA:BB:CC:DD:EE:FF") } returns session
+            coEvery { session.applyScene(any(), any(), any(), any()) } answers {
+                callCount++
+                if (callCount == 1) {
+                    false
+                } else {
+                    clock.nowMs = if (clock.nowMs == 0L) 750L else 1_000L
+                    true
+                }
+            }
+            coEvery { bulbController.applyScene(context, "AA:BB:CC:DD:EE:FF", 255, 128, 64, 0, 100) } returns true
+
+            runner.run(
+                context = context,
+                macAddress = "AA:BB:CC:DD:EE:FF",
+                targetR = 255,
+                targetG = 128,
+                targetB = 64,
+                durationMs = 1_000L,
+                onProgress = { currentStep, totalSteps -> progress += currentStep to totalSteps },
+            )
+
+            assertEquals(listOf(0 to 4, 4 to 4), progress)
+            coVerify(exactly = 2) { session.applyScene(any(), any(), any(), any()) }
+            coVerify(exactly = 0) { crashReporter.reportNonFatal(any(), any(), any()) }
             verify(exactly = 1) { session.close() }
         }
 

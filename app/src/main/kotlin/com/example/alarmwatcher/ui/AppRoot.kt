@@ -42,6 +42,7 @@ private val bottomNavDestinations =
 fun AppRoot(
     alarmStatusText: String,
     bleStatusText: String,
+    liveStatusText: String,
     onTriggerNightMode: () -> Unit,
 ) {
     val navController = rememberNavController()
@@ -80,6 +81,7 @@ fun AppRoot(
                 DashboardScreen(
                     alarmStatusText = alarmStatusText,
                     bleStatusText = bleStatusText,
+                    liveStatusText = liveStatusText,
                     onTriggerNightMode = onTriggerNightMode,
                 )
             }

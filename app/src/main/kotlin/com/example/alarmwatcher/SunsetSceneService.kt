@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import com.example.alarmwatcher.settings.AppSettingsCache
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -131,8 +132,11 @@ class SunsetSceneService : Service() {
         private const val TAG = "SunsetSceneService"
         private const val NOTIFICATION_ID = 402
         private const val NOTIFICATION_CHANNEL_ID = "sunset_scene_service"
-        private const val SCENE_APPLY_MAX_ATTEMPTS = 3
-        private const val SCENE_APPLY_RETRY_DELAY_MS = 1_500L
+        private const val MILLIS_PER_SECOND = 1_000.0
+        private val sceneApplyMaxAttempts: Int
+            get() = AppSettingsCache.current.sunsetSceneRetryAttempts
+        private val sceneApplyRetryDelayMs: Long
+            get() = (AppSettingsCache.current.sunsetSceneRetryDelaySeconds * MILLIS_PER_SECOND).toLong()
 
         internal fun resolveZone(zoneKey: String?): SunriseBulbZone? {
             return when (zoneKey) {
@@ -174,7 +178,8 @@ class SunsetSceneService : Service() {
 
             return try {
                 var applied = false
-                for (attempt in 1..SCENE_APPLY_MAX_ATTEMPTS) {
+                val maxAttempts = sceneApplyMaxAttempts
+                for (attempt in 1..maxAttempts) {
                     applied =
                         ZenggeBulbController.applyScene(
                             context = context,
@@ -185,9 +190,9 @@ class SunsetSceneService : Service() {
                             white = zone.whiteChannel,
                             brightnessPercent = zone.brightnessPercent,
                         )
-                    if (applied || attempt == SCENE_APPLY_MAX_ATTEMPTS) break
+                    if (applied || attempt == maxAttempts) break
                     Log.w(TAG, "Retrying sunset scene for ${zone.label} (attempt $attempt failed)")
-                    delay(SCENE_APPLY_RETRY_DELAY_MS)
+                    delay(sceneApplyRetryDelayMs)
                 }
 
                 if (!applied) {

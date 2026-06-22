@@ -12,19 +12,27 @@ internal object SunsetTimesStore {
     private const val KEY_BUREAU_EVENING_START_MS = "bureau_evening_start_ms"
     private const val KEY_CHAMBRE_EVENING_START_MS = "chambre_evening_start_ms"
     private const val KEY_CUISINE_EVENING_START_MS = "cuisine_evening_start_ms"
+    private const val KEY_SUNSET_INSTANT_MS = "sunset_instant_ms"
 
     fun save(
         context: Context,
+        sunsetInstantMs: Long,
         bureauEveningStartMs: Long,
         chambreEveningStartMs: Long,
         cuisineEveningStartMs: Long,
     ) {
         prefs(context)
             .edit()
+            .putLong(KEY_SUNSET_INSTANT_MS, sunsetInstantMs)
             .putLong(KEY_BUREAU_EVENING_START_MS, bureauEveningStartMs)
             .putLong(KEY_CHAMBRE_EVENING_START_MS, chambreEveningStartMs)
             .putLong(KEY_CUISINE_EVENING_START_MS, cuisineEveningStartMs)
             .apply()
+    }
+
+    fun getSunsetInstantMs(context: Context): Long? {
+        val value = prefs(context).getLong(KEY_SUNSET_INSTANT_MS, -1L)
+        return value.takeIf { it > 0L }
     }
 
     fun getEveningStartMs(
