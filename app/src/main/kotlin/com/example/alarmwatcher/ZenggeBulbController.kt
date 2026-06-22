@@ -88,7 +88,8 @@ object ZenggeBulbController : BulbControllerApi {
                     Log.w(TAG, "Service discovery failed for $normalizedMac, status=${callback.servicesStatus}")
                     val discoveryError =
                         IllegalStateException(
-                            "GATT service discovery failed (macAddress=$normalizedMac, status=${callback.servicesStatus})",
+                            "GATT service discovery failed (macAddress=$normalizedMac, " +
+                                "status=${callback.servicesStatus})",
                         )
                     DiscordCrashReporter.reportNonFatal(
                         context = context,
