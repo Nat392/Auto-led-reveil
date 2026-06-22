@@ -84,7 +84,7 @@ internal object SunsetAutomationScheduler {
         val chambreMs = sunsetMs - settings.chambreSunsetOffsetMinutes * MILLIS_PER_MINUTE
         val cuisineMs = sunsetMs - settings.cuisineSunsetOffsetMinutes * MILLIS_PER_MINUTE
 
-        SunsetTimesStore.save(context, bureauMs, chambreMs, cuisineMs)
+        SunsetTimesStore.save(context, sunsetMs, bureauMs, chambreMs, cuisineMs)
 
         // Nouveau cycle quotidien : la fenêtre du Daylight Harvesting de chaque zone se rouvrira
         // à la fin de la prochaine rampe d'aube de la Chambre/Cuisine.
