@@ -21,6 +21,12 @@ class DaylightHarvestingWorker(
     workerParams: WorkerParameters,
 ) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
+        // La mesure de radiation est rafraîchie à chaque tick, indépendamment de l'état "active"
+        // des zones, pour que le Dashboard affiche toujours une valeur récente — seule
+        // l'application du harvesting reste conditionnée aux zones actives/équipées en BLE.
+        val conditions = OpenMeteoClient.fetchCurrentConditions(applicationContext) ?: return Result.retry()
+        SolarConditionsStore.save(applicationContext, conditions.shortwaveRadiation, System.currentTimeMillis())
+
         if (!BlePermissionSupport.hasBluetoothConnectPermission(applicationContext)) {
             return Result.success()
         }
@@ -29,9 +35,6 @@ class DaylightHarvestingWorker(
         if (dueZoneKeys.isEmpty()) {
             return Result.success()
         }
-
-        val conditions = OpenMeteoClient.fetchCurrentConditions(applicationContext) ?: return Result.retry()
-        SolarConditionsStore.save(applicationContext, conditions.shortwaveRadiation, System.currentTimeMillis())
 
         coroutineScope {
             dueZoneKeys.forEach { zoneKey ->

@@ -5,6 +5,8 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.example.alarmwatcher.settings.AppSettings
+import com.example.alarmwatcher.settings.AppSettingsCache
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -37,6 +39,9 @@ class SunsetSceneServiceTest {
         mockkObject(ZenggeBulbController)
         mockkObject(DiscordCrashReporter)
         mockkObject(DaylightHarvestingStateStore)
+        mockkObject(SolarConditionsStore)
+        AppSettingsCache.current = AppSettings()
+        every { SolarConditionsStore.get(any()) } returns null
         every { Log.w(any(), any<String>()) } returns 0
         every { Log.i(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>()) } returns 0
@@ -331,6 +336,88 @@ class SunsetSceneServiceTest {
             assertFalse(applied)
             verify(exactly = 1) {
                 DaylightHarvestingStateStore.deactivate(applicationContext, SunsetAutomationScheduler.ZONE_CUISINE)
+            }
+        }
+
+    @Test
+    fun `dims the chambre evening scene when a fresh solar reading is still above the saturation threshold`() =
+        runTest {
+            val chambre = configuredZone(label = "Chambre", macAddress = "11:22:33:44:55:66")
+            every { SunriseZoneConfig.chambre } returns chambre
+            every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+            every { SolarConditionsStore.get(applicationContext) } returns
+                SolarConditionsStore.Reading(
+                    shortwaveRadiationWm2 = AppSettingsCache.current.chambreSolarThresholdWm2,
+                    readAtMs = System.currentTimeMillis(),
+                )
+            coEvery {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            } returns true
+
+            SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_CHAMBRE)
+
+            coVerify(exactly = 1) {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), 30)
+            }
+        }
+
+    @Test
+    fun `keeps full brightness when the fresh solar reading is near zero`() =
+        runTest {
+            val cuisine = configuredZone(label = "Cuisine", macAddress = "22:33:44:55:66:77")
+            every { SunriseZoneConfig.cuisine } returns cuisine
+            every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+            every { SolarConditionsStore.get(applicationContext) } returns
+                SolarConditionsStore.Reading(shortwaveRadiationWm2 = 0.0, readAtMs = System.currentTimeMillis())
+            coEvery {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            } returns true
+
+            SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_CUISINE)
+
+            coVerify(exactly = 1) {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), 100)
+            }
+        }
+
+    @Test
+    fun `ignores a stale solar reading and keeps the configured brightness`() =
+        runTest {
+            val chambre = configuredZone(label = "Chambre", macAddress = "11:22:33:44:55:66")
+            every { SunriseZoneConfig.chambre } returns chambre
+            every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+            every { SolarConditionsStore.get(applicationContext) } returns
+                SolarConditionsStore.Reading(
+                    shortwaveRadiationWm2 = AppSettingsCache.current.chambreSolarThresholdWm2,
+                    readAtMs = System.currentTimeMillis() - 60 * 60 * 1_000L,
+                )
+            coEvery {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            } returns true
+
+            SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_CHAMBRE)
+
+            coVerify(exactly = 1) {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), 100)
+            }
+        }
+
+    @Test
+    fun `never dims the bureau evening scene even with a bright solar reading`() =
+        runTest {
+            val bureau = configuredZone(label = "Bureau", macAddress = "AA:BB:CC:DD:EE:FF")
+            every { SunriseZoneConfig.bureau } returns bureau
+            every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
+            every { SolarConditionsStore.get(applicationContext) } returns
+                SolarConditionsStore.Reading(shortwaveRadiationWm2 = 800.0, readAtMs = System.currentTimeMillis())
+            coEvery {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), any())
+            } returns true
+
+            SunsetSceneService.applySunsetScene(applicationContext, SunsetAutomationScheduler.ZONE_BUREAU)
+
+            coVerify(exactly = 1) {
+                ZenggeBulbController.applyScene(any(), any(), any(), any(), any(), any(), 100)
             }
         }
 
