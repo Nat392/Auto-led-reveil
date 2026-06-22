@@ -94,7 +94,7 @@ internal class SunriseRampRunner(
                         request.targetG,
                         request.targetB,
                     )
-                if (!applyScene(session, palette.red, palette.green, palette.blue)) {
+                if (!applySceneWithRetry(session, palette.red, palette.green, palette.blue)) {
                     Log.w(TAG, "Echec d'ecriture BLE pendant la rampe, arret de la sequence")
                     val errorMessage =
                         "Echec d'ecriture BLE pendant la rampe, arret de la sequence" +
@@ -161,6 +161,23 @@ internal class SunriseRampRunner(
             white = 0,
         )
 
+    private suspend fun applySceneWithRetry(
+        session: BulbSession,
+        red: Int,
+        green: Int,
+        blue: Int,
+    ): Boolean {
+        repeat(STEP_WRITE_MAX_ATTEMPTS) { attempt ->
+            if (applyScene(session, red, green, blue)) {
+                return true
+            }
+            if (attempt < STEP_WRITE_MAX_ATTEMPTS - 1) {
+                delay(STEP_WRITE_RETRY_DELAY_MS)
+            }
+        }
+        return false
+    }
+
     private suspend fun waitUntil(targetMs: Long) {
         val sleepMs = (targetMs - nowMs()).coerceAtLeast(0L)
         if (sleepMs > 0L) {
@@ -202,6 +219,11 @@ internal class SunriseRampRunner(
         const val FINAL_WRITE_RESERVE_MS = 400L
         const val MIN_RGB_VALUE = 0
         const val MAX_RGB_VALUE = 255
+
+        // Les steps sont espacés de SunriseRampSupport.MIN_STEP_DELAY_MS (250ms) : un délai de
+        // retry court permet d'absorber un glitch BLE transitoire sans décaler la rampe.
+        const val STEP_WRITE_MAX_ATTEMPTS = 3
+        const val STEP_WRITE_RETRY_DELAY_MS = 150L
     }
 
     private data class RampTiming(

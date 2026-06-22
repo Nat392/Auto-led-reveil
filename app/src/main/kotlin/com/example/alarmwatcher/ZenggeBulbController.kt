@@ -14,6 +14,8 @@ import android.util.Log
 import androidx.annotation.WorkerThread
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import org.json.JSONArray
 import org.json.JSONObject
@@ -31,6 +33,11 @@ object ZenggeBulbController : BulbControllerApi {
 
     private val UUID_RGBW_NEW: UUID = UUID.fromString("0000ff01-0000-1000-8000-00805f9b34fb")
     private val UUID_RGBW_LEGACY: UUID = UUID.fromString("0000ffe9-0000-1000-8000-00805f9b34fb")
+
+    // Sérialise connect()+discoverServices() : Android renvoie souvent GATT_ERROR (status=257)
+    // quand plusieurs connexions GATT sont établies en même temps vers des périphériques
+    // différents (plusieurs zones/ampoules en parallèle).
+    private val sessionMutex = Mutex()
 
     @SuppressLint("MissingPermission")
     @WorkerThread
@@ -72,22 +79,28 @@ object ZenggeBulbController : BulbControllerApi {
             }
 
         val callback = SessionCallback()
-        val gatt = connect(device, context, callback) ?: return null
-        if (!discoverServices(gatt, callback)) {
-            Log.w(TAG, "Service discovery failed for $normalizedMac, status=${callback.servicesStatus}")
-            val discoveryError =
-                IllegalStateException(
-                    "GATT service discovery failed (macAddress=$normalizedMac, status=${callback.servicesStatus})",
-                )
-            DiscordCrashReporter.reportNonFatal(
-                context = context,
-                throwable = discoveryError,
-                source = "ZenggeBulbController.openSession.discoverServices",
-            )
-            runCatching { gatt.disconnect() }
-            runCatching { gatt.close() }
-            return null
-        }
+        val gatt =
+            sessionMutex.withLock {
+                val connectedGatt = connect(device, context, callback) ?: return@withLock null
+                if (discoverServices(connectedGatt, callback)) {
+                    connectedGatt
+                } else {
+                    Log.w(TAG, "Service discovery failed for $normalizedMac, status=${callback.servicesStatus}")
+                    val discoveryError =
+                        IllegalStateException(
+                            "GATT service discovery failed (macAddress=$normalizedMac, " +
+                                "status=${callback.servicesStatus})",
+                        )
+                    DiscordCrashReporter.reportNonFatal(
+                        context = context,
+                        throwable = discoveryError,
+                        source = "ZenggeBulbController.openSession.discoverServices",
+                    )
+                    runCatching { connectedGatt.disconnect() }
+                    runCatching { connectedGatt.close() }
+                    null
+                }
+            } ?: return null
 
         return Session(gatt, callback)
     }
