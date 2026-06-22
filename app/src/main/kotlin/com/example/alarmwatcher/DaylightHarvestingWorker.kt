@@ -4,8 +4,6 @@ import android.content.Context
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.alarmwatcher.settings.AppSettingsCache
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 
 /**
  * Worker périodique (toutes les 15 min) du Daylight Harvesting : compense en continu le déficit
@@ -36,11 +34,10 @@ class DaylightHarvestingWorker(
             return Result.success()
         }
 
-        coroutineScope {
-            dueZoneKeys.forEach { zoneKey ->
-                launch { applyHarvesting(zoneKey, conditions.shortwaveRadiation) }
-            }
-        }
+        // Le fondu (jusqu'à 14 min, voir DaylightFadeRunner) tourne dans un foreground service
+        // plutôt qu'ici : un Worker WorkManager est tué par le système après ~10 min d'exécution
+        // en arrière-plan, ce qui interromprait le fondu et décalerait le cycle suivant.
+        DaylightHarvestingFadeService.start(applicationContext, dueZoneKeys, conditions.shortwaveRadiation)
 
         return Result.success()
     }
@@ -53,32 +50,6 @@ class DaylightHarvestingWorker(
             zone.isConfigured &&
             DaylightHarvestingStateStore.getState(applicationContext, zoneKey).active &&
             System.currentTimeMillis() < eveningStartMs
-    }
-
-    private suspend fun applyHarvesting(
-        zoneKey: String,
-        shortwaveRadiation: Double,
-    ) {
-        val zone = SunsetSceneService.resolveZone(zoneKey) ?: return
-        val state = DaylightHarvestingStateStore.getState(applicationContext, zoneKey)
-        val saturationRadiationWm2 = saturationThresholdWm2(zoneKey)
-
-        val targetRgb =
-            DaylightHarvestingEstimator.calculateTargetRgb(
-                shortwaveRadiation,
-                Triple(zone.sunriseR, zone.sunriseG, zone.sunriseB),
-                saturationRadiationWm2,
-            )
-
-        if (targetRgb == state.currentRgb) {
-            return
-        }
-
-        DaylightFadeRunner(ZenggeBulbController, DiscordCrashReporter).fade(
-            context = applicationContext,
-            fadeZone = FadeZone(key = zoneKey, bulb = zone),
-            transition = ColorTransition(from = state.currentRgb, to = targetRgb),
-        )
     }
 
     companion object {
