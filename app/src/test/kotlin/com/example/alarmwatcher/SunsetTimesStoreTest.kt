@@ -23,20 +23,42 @@ class SunsetTimesStoreTest {
     }
 
     @Test
-    fun `save persists bureau, chambre and cuisine evening start times`() {
+    fun `save persists sunset instant plus bureau, chambre and cuisine evening start times`() {
         setUpPrefs()
 
         SunsetTimesStore.save(
             context,
+            sunsetInstantMs = 4_000L,
             bureauEveningStartMs = 1_000L,
             chambreEveningStartMs = 2_000L,
             cuisineEveningStartMs = 3_000L,
         )
 
+        verify(exactly = 1) { editor.putLong("sunset_instant_ms", 4_000L) }
         verify(exactly = 1) { editor.putLong("bureau_evening_start_ms", 1_000L) }
         verify(exactly = 1) { editor.putLong("chambre_evening_start_ms", 2_000L) }
         verify(exactly = 1) { editor.putLong("cuisine_evening_start_ms", 3_000L) }
         verify(exactly = 1) { editor.apply() }
+    }
+
+    @Test
+    fun `getSunsetInstantMs returns the stored value`() {
+        setUpPrefs()
+        every { prefs.getLong("sunset_instant_ms", -1L) } returns 4_000L
+
+        val result = SunsetTimesStore.getSunsetInstantMs(context)
+
+        assertEquals(4_000L, result)
+    }
+
+    @Test
+    fun `getSunsetInstantMs returns null when no value has been saved yet`() {
+        setUpPrefs()
+        every { prefs.getLong("sunset_instant_ms", -1L) } returns -1L
+
+        val result = SunsetTimesStore.getSunsetInstantMs(context)
+
+        assertNull(result)
     }
 
     @Test

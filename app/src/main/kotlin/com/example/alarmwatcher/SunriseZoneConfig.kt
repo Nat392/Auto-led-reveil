@@ -28,7 +28,7 @@ internal object SunriseZoneConfig {
             val settings = AppSettingsCache.current
             return SunriseBulbZone(
                 label = "Bureau",
-                macAddress = BuildConfig.ZENGGE_BULB_MAC_BUREAU.trim(),
+                macAddress = settings.bureauMacAddress.trim().ifBlank { BuildConfig.ZENGGE_BULB_MAC_BUREAU.trim() },
                 sunriseR = settings.bureauSunriseColor.red,
                 sunriseG = settings.bureauSunriseColor.green,
                 sunriseB = settings.bureauSunriseColor.blue,
@@ -45,7 +45,7 @@ internal object SunriseZoneConfig {
             val settings = AppSettingsCache.current
             return SunriseBulbZone(
                 label = "Chambre",
-                macAddress = BuildConfig.ZENGGE_BULB_MAC_CHAMBRE.trim(),
+                macAddress = settings.chambreMacAddress.trim().ifBlank { BuildConfig.ZENGGE_BULB_MAC_CHAMBRE.trim() },
                 sunriseR = settings.chambreSunriseColor.red,
                 sunriseG = settings.chambreSunriseColor.green,
                 sunriseB = settings.chambreSunriseColor.blue,
@@ -62,7 +62,7 @@ internal object SunriseZoneConfig {
             val settings = AppSettingsCache.current
             return SunriseBulbZone(
                 label = "Cuisine",
-                macAddress = BuildConfig.ZENGGE_BULB_MAC_CUISINE.trim(),
+                macAddress = settings.cuisineMacAddress.trim().ifBlank { BuildConfig.ZENGGE_BULB_MAC_CUISINE.trim() },
                 sunriseR = settings.cuisineSunriseColor.red,
                 sunriseG = settings.cuisineSunriseColor.green,
                 sunriseB = settings.cuisineSunriseColor.blue,

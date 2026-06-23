@@ -32,11 +32,19 @@ data class AppSettings(
     val nightFadeMorningEndMinutes: Int = DEFAULT_NIGHT_FADE_MORNING_END_MINUTES,
     val daylightIntervalMinutes: Int = DEFAULT_DAYLIGHT_INTERVAL_MINUTES,
     val daylightFadeDurationMinutes: Int = DEFAULT_DAYLIGHT_FADE_DURATION_MINUTES,
-    val solarSaturationThresholdWm2: Double = DEFAULT_SOLAR_SATURATION_THRESHOLD_WM2,
+    val chambreSolarThresholdWm2: Double = DEFAULT_CHAMBRE_SOLAR_THRESHOLD_WM2,
+    val cuisineSolarThresholdWm2: Double = DEFAULT_CUISINE_SOLAR_THRESHOLD_WM2,
     val latitude: Double = DEFAULT_LATITUDE,
     val longitude: Double = DEFAULT_LONGITUDE,
     val sunsetRefreshHour: Int = DEFAULT_SUNSET_REFRESH_HOUR,
     val sunsetRefreshMinute: Int = DEFAULT_SUNSET_REFRESH_MINUTE,
+    val bureauMacAddress: String = "",
+    val chambreMacAddress: String = "",
+    val cuisineMacAddress: String = "",
+    val sunsetSceneRetryAttempts: Int = DEFAULT_SUNSET_SCENE_RETRY_ATTEMPTS,
+    val sunsetSceneRetryDelaySeconds: Double = DEFAULT_SUNSET_SCENE_RETRY_DELAY_SECONDS,
+    val bleConnectTimeoutSeconds: Int = DEFAULT_BLE_CONNECT_TIMEOUT_SECONDS,
+    val bleOperationTimeoutSeconds: Int = DEFAULT_BLE_OPERATION_TIMEOUT_SECONDS,
 ) {
     companion object {
         const val DEFAULT_PREWARN_MINUTES = 30
@@ -60,12 +68,22 @@ data class AppSettings(
 
         const val DEFAULT_DAYLIGHT_INTERVAL_MINUTES = 15
         const val DEFAULT_DAYLIGHT_FADE_DURATION_MINUTES = 14
-        const val DEFAULT_SOLAR_SATURATION_THRESHOLD_WM2 = 600.0
+
+        // Seuils par zone, calibrés sur la largeur de vitrage de chacune (Chambre ~74 cm,
+        // Cuisine ~212 cm) : reproduisent le comportement précédent (ratio caché appliqué au
+        // réglage global) mais sont désormais réglables indépendamment.
+        const val DEFAULT_CHAMBRE_SOLAR_THRESHOLD_WM2 = 400.0
+        const val DEFAULT_CUISINE_SOLAR_THRESHOLD_WM2 = 150.0
 
         const val DEFAULT_LATITUDE = 46.6644
         const val DEFAULT_LONGITUDE = 5.5619
 
         const val DEFAULT_SUNSET_REFRESH_HOUR = 0
         const val DEFAULT_SUNSET_REFRESH_MINUTE = 5
+
+        const val DEFAULT_SUNSET_SCENE_RETRY_ATTEMPTS = 3
+        const val DEFAULT_SUNSET_SCENE_RETRY_DELAY_SECONDS = 1.5
+        const val DEFAULT_BLE_CONNECT_TIMEOUT_SECONDS = 12
+        const val DEFAULT_BLE_OPERATION_TIMEOUT_SECONDS = 5
     }
 }
