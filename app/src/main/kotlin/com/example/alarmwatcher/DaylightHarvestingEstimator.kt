@@ -19,21 +19,34 @@ internal object DaylightHarvestingEstimator {
 
     private val DEFAULT_DAY_PROFILE = Triple(220, 240, 255)
 
+    /**
+     * Fraction de lumière artificielle (0 = soleil seul suffit, 1 = aucun apport naturel) requise
+     * pour une radiation donnée, par rapport au seuil de saturation de la zone. Réutilisée pour la
+     * couleur du Daylight Harvesting ([calculateTargetRgb]) et pour la luminosité de la scène du
+     * soir ([SunsetSceneService]).
+     */
+    fun artificialFraction(
+        shortwaveRadiation: Double,
+        saturationRadiationWm2: Double,
+    ): Double {
+        val logSaturationRatio = ln(1.0 + saturationRadiationWm2 / REFERENCE_RADIATION_WM2)
+        val naturalFraction =
+            (ln(1.0 + shortwaveRadiation / REFERENCE_RADIATION_WM2) / logSaturationRatio)
+                .coerceIn(0.0, 1.0)
+        return 1.0 - naturalFraction
+    }
+
     fun calculateTargetRgb(
         shortwaveRadiation: Double,
         dayProfile: Triple<Int, Int, Int> = DEFAULT_DAY_PROFILE,
         saturationRadiationWm2: Double,
     ): Triple<Int, Int, Int> {
-        val logSaturationRatio = ln(1.0 + saturationRadiationWm2 / REFERENCE_RADIATION_WM2)
-        val naturalFraction =
-            (ln(1.0 + shortwaveRadiation / REFERENCE_RADIATION_WM2) / logSaturationRatio)
-                .coerceIn(0.0, 1.0)
-        val artificialFraction = 1.0 - naturalFraction
+        val fraction = artificialFraction(shortwaveRadiation, saturationRadiationWm2)
 
         return Triple(
-            scaleChannel(dayProfile.first, artificialFraction),
-            scaleChannel(dayProfile.second, artificialFraction),
-            scaleChannel(dayProfile.third, artificialFraction),
+            scaleChannel(dayProfile.first, fraction),
+            scaleChannel(dayProfile.second, fraction),
+            scaleChannel(dayProfile.third, fraction),
         )
     }
 
