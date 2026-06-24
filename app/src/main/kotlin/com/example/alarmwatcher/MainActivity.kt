@@ -149,6 +149,7 @@ class MainActivity : ComponentActivity() {
         // Rescan and schedule the next pre-warn directly.
         AlarmMonitor.scanNextAlarmAndSchedule(this)
         SunsetAutomationScheduler.requestRefreshAndSchedule(this)
+        DaylightHarvestingScheduler.schedule(this)
 
         // Diagnostic routine
         if (intent?.action == "com.example.alarmwatcher.DIAGNOSTIC") {

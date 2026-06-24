@@ -43,7 +43,6 @@ class SunsetAutomationSchedulerTest {
         mockkObject(ZenggeBulbController)
         mockkObject(SunsetTimesStore)
         mockkObject(AlarmMonitor)
-        mockkObject(DaylightHarvestingStateStore)
         mockkObject(DiscordCrashReporter)
         every { Log.w(any(), any<String>()) } returns 0
         every { Log.i(any(), any<String>()) } returns 0
@@ -59,7 +58,6 @@ class SunsetAutomationSchedulerTest {
         every { BlePermissionSupport.hasBluetoothConnectPermission(any()) } returns true
         every { SunsetTimesStore.save(any(), any(), any(), any(), any()) } returns Unit
         every { AlarmMonitor.scanNextAlarmAndSchedule(any()) } returns Unit
-        every { DaylightHarvestingStateStore.deactivate(any(), any()) } returns Unit
         SunsetAutomationScheduler.sunsetConnectionFactory = defaultConnectionFactory
         SunsetAutomationScheduler.intentFactory = defaultIntentFactory
     }
@@ -265,39 +263,6 @@ class SunsetAutomationSchedulerTest {
                     bureau.whiteChannel,
                     bureau.brightnessPercent,
                 )
-            }
-        }
-
-    @Test
-    fun `refreshAndSchedule deactivates daylight harvesting for the new day`() =
-        runTest {
-            val sunsetInstant = Instant.parse("2030-05-23T20:00:00Z")
-            val body =
-                """
-                {
-                  "results": {
-                    "sunset": "$sunsetInstant"
-                  }
-                }
-                """.trimIndent()
-
-            SunsetAutomationScheduler.intentFactory = { _, _ -> mockk(relaxed = true) }
-            SunsetAutomationScheduler.sunsetConnectionFactory = {
-                mockk<HttpURLConnection>(relaxed = true).also { connection ->
-                    every { connection.responseCode } returns HttpURLConnection.HTTP_OK
-                    every { connection.inputStream } returns ByteArrayInputStream(body.toByteArray(Charsets.UTF_8))
-                    every { connection.disconnect() } returns Unit
-                }
-            }
-            every { alarmManager.setExactAndAllowWhileIdle(any(), any(), any()) } returns Unit
-
-            SunsetAutomationScheduler.refreshAndSchedule(context)
-
-            verify(exactly = 1) {
-                DaylightHarvestingStateStore.deactivate(context, SunsetAutomationScheduler.ZONE_CHAMBRE)
-            }
-            verify(exactly = 1) {
-                DaylightHarvestingStateStore.deactivate(context, SunsetAutomationScheduler.ZONE_CUISINE)
             }
         }
 
