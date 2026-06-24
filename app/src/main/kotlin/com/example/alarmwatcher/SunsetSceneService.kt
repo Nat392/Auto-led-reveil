@@ -18,6 +18,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 class SunsetSceneService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -133,10 +134,48 @@ class SunsetSceneService : Service() {
         private const val NOTIFICATION_ID = 402
         private const val NOTIFICATION_CHANNEL_ID = "sunset_scene_service"
         private const val MILLIS_PER_SECOND = 1_000.0
+        private const val MAX_SOLAR_READING_AGE_MS = 30 * 60 * 1_000L
+        private const val MIN_EVENING_BRIGHTNESS_PERCENT = 30
         private val sceneApplyMaxAttempts: Int
             get() = AppSettingsCache.current.sunsetSceneRetryAttempts
         private val sceneApplyRetryDelayMs: Long
             get() = (AppSettingsCache.current.sunsetSceneRetryDelaySeconds * MILLIS_PER_SECOND).toLong()
+
+        /**
+         * Sur les longues journées, la bascule soirée peut survenir alors qu'il fait encore
+         * assez clair (radiation solaire résiduelle au-dessus du seuil de saturation de la
+         * zone) : démarrer directement à pleine luminosité serait une marche artificielle.
+         * On atténue la scène du soir en proportion de la lumière naturelle restante, avec un
+         * plancher pour rester visible — ce calcul est ponctuel (au moment de la bascule), pas
+         * réévalué ensuite, donc volontairement conservateur plutôt que précis à la minute.
+         */
+        private fun resolveEveningBrightnessPercent(
+            context: Context,
+            zoneKey: String,
+            configuredBrightnessPercent: Int,
+        ): Int {
+            val isHarvestingZone =
+                zoneKey == SunsetAutomationScheduler.ZONE_CHAMBRE ||
+                    zoneKey == SunsetAutomationScheduler.ZONE_CUISINE
+            if (!isHarvestingZone) return configuredBrightnessPercent
+
+            val freshReading =
+                SolarConditionsStore.get(context)?.takeIf {
+                    System.currentTimeMillis() - it.readAtMs <= MAX_SOLAR_READING_AGE_MS
+                }
+
+            return freshReading?.let { reading ->
+                val saturationRadiationWm2 = DaylightHarvestingWorker.saturationThresholdWm2(zoneKey)
+                val artificialFraction =
+                    DaylightHarvestingEstimator.artificialFraction(
+                        reading.shortwaveRadiationWm2,
+                        saturationRadiationWm2,
+                    )
+                (configuredBrightnessPercent * artificialFraction)
+                    .roundToInt()
+                    .coerceIn(MIN_EVENING_BRIGHTNESS_PERCENT, configuredBrightnessPercent)
+            } ?: configuredBrightnessPercent
+        }
 
         internal fun resolveZone(zoneKey: String?): SunriseBulbZone? {
             return when (zoneKey) {
@@ -179,6 +218,7 @@ class SunsetSceneService : Service() {
             return try {
                 var applied = false
                 val maxAttempts = sceneApplyMaxAttempts
+                val brightnessPercent = resolveEveningBrightnessPercent(context, zoneKey, zone.brightnessPercent)
                 for (attempt in 1..maxAttempts) {
                     applied =
                         ZenggeBulbController.applyScene(
@@ -188,7 +228,7 @@ class SunsetSceneService : Service() {
                             green = zone.sunsetG,
                             blue = zone.sunsetB,
                             white = zone.whiteChannel,
-                            brightnessPercent = zone.brightnessPercent,
+                            brightnessPercent = brightnessPercent,
                         )
                     if (applied || attempt == maxAttempts) break
                     Log.w(TAG, "Retrying sunset scene for ${zone.label} (attempt $attempt failed)")
