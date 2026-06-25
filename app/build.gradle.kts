@@ -158,7 +158,7 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter:6.1.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
     testImplementation("io.mockk:mockk:1.14.11")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
     testImplementation("org.json:json:20260522")
 
     androidTestImplementation("androidx.test:core:1.7.0")
