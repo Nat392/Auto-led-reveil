@@ -111,7 +111,7 @@ jobs:
         sudo udevadm trigger --name-match=kvm
 
     - name: Run Instrumented Tests
-      uses: reactivecircus/android-emulator-runner@v2.37.0
+      uses: reactivecircus/android-emulator-runner@v2.38.0
       with:
         api-level: 33
         target: aosp_atd
